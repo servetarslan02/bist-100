@@ -11,18 +11,20 @@ Memory consolidation periyodik yapılır.
 FAZ 3: Agent Memory
 """
 
+from __future__ import annotations
+
 import atexit
 import gzip
-import logging
 import threading
 import time
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 
 import orjson
+import structlog
 
 # Import at module level to avoid repeated import cost and circular import risk
 try:
@@ -34,7 +36,22 @@ except ImportError:
         return True
 
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
+
+__all__: Final[list[str]] = [
+    "AgentMemory",
+    "EpisodicMemory",
+    "MemoryConsolidator",
+    "MemoryEntry",
+    "MemoryWriteBuffer",
+    "SemanticMemory",
+    "WorkingMemory",
+    "WriteBufferMetrics",
+    "WriteRequest",
+    "get_write_buffer",
+    "should_save",
+]
+
 
 
 @dataclass
@@ -226,7 +243,10 @@ class MemoryWriteBuffer:
             # Thread çalışmıyorsa bile buffer'da kalan varsa yaz
             remaining = self._flush_immediate()
             if remaining > 0:
-                logger.info("MemoryWriteBuffer shutdown flush", records=remaining)
+                try:
+                    logger.info("MemoryWriteBuffer shutdown flush", records=remaining)
+                except Exception:
+                    pass
             return
 
         self._stop_event.set()
@@ -235,7 +255,10 @@ class MemoryWriteBuffer:
         self._running = False
         if self._flush_thread and self._flush_thread.is_alive():
             self._flush_thread.join(timeout=5.0)
-        logger.info("MemoryWriteBuffer shutdown", remaining_flushed=remaining)
+        try:
+            logger.info("MemoryWriteBuffer shutdown", remaining_flushed=remaining)
+        except Exception:
+            pass
 
     def get_metrics(self) -> dict[str, Any]:
         """Buffer istatistiklerini getir."""
@@ -292,7 +315,10 @@ class MemoryWriteBuffer:
 
                     if request.compressed:
                         tmp_path = target.with_suffix(".tmp.gz")
-                        final_path = target.with_suffix(".json.gz") if target.suffix == ".json" else target.with_suffix(".gz")
+                        final_path = (
+                            target.with_suffix(".json.gz") if target.suffix == ".json"
+                            else target.with_suffix(".gz")
+                        )
                     else:
                         tmp_path = target.with_suffix(".tmp")
                         final_path = target

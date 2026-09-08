@@ -1,28 +1,28 @@
 {
-  "updated_at": "2026-08-30T11:23:33.196943+00:00",
-  "n_trials": 20,
+  "updated_at": "2026-09-08T13:30:39.280981+00:00",
+  "n_trials": 2,
   "lightgbm": {
-    "learning_rate": 0.03091160321749858,
-    "num_leaves": 22,
-    "min_data_in_leaf": 10,
-    "feature_fraction": 0.8363896204445141,
-    "bagging_fraction": 0.7492072557238123,
-    "num_boost_round": 115,
-    "best_ic": 0.3559
+    "learning_rate": 0.05756386038472443,
+    "num_leaves": 41,
+    "min_data_in_leaf": 25,
+    "feature_fraction": 0.8335985693230126,
+    "bagging_fraction": 0.6634645387883941,
+    "num_boost_round": 126,
+    "best_ic": 0.4449
   },
   "catboost": {
-    "learning_rate": 0.040276529955237526,
+    "learning_rate": 0.029935221137220597,
     "depth": 5,
-    "iterations": 154,
-    "l2_leaf_reg": 1.6467086454606024,
-    "best_auc": 0.6418
+    "iterations": 110,
+    "l2_leaf_reg": 0.0013108588857341358,
+    "best_auc": 0.5
   },
   "xgboost": {
-    "learning_rate": 0.024962761154914057,
-    "max_depth": 3,
-    "n_estimators": 164,
-    "colsample_bytree": 0.8483146645142742,
-    "subsample": 0.556606982414521,
-    "best_ic": 0.3763
+    "learning_rate": 0.09469135093628996,
+    "max_depth": 7,
+    "n_estimators": 92,
+    "colsample_bytree": 0.5305171814674625,
+    "subsample": 0.6215465654940217,
+    "best_ic": 0.5076
   }
 }

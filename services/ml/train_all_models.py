@@ -7,9 +7,23 @@ Tüm BIST hisse evreninde (600+ hisse, 100/200 kısıtlaması olmadan):
 4. Sıfır Veri Sızıntılı Zamansal Validasyon (5-Gün Purge + 5-Gün Embargo Walk-Forward)
 """
 
+from __future__ import annotations
+
 import os
 import sys
+import threading
+from dataclasses import asdict, dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
+from typing import TYPE_CHECKING, Any, Final
+
+import duckdb
+import numpy as np
+import orjson
+import structlog
+
+if TYPE_CHECKING:
+    import polars as pl
 
 # Workspace root import desteği
 _ROOT = str(Path(__file__).resolve().parents[2])
@@ -23,12 +37,6 @@ if sys.platform == "win32":
     except Exception as exc:
         sys.stderr.write(f"Encoding warning: {exc}\n")
 
-from datetime import UTC, datetime
-from typing import Any
-
-import numpy as np
-import structlog
-
 from services.core.safe_pickle import safe_pickle_dump
 from services.ml.catboost_model import CatBoostConfig, CatBoostModel
 from services.ml.lightgbm_trainer import LightGBMTrainer, MLModelConfig
@@ -36,6 +44,117 @@ from services.ml.ranking_model import RankingModel
 from services.ml.xgboost_model import XGBoostConfig, XGBoostModel
 
 logger = structlog.get_logger()
+
+# --- Sabitler ---
+DEFAULT_DUCKDB_PATH: Final[str] = "data/training_pipeline.duckdb"
+DEFAULT_MODELS_DIR: Final[str] = "models"
+_PIPELINE_LOCK: Final[threading.RLock] = threading.RLock()
+
+
+def configure_duckdb_wal(conn: duckdb.DuckDBPyConnection) -> None:
+    """DuckDB bağlantısına SSD ömrünü ve WAL boyutunu koruma direktiflerini uygular."""
+    try:
+        conn.execute("PRAGMA checkpoint_threshold = '4MB';")
+        conn.execute("PRAGMA wal_autocheckpoint = '2MB';")
+    except Exception as exc:
+        logger.warning("DuckDB WAL pragma yapilandirmasi basarisiz", hata=str(exc))
+
+
+@dataclass(slots=True)
+class TrainingPipelineResult:
+    """Master eğitim hattı sonuç veri modeli."""
+
+    success: bool
+    total_samples: int
+    lightgbm_metrics: dict[str, float] = field(default_factory=dict)
+    catboost_metrics: dict[str, float] = field(default_factory=dict)
+    xgboost_metrics: dict[str, float] = field(default_factory=dict)
+    ranking_status: str = "ACTIVE"
+    timestamp: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        """Sonuçları sözlüğe dönüştürür."""
+        return asdict(self)
+
+    def to_orjson_bytes(self) -> bytes:
+        """Sonuçları orjson byte dizisine dönüştürür."""
+        return orjson.dumps(self.to_dict())
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> TrainingPipelineResult:
+        """Sözlükten TrainingPipelineResult nesnesi oluşturur."""
+        return cls(
+            success=bool(data.get("success", False)),
+            total_samples=int(data.get("total_samples", 0)),
+            lightgbm_metrics=dict(data.get("lightgbm_metrics", {})),
+            catboost_metrics=dict(data.get("catboost_metrics", {})),
+            xgboost_metrics=dict(data.get("xgboost_metrics", {})),
+            ranking_status=str(data.get("ranking_status", "ACTIVE")),
+            timestamp=str(data.get("timestamp", "")),
+        )
+
+    def __repr__(self) -> str:
+        """Özet metin gösterimi."""
+        return (
+            f"TrainingPipelineResult(success={self.success}, samples={self.total_samples}, "
+            f"lgb_ic={self.lightgbm_metrics.get('ic', 0.0):.4f}, cat_auc={self.catboost_metrics.get('val_auc', 0.0):.4f})"
+        )
+
+
+def _record_training_audit(
+    duckdb_path: str,
+    result: TrainingPipelineResult,
+) -> None:
+    """Eğitim sonucunu DuckDB denetim tablosuna kaydeder."""
+    try:
+        db_dir = Path(duckdb_path).parent
+        db_dir.mkdir(parents=True, exist_ok=True)
+        with duckdb.connect(duckdb_path) as conn:
+            configure_duckdb_wal(conn)
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS training_pipeline_audit (
+                    timestamp TIMESTAMPTZ PRIMARY KEY,
+                    success BOOLEAN NOT NULL,
+                    total_samples INTEGER NOT NULL,
+                    lgb_ic DOUBLE NOT NULL,
+                    cat_auc DOUBLE NOT NULL,
+                    xgb_auc DOUBLE NOT NULL,
+                    details VARCHAR NOT NULL
+                );
+                """
+            )
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO training_pipeline_audit
+                (timestamp, success, total_samples, lgb_ic, cat_auc, xgb_auc, details)
+                VALUES (?, ?, ?, ?, ?, ?, ?);
+                """,
+                [
+                    result.timestamp,
+                    result.success,
+                    result.total_samples,
+                    result.lightgbm_metrics.get("ic", 0.0),
+                    result.catboost_metrics.get("val_auc", 0.0),
+                    result.xgboost_metrics.get("val_auc", 0.0),
+                    result.to_orjson_bytes().decode(),
+                ],
+            )
+    except Exception as exc:
+        logger.warning("DuckDB egitim denetim kaydi basarisiz", hata=str(exc))
+
+
+def get_training_audit_as_polars(duckdb_path: str = DEFAULT_DUCKDB_PATH) -> pl.DataFrame:
+    """DuckDB eğitim denetim tablosunu Polars DataFrame olarak döndürür."""
+    import polars as pl
+
+    try:
+        with duckdb.connect(duckdb_path) as conn:
+            configure_duckdb_wal(conn)
+            return conn.execute("SELECT * FROM training_pipeline_audit ORDER BY timestamp ASC").pl()
+    except Exception as exc:
+        logger.warning("DuckDB egitim denetim izi okunamadi", hata=str(exc))
+        return pl.DataFrame()
 
 
 def _get_or_tune_hyperparameters(
@@ -146,13 +265,27 @@ def _get_or_tune_hyperparameters(
     return optimal_params
 
 
-def train_all_models(use_optuna: bool = False, n_trials: int = 35) -> Any:
-    """Tüm BIST hisselerini kapsayan 4 direkli Quant-ML eğitim hattı."""
-    logger.info("=================================================================")
-    logger.info("ALPHA BIST - TUM HISSELER ICIN 4 DIREKLI SWING RANKING EGITIM HATTI")
-    logger.info("=================================================================")
+def train_all_models(
+    use_optuna: bool = False,
+    n_trials: int = 35,
+    duckdb_path: str = DEFAULT_DUCKDB_PATH,
+) -> TrainingPipelineResult:
+    """Tüm BIST hisselerini kapsayan 4 direkli Quant-ML eğitim hattı.
 
-    os.makedirs("models", exist_ok=True)
+    Args:
+        use_optuna: Optuna Bayesian hiperparametre aramasını zorunlu kıl.
+        n_trials: Optuna deneme sayısı.
+        duckdb_path: Denetim izi DuckDB dosya yolu.
+
+    Returns:
+        TrainingPipelineResult nesnesi.
+    """
+    with _PIPELINE_LOCK:
+        logger.info("=================================================================")
+        logger.info("ALPHA BIST - TUM HISSELER ICIN 4 DIREKLI SWING RANKING EGITIM HATTI")
+        logger.info("=================================================================")
+
+        os.makedirs(DEFAULT_MODELS_DIR, exist_ok=True)
 
     # 1. TÜM BIST EVRENİNİ DİNAMİK YÜKLE (Tüm Borsa Evreni)
     tickers: list[str] = []
@@ -508,17 +641,46 @@ def train_all_models(use_optuna: bool = False, n_trials: int = 35) -> Any:
     rank_model = RankingModel()
     logger.info("[OK] Ranking Model Rejim Agirliklari ve Ensemble Mimarisi Kilitlendi!")
     logger.info(f"  * Dahili Feature Listesi: {len(rank_model._feature_names)} Feature")
-    logger.info(f"  * Canli Model Durumu: {'AKTIF' if rank_model._is_trained else 'PASIF'}")
+    ranking_status = "ACTIVE" if rank_model._is_trained else "INACTIVE"
+    logger.info(f"  * Canli Model Durumu: {ranking_status}")
 
     logger.info("=================================================================")
     logger.info("TUM BIST HISSELERI ICIN 4 DIREKLI MODEL EGITIMI VE KAYDI TAMAMLANDI!")
     logger.info("=================================================================")
 
+    lgb_m: dict[str, float] = {}
+    if trained_lgb and hasattr(trained_lgb, "validation_metrics"):
+        lgb_m = {str(k): float(v) for k, v in trained_lgb.validation_metrics.items() if isinstance(v, (int, float))}
+        if hasattr(trained_lgb, "validation_score"):
+            lgb_m["rmse"] = float(trained_lgb.validation_score)
 
-def train_all(model_type: str = "lightgbm", use_optuna: bool = False, n_trials: int = 35) -> Any:
+    cat_m = {str(k): float(v) for k, v in cat_metrics.items() if isinstance(v, (int, float))}
+    xgb_m = {str(k): float(v) for k, v in xgb_metrics.items() if isinstance(v, (int, float))}
+
+    ts = datetime.now(UTC).isoformat()
+    pipeline_result = TrainingPipelineResult(
+        success=True,
+        total_samples=len(features_map),
+        lightgbm_metrics=lgb_m,
+        catboost_metrics=cat_m,
+        xgboost_metrics=xgb_m,
+        ranking_status=ranking_status,
+        timestamp=ts,
+    )
+
+    _record_training_audit(duckdb_path=duckdb_path, result=pipeline_result)
+    return pipeline_result
+
+
+def train_all(
+    model_type: str = "lightgbm",
+    use_optuna: bool = False,
+    n_trials: int = 35,
+    duckdb_path: str = DEFAULT_DUCKDB_PATH,
+) -> dict[str, Any]:
     """Backward-compatible wrapper — queue.py bu metodu çağırır."""
-    train_all_models(use_optuna=use_optuna, n_trials=n_trials)
-    return {"model_type": model_type, "status": "completed"}
+    res = train_all_models(use_optuna=use_optuna, n_trials=n_trials, duckdb_path=duckdb_path)
+    return {"model_type": model_type, "status": "completed", "result": res.to_dict()}
 
 
 if __name__ == "__main__":
@@ -529,3 +691,14 @@ if __name__ == "__main__":
     parser.add_argument("--trials", type=int, default=35, help="Number of Optuna trials (default: 35)")
     args = parser.parse_args()
     train_all_models(use_optuna=args.tune, n_trials=args.trials)
+
+
+__all__: Final[list[str]] = [
+    "DEFAULT_DUCKDB_PATH",
+    "DEFAULT_MODELS_DIR",
+    "TrainingPipelineResult",
+    "configure_duckdb_wal",
+    "get_training_audit_as_polars",
+    "train_all",
+    "train_all_models",
+]

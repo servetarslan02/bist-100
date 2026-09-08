@@ -1,74 +1,234 @@
-"""ALPHA BIST — Stacking Ensemble (Nihai —⭐⭐⭐⭐⭐).
+"""ALPHA BIST — Yığınlama Topluluğu (Stacking Ensemble v3.0) (Nihai — ⭐⭐⭐⭐⭐).
 
-Base models → meta-learner ile model birleştirme.
-Nature (2026) metodolojisi: Ridge meta-learner.
+Bu modül; temel modellerin (Base Models: LightGBM, XGBoost, CatBoost vb.) tahminlerini girdi alan
+ve nihai meta-tahmini üreten çok katmanlı meta-öğrenici (Meta-Learner) mimarisini uygular.
 
-⭐⭐⭐⭐⭐ Eklemeler:
-- Regime-based dynamic weights (BULL/BEAR/SIDEWAYS/HIGH_VOL)
-- Model agreement confidence
-- Feature passthrough
-- Model diversity scoring
-- Online weight adaptation
-- Regime-specific meta-learner
+Temel Yetenekler:
+- Zaman Serisi Çapraz Doğrulamalı Yığınlama (TimeSeriesSplit ile Sıfır Veri Sızıntısı)
+- Rejim Duyarlı Meta-Öğreniciler ve Dinamik Model Ağırlıklandırması (BULL, BEAR, SIDEWAYS, HIGH_VOL)
+- Model Uzlaşısı ve Güven Skoru (Model Agreement Confidence)
+- Model Çeşitlilik Puanlaması (Model Diversity Scoring)
+- Rejim Geçiş Yumuşatması (Regime Transition Smoothing)
+- DuckDB SSD Korumalı WAL ile Eğitim ve Karar Denetim İzi (Audit Trail)
+- Polars DataFrame Desteği (`predict_polars`)
+- İş Parçacığı Güvenliği (`threading.RLock`) ve Kesin Tip Belirteçleri
 """
 
-from dataclasses import dataclass
+from __future__ import annotations
+
+import copy
+import threading
+from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
-from typing import Any
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Final
 
+import duckdb
 import numpy as np
+import orjson
 import structlog
+from scipy.stats import spearmanr
+from sklearn.linear_model import ElasticNet, LinearRegression, LogisticRegression, Ridge
+from sklearn.model_selection import TimeSeriesSplit
 
-logger = structlog.get_logger()
+if TYPE_CHECKING:
+    import polars as pl
+
+logger = structlog.get_logger(__name__)
+
+# --- Sabitler ---
+DEFAULT_MIN_SAMPLES_PER_REGIME: Final[int] = 30
+DEFAULT_MAX_POSSIBLE_STD: Final[float] = 0.5
+DEFAULT_EPSILON: Final[float] = 1e-8
+DEFAULT_DUCKDB_PATH: Final[str] = "data/stacking_ensemble.duckdb"
+DEFAULT_MAX_TRAINING_HISTORY: Final[int] = 1000
 
 
-@dataclass
+def configure_duckdb_wal(conn: duckdb.DuckDBPyConnection) -> None:
+    """DuckDB bağlantısına SSD ömrünü ve WAL boyutunu koruma direktiflerini uygular.
+
+    Args:
+        conn: Yapılandırılacak DuckDB bağlantısı.
+    """
+    try:
+        conn.execute("PRAGMA checkpoint_threshold = '4MB';")
+        conn.execute("PRAGMA wal_autocheckpoint = '2MB';")
+    except Exception as exc:
+        logger.warning("DuckDB WAL pragma yapilandirmasi basarisiz", hata=str(exc))
+
+
+@dataclass(slots=True)
 class StackingConfig:
-    """Stacking ensemble konfigürasyonu."""
+    """Stacking ensemble konfigürasyonu ve hiperparametreleri."""
 
     meta_learner_type: str = "ridge"  # ridge, logistic, linear, elastic_net
     cv_folds: int = 5
     use_proba: bool = True
-    passthrough: bool = False  # Original features de meta-learner'a gitsin
-    # Regime-based
+    passthrough: bool = False  # Orijinal öznitelikleri de meta-learner'a aktar
     regime_aware: bool = True
-    regime_meta_learners: bool = True  # Her rejim için ayrı meta-learner
-    # Diversity
-    min_diversity_score: float = 0.1  # Minimum model çeşitliliği
-    # Online adaptation
+    regime_meta_learners: bool = True  # Her rejim için ayrı meta-öğrenici
+    min_diversity_score: float = 0.1  # Asgari model çeşitliliği
     online_adaptation: bool = True
-    adaptation_rate: float = 0.1  # Ağırlık güncelleme hızı
+    adaptation_rate: float = 0.1  # Ağırlık adaptasyon katsayısı
+
+    def to_dict(self) -> dict[str, Any]:
+        """Konfigürasyonu sözlük yapısına dönüştürür."""
+        return asdict(self)
+
+    def to_orjson_bytes(self) -> bytes:
+        """Konfigürasyonu orjson byte dizisine dönüştürür."""
+        return orjson.dumps(self.to_dict())
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> StackingConfig:
+        """Sözlükten StackingConfig nesnesi oluşturur."""
+        return cls(
+            meta_learner_type=str(data.get("meta_learner_type", "ridge")),
+            cv_folds=int(data.get("cv_folds", 5)),
+            use_proba=bool(data.get("use_proba", True)),
+            passthrough=bool(data.get("passthrough", False)),
+            regime_aware=bool(data.get("regime_aware", True)),
+            regime_meta_learners=bool(data.get("regime_meta_learners", True)),
+            min_diversity_score=float(data.get("min_diversity_score", 0.1)),
+            online_adaptation=bool(data.get("online_adaptation", True)),
+            adaptation_rate=float(data.get("adaptation_rate", 0.1)),
+        )
+
+    def __repr__(self) -> str:
+        """Özet metin gösterimini oluşturur."""
+        return f"StackingConfig(meta='{self.meta_learner_type}', folds={self.cv_folds}, regime_aware={self.regime_aware})"
+
+
+@dataclass(slots=True)
+class StackingPredictionResult:
+    """Tekil tahmin detayı modeli."""
+
+    prediction: float
+    confidence: float
+    model_predictions: dict[str, float]
+    model_weights: dict[str, float]
+    regime: str
+    agreement_score: float
+    diversity_score: float
+
+    def to_dict(self) -> dict[str, Any]:
+        """Modeli sözlüğe dönüştürür."""
+        return asdict(self)
+
+    def to_orjson_bytes(self) -> bytes:
+        """Modeli orjson byte dizisine dönüştürür."""
+        return orjson.dumps(self.to_dict())
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> StackingPredictionResult:
+        """Sözlükten StackingPredictionResult nesnesi oluşturur."""
+        return cls(
+            prediction=float(data.get("prediction", 0.0)),
+            confidence=float(data.get("confidence", 0.0)),
+            model_predictions=dict(data.get("model_predictions", {})),
+            model_weights=dict(data.get("model_weights", {})),
+            regime=str(data.get("regime", "UNKNOWN")),
+            agreement_score=float(data.get("agreement_score", 0.0)),
+            diversity_score=float(data.get("diversity_score", 0.0)),
+        )
+
+    def __repr__(self) -> str:
+        """Özet metin gösterimi."""
+        return (
+            f"StackingPredictionResult(pred={self.prediction:.4f}, conf={self.confidence:.2f}, "
+            f"agreement={self.agreement_score:.2f}, regime='{self.regime}')"
+        )
 
 
 class StackingEnsemble:
-    """Stacking ensemble —⭐⭐⭐⭐⭐ seviye.
+    """Çoklu Model Yığınlama Topluluğu ve Rejim Duyarlı Meta-Öğrenici."""
 
-    Özellikler:
-    - Cross-validated stacking (data leakage önleme)
-    - Regime-based dynamic weights (BULL/BEAR/SIDEWAYS/HIGH_VOL)
-    - Model agreement confidence
-    - Feature passthrough
-    - Model diversity scoring
-    - Online weight adaptation
-    - Regime-specific meta-learner
-    """
+    def __init__(
+        self,
+        config: StackingConfig | None = None,
+        duckdb_path: str = DEFAULT_DUCKDB_PATH,
+    ) -> None:
+        """StackingEnsemble bileşenini başlatır.
 
-    def __init__(self, config: StackingConfig | None = None):
-        """Otomatik eklendi."""
-        self._config = config or StackingConfig()
+        Args:
+            config: Yığınlama konfigürasyonu nesnesi.
+            duckdb_path: Denetim kaydı için DuckDB veritabanı yolu.
+        """
+        self._config: StackingConfig = config or StackingConfig()
+        self._duckdb_path: str = duckdb_path
+        self._lock: threading.RLock = threading.RLock()
+
         self._base_models: dict[str, Any] = {}
-        self._meta_learner = None
-        self._regime_meta_learners: dict[str, Any] = {}  # regime → meta-learner
+        self._meta_learner: Any = None
+        self._regime_meta_learners: dict[str, Any] = {}
         self._model_weights: dict[str, float] = {}
-        self._regime_weights: dict[str, dict[str, float]] = {}  # regime → {model: weight}
-        self._is_fitted = False
+        self._regime_weights: dict[str, dict[str, float]] = {}
+        self._is_fitted: bool = False
         self._training_history: list[dict[str, Any]] = []
         self._diversity_scores: dict[str, float] = {}
 
-    def add_model(self, name: str, model: Any, weight: float = 1.0) -> Any:
-        """Base model ekle."""
-        self._base_models[name] = model
-        self._model_weights[name] = weight
+        self._init_duckdb()
+        logger.info("StackingEnsemble v3.0 baslatildi", meta_learner=self._config.meta_learner_type)
+
+    def _init_duckdb(self) -> None:
+        """DuckDB denetim tablosunu güvenle oluşturur."""
+        try:
+            db_dir = Path(self._duckdb_path).parent
+            db_dir.mkdir(parents=True, exist_ok=True)
+            with duckdb.connect(self._duckdb_path) as conn:
+                configure_duckdb_wal(conn)
+                conn.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS stacking_ensemble_audit (
+                        timestamp TIMESTAMPTZ NOT NULL,
+                        operation VARCHAR NOT NULL,
+                        base_model_count BIGINT NOT NULL,
+                        val_ic DOUBLE NOT NULL,
+                        val_rank_ic DOUBLE NOT NULL,
+                        details VARCHAR NOT NULL
+                    );
+                    """
+                )
+        except Exception as exc:
+            logger.warning("DuckDB stacking_ensemble_audit tablosu ilklendirilemedi", hata=str(exc))
+
+    def _record_audit_event(
+        self,
+        operation: str,
+        base_model_count: int,
+        val_ic: float,
+        val_rank_ic: float,
+        details: dict[str, Any],
+    ) -> None:
+        """Denetim kaydını DuckDB tablosuna işler."""
+        try:
+            now_iso = datetime.now(UTC).isoformat()
+            details_json = orjson.dumps(details).decode()
+            with duckdb.connect(self._duckdb_path) as conn:
+                configure_duckdb_wal(conn)
+                conn.execute(
+                    """
+                    INSERT INTO stacking_ensemble_audit
+                    (timestamp, operation, base_model_count, val_ic, val_rank_ic, details)
+                    VALUES (?, ?, ?, ?, ?, ?);
+                    """,
+                    [now_iso, operation, base_model_count, val_ic, val_rank_ic, details_json],
+                )
+        except Exception as exc:
+            logger.warning("DuckDB stacking_ensemble denetim kaydi basarisiz", hata=str(exc))
+
+    def add_model(self, name: str, model: Any, weight: float = 1.0) -> None:
+        """Topluluğa yeni bir temel (base) model ekler.
+
+        Args:
+            name: Modelin benzersiz adı.
+            model: fit ve predict / predict_proba metodlarına sahip model nesnesi.
+            weight: Başlangıç ağırlığı.
+        """
+        with self._lock:
+            self._base_models[name] = model
+            self._model_weights[name] = float(weight)
+            logger.info("Temel model topluluga eklendi", model=name, weight=weight)
 
     def fit(
         self,
@@ -79,282 +239,366 @@ class StackingEnsemble:
         regimes_train: np.ndarray | None = None,
         regimes_val: np.ndarray | None = None,
     ) -> dict[str, Any]:
-        """Stacking ensemble eğit.
+        """Zaman serisi TimeSeriesSplit çapraz doğrulama ile meta-öğreniciyi ve modelleri eğitir.
 
         Args:
-            X_train: Eğitim verisi
-            y_train: Eğitim label
-            X_val: Validation verisi
-            y_val: Validation label
-            regimes_train: Eğitim rejim etiketleri (opsiyonel)
-            regimes_val: Validation rejim etiketleri (opsiyonel)
+            X_train: Eğitim öznitelik matrisi.
+            y_train: Eğitim hedef vektörü.
+            X_val: Doğrulama öznitelik matrisi.
+            y_val: Doğrulama hedef vektörü.
+            regimes_train: Eğitim rejim etiketleri (opsiyonel).
+            regimes_val: Doğrulama rejim etiketleri (opsiyonel).
 
         Returns:
-            Training metrics
+            Eğitim ve doğrulama metriklerini içeren sözlük.
         """
-        from sklearn.model_selection import TimeSeriesSplit
+        with self._lock:
+            if len(self._base_models) < 2:
+                logger.error("Yetersiz temel model", mevcut=len(self._base_models))
+                return {"error": "En az 2 temel model gereklidir"}
 
-        if len(self._base_models) < 2:
-            return {"error": "Need at least 2 base models"}
+            # Cross-validated stacking (TimeSeriesSplit — veri sızıntısını önler)
+            n_splits = min(self._config.cv_folds, max(2, len(X_train) // 10))
+            kf = TimeSeriesSplit(n_splits=n_splits)
+            meta_features_train = np.zeros((len(X_train), len(self._base_models)), dtype=np.float64)
 
-        # Cross-validated stacking (TimeSeriesSplit — zaman serisi verisi için)
-        kf = TimeSeriesSplit(n_splits=self._config.cv_folds)
-        meta_features_train = np.zeros((len(X_train), len(self._base_models)))
+            for fold_idx, (train_idx, val_idx) in enumerate(kf.split(X_train)):
+                X_tr, X_vl = X_train[train_idx], X_train[val_idx]
+                y_tr = y_train[train_idx]
 
-        for fold_idx, (train_idx, val_idx) in enumerate(kf.split(X_train)):
-            X_tr, X_vl = X_train[train_idx], X_train[val_idx]
-            y_tr = y_train[train_idx]
+                for model_idx, (name, model) in enumerate(self._base_models.items()):
+                    try:
+                        fold_model = copy.deepcopy(model)
+                        if hasattr(fold_model, "fit"):
+                            fold_model.fit(X_tr, y_tr)
 
-            for model_idx, (name, model) in enumerate(self._base_models.items()):
+                        if self._config.use_proba and hasattr(fold_model, "predict_proba"):
+                            probs = fold_model.predict_proba(X_vl)
+                            meta_features_train[val_idx, model_idx] = (
+                                probs[:, 1] if probs.shape[1] > 1 else probs[:, 0]
+                            )
+                        else:
+                            meta_features_train[val_idx, model_idx] = fold_model.predict(X_vl)
+                    except Exception as exc:
+                        logger.warning("Katman fold egitimi basarisiz", model=name, fold=fold_idx, hata=str(exc))
+                        meta_features_train[val_idx, model_idx] = 0.5
+
+            # Orijinal öznitelik geçişi (Passthrough)
+            if self._config.passthrough:
+                meta_features_train = np.hstack([meta_features_train, X_train])
+
+            # Ana meta-öğrenici eğitimi
+            self._meta_learner = self._create_meta_learner()
+            self._meta_learner.fit(meta_features_train, y_train)
+
+            # Rejime özgü meta-öğreniciler
+            if self._config.regime_aware and self._config.regime_meta_learners and regimes_train is not None:
+                self._fit_regime_meta_learners(meta_features_train, y_train, regimes_train)
+
+            # Temel modelleri tüm eğitim verisi üzerinde yeniden eğit
+            for name, model in self._base_models.items():
                 try:
-                    import copy
+                    if hasattr(model, "fit"):
+                        model.fit(X_train, y_train)
+                except Exception as exc:
+                    logger.warning("Temel model tam egitimi basarisiz", model=name, hata=str(exc))
 
-                    fold_model = copy.deepcopy(model)
+            self._is_fitted = True
 
-                    if hasattr(fold_model, "fit"):
-                        fold_model.fit(X_tr, y_tr)
+            # Model çeşitlilik puanlaması
+            self._compute_diversity(X_val)
 
-                    if self._config.use_proba and hasattr(fold_model, "predict_proba"):
-                        meta_features_train[val_idx, model_idx] = fold_model.predict_proba(X_vl)[:, 1]
-                    else:
-                        meta_features_train[val_idx, model_idx] = fold_model.predict(X_vl)
+            # Rejim bazlı ağırlık hesaplaması
+            if regimes_val is not None:
+                self._compute_regime_weights(X_val, y_val, regimes_val)
 
-                except Exception as e:
-                    logger.warning("stacking_fold_failed", model=name, fold=fold_idx, error=str(e))
-                    meta_features_train[val_idx, model_idx] = 0.5
+            # Doğrulama metrikleri
+            metrics = self._compute_validation_metrics(X_val, y_val)
 
-        # Feature passthrough
-        if self._config.passthrough:
-            meta_features_train = np.hstack([meta_features_train, X_train])
+            self._training_history.append(
+                {
+                    "timestamp": datetime.now(UTC).isoformat(),
+                    "metrics": metrics,
+                    "n_base_models": len(self._base_models),
+                    "diversity_scores": self._diversity_scores,
+                }
+            )
+            if len(self._training_history) > DEFAULT_MAX_TRAINING_HISTORY:
+                self._training_history = self._training_history[-DEFAULT_MAX_TRAINING_HISTORY:]
 
-        # Ana meta-learner eğit
-        self._meta_learner = self._create_meta_learner()
-        self._meta_learner.fit(meta_features_train, y_train)
+            self._record_audit_event(
+                operation="FIT",
+                base_model_count=len(self._base_models),
+                val_ic=metrics.get("val_ic", 0.0),
+                val_rank_ic=metrics.get("val_rank_ic", 0.0),
+                details=metrics,
+            )
 
-        # Regime-specific meta-learner'lar
-        if self._config.regime_aware and self._config.regime_meta_learners and regimes_train is not None:
-            self._fit_regime_meta_learners(meta_features_train, y_train, regimes_train)
-
-        # Base modelleri tüm eğitim verisi üzerinde eğit
-        for name, model in self._base_models.items():
-            try:
-                model.fit(X_train, y_train)
-            except Exception as e:
-                logger.warning("base_model_fit_failed", model=name, error=str(e))
-
-        self._is_fitted = True
-
-        # Model diversity hesapla
-        self._compute_diversity(X_val)
-
-        # Regime-based ağırlıkları hesapla
-        if regimes_val is not None:
-            self._compute_regime_weights(X_val, y_val, regimes_val)
-
-        # Validation metrics
-        metrics = self._compute_validation_metrics(X_val, y_val)
-
-        # Training history
-        self._training_history.append(
-            {
-                "timestamp": datetime.now(UTC).isoformat(),
-                "metrics": metrics,
-                "n_base_models": len(self._base_models),
-                "diversity_scores": self._diversity_scores,
-            }
-        )
-        if len(self._training_history) > 1000:
-            self._training_history = self._training_history[-1000:]
-
-        logger.info("stacking_ensemble_fitted", **metrics)
-        return metrics
+            logger.info("Stacking ensemble basariyla egitildi", **metrics)
+            return metrics
 
     def predict(
         self,
         X: np.ndarray,
         regime: str | None = None,
     ) -> np.ndarray:
-        """Stacking prediction.
+        """Topluluk tahminini hesaplar.
 
         Args:
-            X: Feature matrix
-            regime: Mevcut piyasa rejimi (opsiyonel — regime-specific meta-learner kullanır)
+            X: Girdi öznitelik matrisi.
+            regime: Aktif piyasa rejimi (None ise genel meta-öğrenici kullanılır).
 
         Returns:
-            Tahmin array'i
+            Tahmin dizisi (N,).
         """
-        if not self._is_fitted:
-            return np.zeros(len(X))
+        with self._lock:
+            if not self._is_fitted:
+                return np.zeros(len(X), dtype=np.float64)
 
-        # Base model predictions
-        meta_features = self._get_meta_features(X)
+            meta_features = self._get_meta_features(X)
 
-        # Regime-specific meta-learner
-        if regime and regime in self._regime_meta_learners:
-            meta_learner = self._regime_meta_learners[regime]
-        else:
-            meta_learner = self._meta_learner
+            if regime and regime in self._regime_meta_learners:
+                meta_learner = self._regime_meta_learners[regime]
+            else:
+                meta_learner = self._meta_learner
 
-        # Meta-learner prediction
-        try:
-            if hasattr(meta_learner, "predict_proba"):
-                return meta_learner.predict_proba(meta_features)[:, 1]
-            return meta_learner.predict(meta_features)
-        except Exception as e:
-            logger.warning("stacking_meta_learner_predict_failed", error=str(e))
-            return np.zeros(len(X))
+            try:
+                if hasattr(meta_learner, "predict_proba"):
+                    probs = meta_learner.predict_proba(meta_features)
+                    return probs[:, 1] if probs.shape[1] > 1 else probs[:, 0]
+                return meta_learner.predict(meta_features)
+            except Exception as exc:
+                logger.warning("Meta ogrenici tahmini basarisiz, agirlikli ortalamaya geciliyor", hata=str(exc))
+                return self._weighted_average_predict(X, regime=regime)
+
+    def _weighted_average_predict(self, X: np.ndarray, regime: str | None = None) -> np.ndarray:
+        """Meta-learner başarısız olduğunda güvenli ağırlıklı ortalama fallback'i uygular."""
+        weights = self.get_model_weights(regime)
+        preds_list: list[np.ndarray] = []
+        w_list: list[float] = []
+
+        for name, model in self._base_models.items():
+            try:
+                if self._config.use_proba and hasattr(model, "predict_proba"):
+                    p = model.predict_proba(X)[:, 1]
+                else:
+                    p = model.predict(X)
+                preds_list.append(p)
+                w_list.append(weights.get(name, 1.0))
+            except Exception:
+                continue
+
+        if not preds_list:
+            return np.zeros(len(X), dtype=np.float64)
+
+        total_w = sum(w_list) or 1.0
+        norm_w = [w / total_w for w in w_list]
+        return np.sum([p * w for p, w in zip(preds_list, norm_w, strict=False)], axis=0)
 
     def predict_with_confidence(
         self,
         X: np.ndarray,
         regime: str | None = None,
-    ) -> tuple:
-        """Prediction + confidence (model agreement).
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Tahmin ve model uzlaşı güven skorunu (0.0-1.0) birlikte üretir.
 
         Args:
-            X: Feature matrix
-            regime: Mevcut piyasa rejimi
+            X: Öznitelik matrisi.
+            regime: Aktif rejim adı.
 
         Returns:
-            (predictions, confidence) — confidence: 0-1 arası
+            (predictions, confidence) demeti.
         """
-        if not self._is_fitted:
-            return np.zeros(len(X)), np.zeros(len(X))
+        with self._lock:
+            if not self._is_fitted:
+                return np.zeros(len(X), dtype=np.float64), np.zeros(len(X), dtype=np.float64)
 
-        # Base model predictions
-        all_preds = []
-        for _name, model in self._base_models.items():
-            try:
-                if self._config.use_proba and hasattr(model, "predict_proba"):
-                    preds = model.predict_proba(X)[:, 1]
-                else:
-                    preds = model.predict(X)
-                all_preds.append(preds)
-            except Exception as e:
-                logger.warning("stacking_handled_exception", error=str(e), context="stacking_ensemble.py:224")
+            all_preds: list[np.ndarray] = []
+            for _name, model in self._base_models.items():
+                try:
+                    if self._config.use_proba and hasattr(model, "predict_proba"):
+                        probs = model.predict_proba(X)
+                        preds = probs[:, 1] if probs.shape[1] > 1 else probs[:, 0]
+                    else:
+                        preds = model.predict(X)
+                    all_preds.append(preds)
+                except Exception as exc:
+                    logger.debug("Model tahmin uretim hatasi", hata=str(exc))
 
-        if not all_preds:
-            return np.zeros(len(X)), np.zeros(len(X))
+            if not all_preds:
+                return np.zeros(len(X), dtype=np.float64), np.zeros(len(X), dtype=np.float64)
 
-        # Model agreement
-        preds_matrix = np.array(all_preds)
-        np.mean(preds_matrix, axis=0)
+            preds_matrix = np.asarray(all_preds, dtype=np.float64)
 
-        # Confidence: 1 - normalized_std (yüksek = modeller uzlaşıyor)
-        pred_std = np.std(preds_matrix, axis=0)
-        max_possible_std = 0.5  # 0-1 arası tahminler için max std
-        confidence = 1.0 - (pred_std / max_possible_std)
-        confidence = np.clip(confidence, 0, 1)
+            # Güven: 1 - normalize standart sapma
+            pred_std = np.std(preds_matrix, axis=0)
+            confidence = 1.0 - (pred_std / DEFAULT_MAX_POSSIBLE_STD)
+            confidence = np.clip(np.nan_to_num(confidence, nan=0.5), 0.0, 1.0)
 
-        # Weighted prediction
-        weighted_pred = self.predict(X, regime)
-
-        return weighted_pred, confidence
+            weighted_pred = self.predict(X, regime=regime)
+            return weighted_pred, confidence
 
     def predict_with_details(
         self,
         X: np.ndarray,
         regime: str | None = None,
-    ) -> dict[str, Any]:
-        """Detaylı prediction — her modelin katkısı dahil.
-
-        Returns:
-            {
-                "prediction": float,
-                "confidence": float,
-                "model_predictions": {model_name: prediction},
-                "model_weights": {model_name: weight},
-                "regime": str,
-                "agreement_score": float,
-            }
-        """
-        # Her modelin tahmini
-        model_preds = {}
-        for name, model in self._base_models.items():
-            try:
-                if self._config.use_proba and hasattr(model, "predict_proba"):
-                    pred = model.predict_proba(X[:1])[:, 1]
-                else:
-                    pred = model.predict(X[:1])
-                model_preds[name] = float(pred[0]) if len(pred) > 0 else 0.5
-            except Exception as e:
-                logger.warning("stacking_detail_predict_failed", model=name, error=str(e))
-                model_preds[name] = 0.5
-
-        # Weighted prediction
-        pred, conf = self.predict_with_confidence(X[:1], regime)
-
-        # Agreement score (tüm modellerin aynı yönde olup olmadığı)
-        preds_list = list(model_preds.values())
-        above_half = sum(1 for p in preds_list if p > 0.5)
-        agreement = max(above_half, len(preds_list) - above_half) / max(len(preds_list), 1)
-
-        return {
-            "prediction": float(pred[0]) if len(pred) > 0 else 0.5,
-            "confidence": float(conf[0]) if len(conf) > 0 else 0.0,
-            "model_predictions": model_preds,
-            "model_weights": self.get_model_weights(regime),
-            "regime": regime or "UNKNOWN",
-            "agreement_score": round(agreement, 4),
-            "diversity_score": round(
-                float(np.mean(list(self._diversity_scores.values()))) if self._diversity_scores else 0, 4
-            ),
-        }
-
-    def get_model_weights(self, regime: str | None = None) -> dict[str, float]:
-        """Model ağırlıklarını döndür.
+    ) -> StackingPredictionResult:
+        """Detaylı model tahmin ve katkı dökümünü üretir.
 
         Args:
-            regime: Hangi rejim için ağırlıklar (None = genel)
+            X: Öznitelik matrisi (ilk satır analiz edilir).
+            regime: Aktif rejim adı.
 
         Returns:
-            {model_name: weight}
+            StackingPredictionResult nesnesi.
         """
-        if regime and regime in self._regime_weights:
-            return self._regime_weights[regime]
+        with self._lock:
+            X_sample = X[:1]
+            model_preds: dict[str, float] = {}
 
-        if self._meta_learner is None:
+            for name, model in self._base_models.items():
+                try:
+                    if self._config.use_proba and hasattr(model, "predict_proba"):
+                        probs = model.predict_proba(X_sample)
+                        p_val = float(probs[0, 1] if probs.shape[1] > 1 else probs[0, 0])
+                    else:
+                        p_val = float(model.predict(X_sample)[0])
+                    model_preds[name] = p_val
+                except Exception as exc:
+                    logger.warning("Detayli tahmin hatasi", model=name, hata=str(exc))
+                    model_preds[name] = 0.5
+
+            pred_arr, conf_arr = self.predict_with_confidence(X_sample, regime=regime)
+            pred = float(pred_arr[0]) if len(pred_arr) > 0 else 0.5
+            conf = float(conf_arr[0]) if len(conf_arr) > 0 else 0.0
+
+            preds_list = list(model_preds.values())
+            above_half = sum(1 for p in preds_list if p > 0.5)
+            agreement = max(above_half, len(preds_list) - above_half) / max(len(preds_list), 1)
+
+            avg_diversity = (
+                float(np.mean(list(self._diversity_scores.values()))) if self._diversity_scores else 0.0
+            )
+
+            return StackingPredictionResult(
+                prediction=round(pred, 4),
+                confidence=round(conf, 4),
+                model_predictions=model_preds,
+                model_weights=self.get_model_weights(regime),
+                regime=regime or "UNKNOWN",
+                agreement_score=round(agreement, 4),
+                diversity_score=round(avg_diversity, 4),
+            )
+
+    def predict_polars(
+        self,
+        df: pl.DataFrame,
+        feature_cols: list[str],
+        regime: str | None = None,
+    ) -> pl.DataFrame:
+        """Polars DataFrame girdisi üzerinde tahmin yürüterek sonuç sütunlarını ekler.
+
+        Args:
+            df: Veri satırlarını içeren Polars DataFrame.
+            feature_cols: Model girdi öznitelik sütunları.
+            regime: Aktif piyasa rejimi.
+
+        Returns:
+            'stacking_pred' ve 'stacking_confidence' sütunları eklenmiş Polars DataFrame.
+        """
+        import polars as pl
+
+        if df.is_empty():
+            return df.with_columns(
+                pl.lit(0.0).alias("stacking_pred"),
+                pl.lit(0.0).alias("stacking_confidence"),
+            )
+
+        X = df.select(feature_cols).fill_null(0.0).to_numpy()
+        preds, confs = self.predict_with_confidence(X, regime=regime)
+
+        cols = [
+            pl.Series("stacking_pred", preds),
+            pl.Series("stacking_prediction", preds),
+            pl.Series("stacking_confidence", confs),
+            pl.Series("confidence", confs),
+        ]
+        if regime:
+            cols.append(pl.lit(regime).alias("regime"))
+
+        return df.with_columns(cols)
+
+    def predict_detailed(
+        self,
+        X: np.ndarray,
+        regime: str | None = None,
+    ) -> list[StackingPredictionResult]:
+        """Ayrıntılı tahmin çıktısı ve model uzlaşısı (predict_with_details sarmalayıcısı)."""
+        return self.predict_with_details(X, regime=regime)
+
+    def evaluate_by_regime(
+        self,
+        X_val: np.ndarray,
+        y_val: np.ndarray,
+        regimes_val: np.ndarray,
+    ) -> dict[str, dict[str, Any]]:
+        """Rejim bazlı performans raporu (get_regime_performance_report sarmalayıcısı)."""
+        return self.get_regime_performance_report(X_val, y_val, regimes_val)
+
+    def get_model_weights(self, regime: str | None = None) -> dict[str, float]:
+        """Piyasa rejimine veya genel modele göre göreli model katsayılarını döndürür."""
+        with self._lock:
+            if regime and regime in self._regime_weights:
+                return self._regime_weights[regime]
+
+            if self._meta_learner is None or not hasattr(self._meta_learner, "coef_"):
+                return self._model_weights
+
+            try:
+                coefs = self._meta_learner.coef_
+                if coefs.ndim > 1:
+                    coefs = coefs[0]
+                n_models = len(self._base_models)
+                if len(coefs) >= n_models:
+                    model_coefs = coefs[:n_models]
+                    total = sum(abs(c) for c in model_coefs)
+                    if total > 0:
+                        return {
+                            name: round(float(abs(c) / total), 4)
+                            for (name, _), c in zip(self._base_models.items(), model_coefs, strict=False)
+                        }
+            except Exception as exc:
+                logger.debug("Model agirlik hesaplama bildirimi", hata=str(exc))
+
             return self._model_weights
 
-        try:
-            coefs = self._meta_learner.coef_
-            n_models = len(self._base_models)
-            if len(coefs) >= n_models:
-                model_coefs = coefs[:n_models]
-                total = sum(abs(c) for c in model_coefs)
-                if total > 0:
-                    return {
-                        name: round(float(abs(c) / total), 4)
-                        for (name, _), c in zip(self._base_models.items(), model_coefs, strict=False)
-                    }
-        except Exception as e:
-            logger.warning("stacking_handled_exception", error=str(e), context="stacking_ensemble.py:318")
-
-        return self._model_weights
-
     def get_regime_weights(self) -> dict[str, dict[str, float]]:
-        """Tüm rejim ağırlıklarını döndür."""
-        return self._regime_weights
+        """Tüm rejim ağırlıkları sözlüğünü döndürür."""
+        with self._lock:
+            return dict(self._regime_weights)
 
     def get_diversity_scores(self) -> dict[str, float]:
-        """Model diversity skorlarını döndür."""
-        return self._diversity_scores
+        """Modeller arası çeşitlilik skorlarını döndürür."""
+        with self._lock:
+            return dict(self._diversity_scores)
 
     def get_training_history(self) -> list[dict[str, Any]]:
-        """Training history döndür."""
-        return self._training_history
+        """Eğitim geçmiş kayıtlarını döndürür."""
+        with self._lock:
+            return list(self._training_history)
 
     def _get_meta_features(self, X: np.ndarray) -> np.ndarray:
-        """Base model predictions'ı meta-feature olarak oluştur."""
-        meta_features = np.zeros((len(X), len(self._base_models)))
+        """Temel modellerin tahminlerini meta-öğrenici girdi matrisine dönüştürür."""
+        meta_features = np.zeros((len(X), len(self._base_models)), dtype=np.float64)
         for model_idx, (model_name, model) in enumerate(self._base_models.items()):
             try:
                 if self._config.use_proba and hasattr(model, "predict_proba"):
-                    meta_features[:, model_idx] = model.predict_proba(X)[:, 1]
+                    probs = model.predict_proba(X)
+                    meta_features[:, model_idx] = probs[:, 1] if probs.shape[1] > 1 else probs[:, 0]
                 else:
                     meta_features[:, model_idx] = model.predict(X)
-            except Exception as e:
-                logger.warning("stacking_meta_feature_failed", model=model_name, error=str(e))
+            except Exception as exc:
+                logger.warning("Meta feature uretimi basarisiz", model=model_name, hata=str(exc))
                 meta_features[:, model_idx] = 0.5
 
         if self._config.passthrough:
@@ -363,69 +607,69 @@ class StackingEnsemble:
         return meta_features
 
     def _create_meta_learner(self) -> Any:
-        """Meta-learner oluştur."""
-        from sklearn.linear_model import ElasticNet, LinearRegression, LogisticRegression, Ridge
-
-        if self._config.meta_learner_type == "ridge":
+        """Konfigürasyona uygun sklearn regresyon/sınıflandırıcı meta-öğrenicisini oluşturur."""
+        m_type = self._config.meta_learner_type
+        if m_type == "ridge":
             return Ridge(alpha=1.0)
-        elif self._config.meta_learner_type == "logistic":
+        if m_type == "logistic":
             return LogisticRegression(max_iter=1000)
-        elif self._config.meta_learner_type == "elastic_net":
+        if m_type == "elastic_net":
             return ElasticNet(alpha=1.0, l1_ratio=0.5)
-        else:
-            return LinearRegression()
+        return LinearRegression()
 
     def _fit_regime_meta_learners(
         self,
         meta_features: np.ndarray,
         y: np.ndarray,
         regimes: np.ndarray,
-    ) -> Any:
-        """Her rejim için ayrı meta-learner eğit."""
+    ) -> None:
+        """Her rejim için ayrı bir meta-öğrenici eğitir."""
         unique_regimes = np.unique(regimes)
         for regime in unique_regimes:
             mask = regimes == regime
-            if np.sum(mask) < 30:  # Minimum sample — 10 cok dusuktu
+            if np.sum(mask) < DEFAULT_MIN_SAMPLES_PER_REGIME:
                 continue
 
             try:
-                meta_learner = self._create_meta_learner()
-                meta_learner.fit(meta_features[mask], y[mask])
-                self._regime_meta_learners[regime] = meta_learner
-                logger.info("regime_meta_learner_fitted", regime=regime, n_samples=int(np.sum(mask)))
-            except Exception as e:
-                logger.warning("regime_meta_learner_failed", regime=regime, error=str(e))
+                learner = self._create_meta_learner()
+                learner.fit(meta_features[mask], y[mask])
+                self._regime_meta_learners[str(regime)] = learner
+                logger.info("Rejime ozgu meta ogrenici egitildi", regime=str(regime), samples=int(np.sum(mask)))
+            except Exception as exc:
+                logger.warning("Rejim meta ogrenici egitimi basarisiz", regime=str(regime), hata=str(exc))
 
-    def _compute_diversity(self, X: np.ndarray) -> Any:
-        """Model diversity hesapla — farklı modeller farklı tahminler yapmalı."""
-        all_preds = []
+    def _compute_diversity(self, X: np.ndarray) -> None:
+        """Modeller arası ikili korelasyonu hesaplayarak çeşitlilik puanını belirler."""
+        all_preds: list[tuple[str, np.ndarray]] = []
         for name, model in self._base_models.items():
             try:
                 if self._config.use_proba and hasattr(model, "predict_proba"):
-                    preds = model.predict_proba(X)[:, 1]
+                    probs = model.predict_proba(X)
+                    preds = probs[:, 1] if probs.shape[1] > 1 else probs[:, 0]
                 else:
                     preds = model.predict(X)
                 all_preds.append((name, preds))
-            except Exception as e:
-                logger.warning("stacking_handled_exception", error=str(e), context="stacking_ensemble.py:396")
+            except Exception as exc:
+                logger.debug("Cesitlilik tahmin hatasi", model=name, hata=str(exc))
 
         if len(all_preds) < 2:
             return
 
-        # Pairwise correlation
         names = [n for n, _ in all_preds]
-        preds_matrix = np.array([p for _, p in all_preds])
+        preds_matrix = np.asarray([p for _, p in all_preds], dtype=np.float64)
 
         for i, name_i in enumerate(names):
-            correlations = []
+            correlations: list[float] = []
             for j, _name_j in enumerate(names):
                 if i != j:
-                    corr = np.corrcoef(preds_matrix[i], preds_matrix[j])[0, 1]
-                    if not np.isnan(corr):
-                        correlations.append(abs(corr))
+                    std_i = np.std(preds_matrix[i])
+                    std_j = np.std(preds_matrix[j])
+                    if std_i > DEFAULT_EPSILON and std_j > DEFAULT_EPSILON:
+                        corr = np.corrcoef(preds_matrix[i], preds_matrix[j])[0, 1]
+                        if np.isfinite(corr):
+                            correlations.append(abs(corr))
 
-            # Diversity = 1 - ortalama korelasyon
-            avg_corr = np.mean(correlations) if correlations else 1.0
+            avg_corr = float(np.mean(correlations)) if correlations else 1.0
             self._diversity_scores[name_i] = round(1.0 - avg_corr, 4)
 
     def _compute_regime_weights(
@@ -433,59 +677,64 @@ class StackingEnsemble:
         X: np.ndarray,
         y: np.ndarray,
         regimes: np.ndarray,
-    ) -> Any:
-        """Her rejim için optimal ağırlıkları hesapla."""
+    ) -> None:
+        """Her rejim kesiti için modellerin korelasyon (IC) performansına göre ağırlıklarını hesaplar."""
         unique_regimes = np.unique(regimes)
 
         for regime in unique_regimes:
             mask = regimes == regime
-            if np.sum(mask) < 30:  # Minimum sample
+            if np.sum(mask) < DEFAULT_MIN_SAMPLES_PER_REGIME:
                 continue
 
             try:
-                # Her modelin bu rejimdeki performansı
-                regime_scores = {}
+                regime_scores: dict[str, float] = {}
                 for name, model in self._base_models.items():
                     try:
                         if self._config.use_proba and hasattr(model, "predict_proba"):
-                            preds = model.predict_proba(X[mask])[:, 1]
+                            probs = model.predict_proba(X[mask])
+                            preds = probs[:, 1] if probs.shape[1] > 1 else probs[:, 0]
                         else:
                             preds = model.predict(X[mask])
 
-                        # IC (correlation)
-                        ic = np.corrcoef(preds, y[mask])[0, 1]
-                        if np.isnan(ic):
-                            ic = 0.0
-                        regime_scores[name] = abs(ic)
-                    except Exception as e:
-                        logger.warning("stacking_regime_score_failed", model=name, regime=regime, error=str(e))
+                        std_p = np.std(preds)
+                        std_y = np.std(y[mask])
+                        if std_p > DEFAULT_EPSILON and std_y > DEFAULT_EPSILON:
+                            ic = np.corrcoef(preds, y[mask])[0, 1]
+                            ic_val = abs(float(ic)) if np.isfinite(ic) else 0.0
+                        else:
+                            ic_val = 0.0
+
+                        regime_scores[name] = ic_val
+                    except Exception as exc:
+                        logger.warning("Rejim skoru hesabi basarisiz", model=name, regime=str(regime), hata=str(exc))
                         regime_scores[name] = 0.0
 
-                # Normalize to weights
                 total = sum(regime_scores.values())
                 if total > 0:
-                    self._regime_weights[regime] = {
+                    self._regime_weights[str(regime)] = {
                         name: round(score / total, 4) for name, score in regime_scores.items()
                     }
                 else:
-                    self._regime_weights[regime] = {name: 1.0 / len(self._base_models) for name in self._base_models}
-
-            except Exception as e:
-                logger.warning("regime_weight_computation_failed", regime=regime, error=str(e))
+                    self._regime_weights[str(regime)] = {
+                        name: round(1.0 / len(self._base_models), 4) for name in self._base_models
+                    }
+            except Exception as exc:
+                logger.warning("Rejim agirligi hesaplama hatasi", regime=str(regime), hata=str(exc))
 
     def _compute_validation_metrics(self, X_val: np.ndarray, y_val: np.ndarray) -> dict[str, Any]:
-        """Validation metrics hesapla."""
+        """Doğrulama kümesi üzerinde IC, Rank IC ve yön doğruluğu metriklerini hesaplar."""
         val_pred = self.predict(X_val)
 
         # IC (Information Coefficient)
-        try:
-            ic = float(np.corrcoef(val_pred, y_val)[0, 1])
-            if np.isnan(ic):
-                ic = 0.0
-        except Exception:
+        std_p = np.std(val_pred)
+        std_y = np.std(y_val)
+        if std_p > DEFAULT_EPSILON and std_y > DEFAULT_EPSILON:
+            ic_corr = np.corrcoef(val_pred, y_val)[0, 1]
+            ic = float(ic_corr) if np.isfinite(ic_corr) else 0.0
+        else:
             ic = 0.0
 
-        # Directional accuracy — sign-based (regression icin dogru)
+        # Yön Doğruluğu (Directional Accuracy)
         try:
             pred_sign = np.sign(val_pred)
             true_sign = np.sign(y_val)
@@ -493,14 +742,14 @@ class StackingEnsemble:
         except Exception:
             directional_accuracy = 0.0
 
-        # Rank IC (Spearman)
+        # Spearman Rank IC
         try:
-            from scipy.stats import spearmanr
-
             rank_ic, _ = spearmanr(val_pred, y_val)
             rank_ic = float(rank_ic) if np.isfinite(rank_ic) else 0.0
         except Exception:
             rank_ic = 0.0
+
+        avg_div = float(np.mean(list(self._diversity_scores.values()))) if self._diversity_scores else 0.0
 
         return {
             "n_base_models": len(self._base_models),
@@ -509,16 +758,10 @@ class StackingEnsemble:
             "val_ic": round(ic, 4),
             "val_rank_ic": round(rank_ic, 4),
             "val_directional_accuracy": round(directional_accuracy, 4),
-            "diversity_score": round(
-                float(np.mean(list(self._diversity_scores.values()))) if self._diversity_scores else 0, 4
-            ),
+            "diversity_score": round(avg_div, 4),
             "n_regime_meta_learners": len(self._regime_meta_learners),
             "n_regime_weights": len(self._regime_weights),
         }
-
-    # =====================================================
-    # REGIME SMOOTHING (v2.1)
-    # =====================================================
 
     def predict_with_regime_smoothing(
         self,
@@ -527,37 +770,25 @@ class StackingEnsemble:
         previous_regime: str | None = None,
         smoothing_factor: float = 0.3,
     ) -> np.ndarray:
-        """Rejim geçişlerinde ağırlık smoothing.
+        """Ani rejim geçişlerinde tahmin sıçramalarını yumuşatır (Smoothing).
 
-                Ani rejim değişimlerinde ağırlıkları kademeli olarak değiştirir.
+        Args:
+            X: Öznitelik matrisi.
+            current_regime: Aktif piyasa rejimi.
+            previous_regime: Önceki adımın piyasa rejimi.
+            smoothing_factor: Yeni rejimin ağırlığı [0.0-1.0].
 
-                Args:
-                    X: Feature matrix
-        n            current_regime: Mevcut rejim
-                    previous_regime: Önceki rejim (None = ilk tahmin)
-                    smoothing_factor: Smoothing hızı (0 = tam smoothing, 1 = anlık geçiş)
-
-                Returns:
-                    Smoothed predictions
+        Returns:
+            Yumuşatılmış tahmin dizisi.
         """
         if previous_regime is None or previous_regime == current_regime:
             return self.predict(X, regime=current_regime)
 
-        # İki rejim için ayrı tahminler
         pred_current = self.predict(X, regime=current_regime)
         pred_previous = self.predict(X, regime=previous_regime)
 
-        # Smoothing: smoothing_factor kadar yeni rejime, geri kalanı eski rejime
-        smoothed = smoothing_factor * pred_current + (1 - smoothing_factor) * pred_previous
-
-        logger.debug(
-            "regime_smoothing_applied",
-            current=current_regime,
-            previous=previous_regime,
-            factor=smoothing_factor,
-        )
-
-        return smoothed
+        alpha = float(np.clip(smoothing_factor, 0.0, 1.0))
+        return alpha * pred_current + (1.0 - alpha) * pred_previous
 
     def get_regime_performance_report(
         self,
@@ -565,59 +796,44 @@ class StackingEnsemble:
         y_val: np.ndarray,
         regimes: np.ndarray,
     ) -> dict[str, dict[str, float]]:
-        """Her rejimdeki ensemble performansı.
-
-        Args:
-            X_val: Validation features
-            y_val: Validation targets
-            regimes: Rejim etiketleri
-
-        Returns:
-            {regime: {ic, rank_ic, direction_accuracy, n_samples}}
-        """
+        """Her rejimdeki topluluk performans dökümünü oluşturur."""
         report: dict[str, dict[str, float]] = {}
-
         unique_regimes = np.unique(regimes)
+
         for regime in unique_regimes:
             mask = regimes == regime
             n = int(np.sum(mask))
-
             if n < 10:
                 continue
 
             preds = self.predict(X_val[mask], regime=str(regime))
             y_regime = y_val[mask]
 
-            # IC
-            try:
-                finite_mask = np.isfinite(preds) & np.isfinite(y_regime)
-                ic = float(np.corrcoef(preds[finite_mask], y_regime[finite_mask])[0, 1])
-                if not np.isfinite(ic):
-                    ic = 0.0
-            except Exception:
+            finite_mask = np.isfinite(preds) & np.isfinite(y_regime)
+            if np.sum(finite_mask) < 5:
+                continue
+
+            p_fin = preds[finite_mask]
+            y_fin = y_regime[finite_mask]
+
+            if np.std(p_fin) > DEFAULT_EPSILON and np.std(y_fin) > DEFAULT_EPSILON:
+                ic_val = float(np.corrcoef(p_fin, y_fin)[0, 1])
+                ic = ic_val if np.isfinite(ic_val) else 0.0
+            else:
                 ic = 0.0
 
-            # Rank IC
             try:
-                from scipy.stats import spearmanr
-
-                rank_ic, _ = spearmanr(preds[finite_mask], y_regime[finite_mask])
+                rank_ic, _ = spearmanr(p_fin, y_fin)
                 rank_ic = float(rank_ic) if np.isfinite(rank_ic) else 0.0
             except Exception:
                 rank_ic = 0.0
 
-            # Direction accuracy
-            try:
-                pred_sign = np.sign(preds)
-                true_sign = np.sign(y_regime)
-                direction_acc = float(np.mean(pred_sign == true_sign))
-            except Exception:
-                direction_acc = 0.0
+            dir_acc = float(np.mean(np.sign(p_fin) == np.sign(y_fin)))
 
             report[str(regime)] = {
                 "ic": round(ic, 4),
                 "rank_ic": round(rank_ic, 4),
-                "direction_accuracy": round(direction_acc, 4),
+                "direction_accuracy": round(dir_acc, 4),
                 "n_samples": n,
             }
 
@@ -625,10 +841,46 @@ class StackingEnsemble:
 
     @property
     def is_fitted(self) -> bool:
-        """Otomatik eklendi."""
-        return self._is_fitted
+        """Modelin başarıyla eğitilip eğitilmediğini döndürür."""
+        with self._lock:
+            return self._is_fitted
 
     @property
     def base_model_names(self) -> list[str]:
-        """Otomatik eklendi."""
-        return list(self._base_models.keys())
+        """Kayıtlı temel model adlarının listesini döndürür."""
+        with self._lock:
+            return list(self._base_models.keys())
+
+    def get_audit_as_polars(self) -> pl.DataFrame:
+        """DuckDB denetim tablosunu Polars DataFrame olarak döndürür."""
+        import polars as pl
+
+        with self._lock:
+            try:
+                with duckdb.connect(self._duckdb_path) as conn:
+                    configure_duckdb_wal(conn)
+                    return conn.execute("SELECT * FROM stacking_ensemble_audit ORDER BY timestamp ASC").pl()
+            except Exception as exc:
+                logger.warning("DuckDB denetim izi okunamadi", hata=str(exc))
+                return pl.DataFrame()
+
+    def __repr__(self) -> str:
+        """StackingEnsemble özet metin gösterimini oluşturur."""
+        with self._lock:
+            return (
+                f"StackingEnsemble(is_fitted={self._is_fitted}, "
+                f"base_models={list(self._base_models.keys())}, meta='{self._config.meta_learner_type}')"
+            )
+
+
+__all__: Final[list[str]] = [
+    "DEFAULT_DUCKDB_PATH",
+    "DEFAULT_EPSILON",
+    "DEFAULT_MAX_POSSIBLE_STD",
+    "DEFAULT_MAX_TRAINING_HISTORY",
+    "DEFAULT_MIN_SAMPLES_PER_REGIME",
+    "StackingConfig",
+    "StackingEnsemble",
+    "StackingPredictionResult",
+    "configure_duckdb_wal",
+]

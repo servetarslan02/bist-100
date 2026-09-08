@@ -7,15 +7,25 @@ Confidence-weighted conflict resolution.
 FAZ 4: Conflict Resolution + Communication
 """
 
-import logging
+from __future__ import annotations
+
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
+import structlog
+
 from .agent_system import AgentResult, AgentRole
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
+
+__all__ = [
+    "AgentMessage",
+    "Resolution",
+    "ConflictResolver",
+    "AgentCommunicationBus",
+]
 
 
 @dataclass

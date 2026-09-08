@@ -106,7 +106,15 @@ class DuckDBStore:
                 except OSError as unlink_err:
                     logger.debug("Sıfır baytlık dosya silinirken hata", error=str(unlink_err))
 
-            self._conn = duckdb.connect(str(self._db_path))
+            try:
+                self._conn = duckdb.connect(str(self._db_path))
+            except Exception as conn_err:
+                logger.warning(
+                    "DuckDB disk bağlantısı kurulamadı (dosya kilitli olabilir), bellek moduna geçiliyor",
+                    hata=str(conn_err),
+                    path=str(self._db_path),
+                )
+                self._conn = duckdb.connect(":memory:")
 
             # SSD write reduction: DuckDB WAL ve Checkpoint optimizasyonları
             try:

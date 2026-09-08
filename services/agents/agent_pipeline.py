@@ -16,13 +16,16 @@ Akış:
 FAZ 6: Full Pipeline Integration
 """
 
-import logging
+from __future__ import annotations
+
 import os
 import time
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
+
+import structlog
 
 from .agent_memory import AgentMemory, MemoryConsolidator
 from .agent_system import AgentResult, AgentRole, AgentTask, BaseAgent
@@ -38,7 +41,13 @@ from .self_evaluator import MultiAgentEvaluator
 from .synthesis_engine import SynthesisEngine, SynthesisResult
 from .trace_context import TraceContext
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
+
+__all__ = [
+    "PipelineMetrics",
+    "PipelineResult",
+    "AgentPipelineOrchestrator",
+]
 
 
 @dataclass

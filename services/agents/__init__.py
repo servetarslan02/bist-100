@@ -20,6 +20,9 @@ Modüller:
 - schemas: Veri şemaları
 - prompts: Prompt şablonları
 """
+from __future__ import annotations
+
+from typing import Final
 
 __version__ = "2.0.0"
 
@@ -98,7 +101,7 @@ from .self_evaluator import AgentSelfEvaluator, EvalReport, MultiAgentEvaluator
 from .synthesis_engine import SynthesisEngine, SynthesisResult
 from .trace_context import TraceContext, get_trace_id, trace_processor
 
-__all__ = [
+__all__: Final[list[str]] = [
     # Core
     "AgentRole",
     "AgentTask",

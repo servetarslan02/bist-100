@@ -15,10 +15,13 @@ v2.1 değişiklikleri:
 FAZ 4: Synthesis Engine
 """
 
-import logging
+from __future__ import annotations
+
 import time
 from dataclasses import dataclass, field
 from typing import Any
+
+import structlog
 
 from .agent_memory import AgentMemory
 from .agent_system import AgentResult, AgentRole
@@ -27,7 +30,12 @@ from .debate_engine import DebateResult
 from .llm_client import BaseLLMClient
 from .prompts import PromptFactory
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
+
+__all__ = [
+    "SynthesisResult",
+    "SynthesisEngine",
+]
 
 
 @dataclass

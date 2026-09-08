@@ -10,17 +10,28 @@ Kurallar:
 - Test başarılı → CLOSED, başarısız → OPEN devam
 """
 
-import logging
+from __future__ import annotations
+
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Final
+
+import structlog
 
 if TYPE_CHECKING:
     from .llm_client import LLMResponse
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
+
+__all__: Final[list[str]] = [
+    "CircuitBreaker",
+    "CircuitBreakerLLMClient",
+    "CircuitBreakerStats",
+    "CircuitState",
+]
+
 
 
 class CircuitState(StrEnum):

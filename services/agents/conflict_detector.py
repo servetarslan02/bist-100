@@ -14,14 +14,23 @@ v2.1 değişiklikleri:
 FAZ 2: Conflict Detection
 """
 
-import logging
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
 
+import structlog
+
 from .agent_system import AgentResult, AgentRole
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
+
+__all__ = [
+    "ConflictSeverity",
+    "ConflictReport",
+    "ConflictDetector",
+]
 
 
 class ConflictSeverity(StrEnum):

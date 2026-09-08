@@ -19,15 +19,24 @@ v2.1 değişiklikleri:
 FAZ 5: Self-Evaluation
 """
 
-import logging
+from __future__ import annotations
+
 import statistics
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
+import structlog
+
 from .agent_memory import AgentMemory
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
+
+__all__ = [
+    "EvalReport",
+    "AgentSelfEvaluator",
+    "MultiAgentEvaluator",
+]
 
 
 @dataclass

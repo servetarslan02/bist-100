@@ -1,8 +1,20 @@
-"""ALPHA BIST — ML Package (Nihai).
+"""ALPHA BIST — Makine Öğrenimi ve Tahmin Modelleri Paketi (Machine Learning Engine).
 
-LightGBM, XGBoost, CatBoost, Stacking Ensemble, Model Registry,
-Champion-Challenger, Hyperparameter Tuning, Calibration, Feature Drift, Monitoring.
+Bu paket; Borsa İstanbul (BIST) pay piyasası için point-in-time uyumlu,
+sıfır veri sızıntısı (zero data leakage) ilkelerine bağlı ve kurumsal kalitede
+makine öğrenimi altyapısı sunar.
+
+Mimari Standartlar:
+- Şampiyon Model: LightGBM (Gradient Boosting Champion).
+- Meydan Okuyan (Challenger) Modeller: XGBoost ve CatBoost.
+- Ensemble Stratejileri: Ağırlıklı Ensemble, Stacking ve Dynamic Champion-Challenger.
+- Olasılık Kalibrasyonu: Isotonic & Sigmoid Probability Calibration.
+- Doğrulama & Sürüklenme: Purge + Embargo Walk-Forward Validation, Feature Drift (Evidently/KS).
 """
+
+from __future__ import annotations
+
+from typing import Final
 
 import structlog
 
@@ -12,7 +24,9 @@ logger = structlog.get_logger(__name__)
 try:
     from .catboost_model import CatBoostConfig, CatBoostModel
 except ImportError:
-    logger.debug("Optional import not available in module_level", exc_info=True)
+    CatBoostConfig = None  # type: ignore[assignment, misc]
+    CatBoostModel = None  # type: ignore[assignment, misc]
+    logger.debug("CatBoost modelleri opsiyonel içe aktarılamadı", exc_info=True)
 
 from .adjusted_loss import AdjustedMSELoss
 from .calibration import CalibrationResult, ModelCalibration
@@ -57,7 +71,7 @@ from .transformer_model import StockTransformer
 from .walk_forward import WalkForwardValidation
 from .xgboost_model import XGBoostConfig, XGBoostModel
 
-__all__ = [
+__all__: Final[list[str]] = [
     # Core models
     "MLModelConfig",
     "LightGBMTrainer",

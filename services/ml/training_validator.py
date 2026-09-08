@@ -15,13 +15,32 @@ Kontroller:
 8. Validation metrikleri (MAE, RMSE, R², directional accuracy)
 """
 
-from dataclasses import dataclass, field
-from typing import Any
+from __future__ import annotations
 
+import threading
+from dataclasses import asdict, dataclass, field
+from datetime import UTC, datetime
+from typing import Any, Final
+
+import duckdb
 import numpy as np
+import orjson
+import polars as pl
 import structlog
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+
+DEFAULT_DUCKDB_PATH: Final[str] = "data/training_validator.duckdb"
+_VALIDATOR_LOCK: Final[threading.RLock] = threading.RLock()
+
+
+def configure_duckdb_wal(conn: duckdb.DuckDBPyConnection) -> None:
+    """DuckDB bağlantısına SSD ömrünü ve WAL boyutunu koruma direktiflerini uygular."""
+    try:
+        conn.execute("PRAGMA checkpoint_threshold = '4MB';")
+        conn.execute("PRAGMA wal_autocheckpoint = '2MB';")
+    except Exception as exc:
+        logger.warning("DuckDB WAL pragma yapilandirmasi basarisiz", hata=str(exc))
 
 
 @dataclass
@@ -33,6 +52,29 @@ class SampleMeta:
     feature_date: str  # T
     target_date: str  # T+5
     forward_return: float  # target
+
+    def to_dict(self) -> dict[str, Any]:
+        """Dataclass içeriğini sözlük olarak döndürür."""
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> SampleMeta:
+        """Sözlükten SampleMeta nesnesi oluşturur."""
+        return cls(
+            sample_key=str(data.get("sample_key", "")),
+            ticker=str(data.get("ticker", "")),
+            feature_date=str(data.get("feature_date", "")),
+            target_date=str(data.get("target_date", "")),
+            forward_return=float(data.get("forward_return", 0.0)),
+        )
+
+    def to_orjson_bytes(self) -> bytes:
+        """orjson ikili serileştirme döndürür."""
+        return orjson.dumps(self.to_dict())
+
+    def __repr__(self) -> str:
+        """SampleMeta metin gösterimi."""
+        return f"SampleMeta(key='{self.sample_key}', ticker='{self.ticker}', return={self.forward_return:.4f})"
 
 
 @dataclass
@@ -76,6 +118,77 @@ class DataQualityReport:
     warnings: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
 
+    def to_dict(self) -> dict[str, Any]:
+        """Dataclass içeriğini sözlük olarak döndürür."""
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> DataQualityReport:
+        """Sözlükten DataQualityReport nesnesi oluşturur."""
+        return cls(
+            total_samples=int(data.get("total_samples", 0)),
+            valid_samples=int(data.get("valid_samples", 0)),
+            dropped_samples=int(data.get("dropped_samples", 0)),
+            drop_reasons=dict(data.get("drop_reasons", {})),
+            nan_features=dict(data.get("nan_features", {})),
+            inf_features=dict(data.get("inf_features", {})),
+            outlier_features=dict(data.get("outlier_features", {})),
+            target_mean=float(data.get("target_mean", 0.0)),
+            target_std=float(data.get("target_std", 0.0)),
+            target_median=float(data.get("target_median", 0.0)),
+            target_min=float(data.get("target_min", 0.0)),
+            target_max=float(data.get("target_max", 0.0)),
+            target_skew=float(data.get("target_skew", 0.0)),
+            target_kurtosis=float(data.get("target_kurtosis", 0.0)),
+            target_positive_pct=float(data.get("target_positive_pct", 0.0)),
+            feature_stats=dict(data.get("feature_stats", {})),
+            unique_tickers=int(data.get("unique_tickers", 0)),
+            unique_dates=int(data.get("unique_dates", 0)),
+            samples_per_date=dict(data.get("samples_per_date", {})),
+            train_test_overlap=bool(data.get("train_test_overlap", False)),
+            overlap_details=list(data.get("overlap_details", [])),
+            quality_score=float(data.get("quality_score", 0.0)),
+            warnings=list(data.get("warnings", [])),
+            errors=list(data.get("errors", [])),
+        )
+
+    def to_orjson_bytes(self) -> bytes:
+        """orjson ikili serileştirme döndürür."""
+        return orjson.dumps(self.to_dict())
+
+    def to_polars(self) -> pl.DataFrame:
+        """Önemli metrik ve istatistikleri Polars DataFrame formatında özetler."""
+        rows = []
+        for feat, stats in self.feature_stats.items():
+            rows.append({
+                "feature": feat,
+                "mean": stats.get("mean", 0.0),
+                "std": stats.get("std", 0.0),
+                "median": stats.get("median", 0.0),
+                "min": stats.get("min", 0.0),
+                "max": stats.get("max", 0.0),
+                "nan_count": stats.get("nan_count", 0),
+                "inf_count": stats.get("inf_count", 0),
+                "outlier_count": stats.get("outlier_count", 0),
+                "quality_score": self.quality_score,
+            })
+        if not rows:
+            return pl.DataFrame({
+                "total_samples": [self.total_samples],
+                "valid_samples": [self.valid_samples],
+                "dropped_samples": [self.dropped_samples],
+                "quality_score": [self.quality_score],
+                "train_test_overlap": [self.train_test_overlap],
+            })
+        return pl.DataFrame(rows)
+
+    def __repr__(self) -> str:
+        """DataQualityReport metin gösterimi."""
+        return (
+            f"DataQualityReport(total={self.total_samples}, valid={self.valid_samples}, "
+            f"dropped={self.dropped_samples}, score={self.quality_score:.2f})"
+        )
+
 
 @dataclass
 class ValidationMetrics:
@@ -89,6 +202,39 @@ class ValidationMetrics:
     ndcg: float = 0.0
     precision_at_5: float = 0.0
     precision_at_10: float = 0.0
+
+    def to_dict(self) -> dict[str, Any]:
+        """Dataclass içeriğini sözlük olarak döndürür."""
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> ValidationMetrics:
+        """Sözlükten ValidationMetrics nesnesi oluşturur."""
+        return cls(
+            mae=float(data.get("mae", 0.0)),
+            rmse=float(data.get("rmse", 0.0)),
+            r_squared=float(data.get("r_squared", 0.0)),
+            directional_accuracy=float(data.get("directional_accuracy", 0.0)),
+            ic=float(data.get("ic", 0.0)),
+            ndcg=float(data.get("ndcg", 0.0)),
+            precision_at_5=float(data.get("precision_at_5", 0.0)),
+            precision_at_10=float(data.get("precision_at_10", 0.0)),
+        )
+
+    def to_orjson_bytes(self) -> bytes:
+        """orjson ikili serileştirme döndürür."""
+        return orjson.dumps(self.to_dict())
+
+    def to_polars(self) -> pl.DataFrame:
+        """Metrikleri tek satırlık Polars DataFrame olarak sunar."""
+        return pl.DataFrame([self.to_dict()])
+
+    def __repr__(self) -> str:
+        """ValidationMetrics metin gösterimi."""
+        return (
+            f"ValidationMetrics(ic={self.ic:.4f}, rmse={self.rmse:.4f}, "
+            f"dir_acc={self.directional_accuracy:.2f}, ndcg={self.ndcg:.4f})"
+        )
 
 
 class TrainingDatasetValidator:
@@ -107,6 +253,76 @@ class TrainingDatasetValidator:
     MIN_VALID_SAMPLE_RATIO = 0.8  # En az %80 sample geçerli olmalı
     MIN_SAMPLES_PER_DATE = 2  # Her tarihte en az 2 hisse (cross-sectional için)
     MAX_NAN_RATIO_PER_FEATURE = 0.3  # Tek feature'da %30'dan fazla NaN = uyarı
+
+    def __init__(self, duckdb_path: str = DEFAULT_DUCKDB_PATH) -> None:
+        """TrainingDatasetValidator bileşenini başlatır."""
+        self._lock = threading.RLock()
+        self._duckdb_path = duckdb_path
+
+    def __repr__(self) -> str:
+        return f"TrainingDatasetValidator(duckdb_path={self._duckdb_path!r})"
+
+    def record_quality_audit(
+        self,
+        report: DataQualityReport,
+        dataset_name: str = "default_training_set",
+        duckdb_path: str | None = None,
+    ) -> None:
+        """Kalite denetim raporunu DuckDB WAL tablosuna işler."""
+        target_db = duckdb_path or self._duckdb_path
+        with self._lock:
+            try:
+                with duckdb.connect(target_db) as conn:
+                    configure_duckdb_wal(conn)
+                    conn.execute(
+                        """
+                        CREATE TABLE IF NOT EXISTS training_quality_audit (
+                            timestamp TIMESTAMPTZ NOT NULL,
+                            dataset_name VARCHAR NOT NULL,
+                            total_samples BIGINT NOT NULL,
+                            valid_samples BIGINT NOT NULL,
+                            dropped_samples BIGINT NOT NULL,
+                            quality_score DOUBLE NOT NULL,
+                            leakage_detected BOOLEAN NOT NULL,
+                            report_json VARCHAR NOT NULL
+                        );
+                        """
+                    )
+                    now_iso = datetime.now(UTC).isoformat()
+                    conn.execute(
+                        """
+                        INSERT INTO training_quality_audit
+                        (timestamp, dataset_name, total_samples, valid_samples, dropped_samples, quality_score, leakage_detected, report_json)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+                        """,
+                        [
+                            now_iso,
+                            dataset_name,
+                            report.total_samples,
+                            report.valid_samples,
+                            report.dropped_samples,
+                            report.quality_score,
+                            report.train_test_overlap,
+                            report.to_orjson_bytes().decode("utf-8"),
+                        ],
+                    )
+            except Exception as exc:
+                logger.warning("training_quality_audit kaydi basarisiz", hata=str(exc))
+
+    def get_audit_as_polars(self, duckdb_path: str | None = None) -> pl.DataFrame:
+        """DuckDB audit geçmişini Polars DataFrame olarak döndürür."""
+        target_db = duckdb_path or self._duckdb_path
+        with self._lock:
+            try:
+                with duckdb.connect(target_db) as conn:
+                    configure_duckdb_wal(conn)
+                    arrow_table = conn.execute(
+                        "SELECT * FROM training_quality_audit ORDER BY timestamp DESC;"
+                    ).arrow()
+                    return pl.from_arrow(arrow_table)  # type: ignore[return-value]
+            except Exception as exc:
+                logger.warning("training_quality_audit okunamadi", hata=str(exc))
+                return pl.DataFrame()
 
     def validate_dataset(
         self,
@@ -128,16 +344,17 @@ class TrainingDatasetValidator:
         Returns:
             DataQualityReport
         """
-        report = DataQualityReport()
-        report.total_samples = len(features_map)
+        with self._lock:
+            report = DataQualityReport()
+            report.total_samples = len(features_map)
 
-        if report.total_samples == 0:
-            report.errors.append("Empty dataset")
-            report.quality_score = 0.0
-            return report
+            if report.total_samples == 0:
+                report.errors.append("Empty dataset")
+                report.quality_score = 0.0
+                return report
 
-        # === 1. SAMPLE METADATA DOĞRULUĞU ===
-        self._validate_sample_metadata(features_map, returns, date_groups, report)
+            # === 1. SAMPLE METADATA DOĞRULUĞU ===
+            self._validate_sample_metadata(features_map, returns, date_groups, report)
 
         # === 2. NaN/INF/OUTLIER ANALİZİ ===
         self._validate_features(features_map, feature_names, report)
@@ -599,6 +816,13 @@ class CrossSectionalNormalizer:
     KURAL: Sadece o tarihe kadar bilinen veriler kullanılır.
     """
 
+    def __init__(self) -> None:
+        """CrossSectionalNormalizer bileşenini başlatır."""
+        self._lock = threading.RLock()
+
+    def __repr__(self) -> str:
+        return "CrossSectionalNormalizer()"
+
     def normalize_zscore_by_date(
         self,
         features_map: dict[str, dict[str, Any]],
@@ -808,3 +1032,17 @@ def prepare_features_for_inference(
                 result[fname] = 0.0
 
     return result
+
+
+__all__: Final[list[str]] = [
+    "DEFAULT_DUCKDB_PATH",
+    "CrossSectionalNormalizer",
+    "DataQualityReport",
+    "SampleMeta",
+    "TrainingDatasetValidator",
+    "ValidationMetrics",
+    "configure_duckdb_wal",
+    "cross_sectional_normalizer",
+    "prepare_features_for_inference",
+    "training_validator",
+]

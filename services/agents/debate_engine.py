@@ -18,15 +18,24 @@ v2.1 değişiklikleri:
 FAZ 2: Bull/Bear Debate
 """
 
-import logging
+from __future__ import annotations
+
 import time
 from dataclasses import dataclass, field
 from typing import Any
 
+import structlog
+
 from .agent_system import AgentResult, AgentRole, AgentTask, BaseAgent
 from .llm_client import BaseLLMClient
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
+
+__all__ = [
+    "DebateRound",
+    "DebateResult",
+    "DebateEngine",
+]
 
 
 def _truncate_at_sentence(text: str, max_len: int) -> str:

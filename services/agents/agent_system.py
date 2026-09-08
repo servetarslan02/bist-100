@@ -11,9 +11,10 @@ Refactored:
 FAZ 0: Temel altyapı refactor
 """
 
+from __future__ import annotations
+
 import asyncio
 import hashlib
-import logging
 import re
 import time
 from dataclasses import dataclass, field
@@ -22,6 +23,7 @@ from enum import StrEnum
 from typing import Any
 
 import orjson
+import structlog
 
 from .llm_client import (
     BaseLLMClient,
@@ -41,7 +43,19 @@ from .schemas import (
     validate_agent_output,
 )
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
+
+__all__ = [
+    "AgentRole",
+    "AgentTask",
+    "AgentResult",
+    "AgentToolRegistry",
+    "AIOutputValidator",
+    "AIFallback",
+    "BaseAgent",
+    "run_agent_analysis",
+    "PROMPT_VERSION",
+]
 
 
 class AgentRole(StrEnum):

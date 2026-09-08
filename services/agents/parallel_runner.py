@@ -14,12 +14,15 @@ v2.1 değişiklikleri:
 FAZ 1: Paralel Çalışma
 """
 
+from __future__ import annotations
+
 import asyncio
-import logging
 import time
 import uuid
 from dataclasses import dataclass, field
 from typing import Any
+
+import structlog
 
 from .agent_system import (
     AgentResult,
@@ -30,7 +33,13 @@ from .agent_system import (
 )
 from .llm_client import BaseLLMClient
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
+
+__all__ = [
+    "ParallelRunResult",
+    "ParallelAgentRunner",
+    "AgentPipelineBuilder",
+]
 
 
 @dataclass
