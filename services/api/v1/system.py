@@ -212,7 +212,8 @@ async def get_databases_info(user=Depends(get_current_user), _=Depends(check_rat
         t_res = await loop.run_in_executor(
             None,
             ch_execute,
-            "SELECT table, sum(rows), formatReadableSize(sum(data_compressed_bytes)) FROM system.parts WHERE active GROUP BY table",
+            "SELECT table, sum(rows), formatReadableSize(sum(data_compressed_bytes)) "
+            "FROM system.parts WHERE active GROUP BY table",
         )
         for row in t_res.result_rows:
             ch_tables.append({"name": str(row[0]), "rows": f"{row[1]:,} Satır", "size": str(row[2])})
@@ -237,7 +238,8 @@ async def get_databases_info(user=Depends(get_current_user), _=Depends(check_rat
             pg_size = str(res_pg)
 
         rows = await pg_fetch("""
-            SELECT relname AS table_name, n_live_tup AS row_count, pg_size_pretty(pg_total_relation_size(relid)) AS total_size
+            SELECT relname AS table_name, n_live_tup AS row_count,
+                   pg_size_pretty(pg_total_relation_size(relid)) AS total_size
             FROM pg_stat_user_tables
             ORDER BY n_live_tup DESC
             LIMIT 5
@@ -399,7 +401,7 @@ async def get_db_performance(user=Depends(get_current_user), _=Depends(check_rat
 
 @router.get("/alerts")
 async def get_system_alerts(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
-    """Alarm & Risk Bildirim Merkezi — Canlı piyasa, model sinyalleri, volatilite ve risk alarmları (Hızlı Önbellekli)."""
+    """Alarm & Risk Bildirim Merkezi — Canlı piyasa, model sinyalleri, volatilite ve risk alarmları."""
     cached = _alerts_cache.get()
     if cached is not None:
         return cached
@@ -426,7 +428,10 @@ async def get_system_alerts(user=Depends(get_current_user), _=Depends(check_rate
                 {
                     "id": f"alt-ml-{ticker}-{idx}",
                     "title": f"ML Model Sinyali: {ticker} ({sig_type})",
-                    "message": f"{ticker} için {score} güvenilirlik skoruyla {sig_type} tespit edildi. Güncel Fiyat: ₺{price:.2f}, Hedef: ₺{target_p:.2f}, Stop: ₺{stop_p:.2f}.",
+                    "message": (
+                        f"{ticker} için {score} güvenilirlik skoruyla {sig_type} tespit edildi. "
+                        f"Güncel Fiyat: ₺{price:.2f}, Hedef: ₺{target_p:.2f}, Stop: ₺{stop_p:.2f}."
+                    ),
                     "severity": "CRITICAL" if score >= 85 else "INFO",
                     "category": "SIGNAL",
                     "ticker": ticker,

@@ -557,7 +557,8 @@ class PointInTimeValidator:
                                 violation_type="timing_error",
                                 severity="warning",
                                 description=(
-                                    f"Öznitelik '{col}' son {len(recent_df)} gözlemde %{nan_ratio * 100:.1f} eksik/NaN içeriyor. "
+                                    f"Öznitelik '{col}' son {len(recent_df)} gözlemde "
+                                    f"%{nan_ratio * 100:.1f} eksik/NaN içeriyor. "
                                     "Veri erişiminde gecikme veya eksiklik olabilir."
                                 ),
                             )

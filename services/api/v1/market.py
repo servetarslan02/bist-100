@@ -3,18 +3,19 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 from collections import defaultdict
 from datetime import UTC, datetime
 from typing import Any
 
 import numpy as np
+import structlog
 import yfinance as yf
 from fastapi import APIRouter, Depends, HTTPException, Query
 
+from ...core.swr_cache import SWRCache
 from ..dependencies import check_rate_limit, get_current_user, get_service_orchestrator
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 router = APIRouter()
 
@@ -280,8 +281,6 @@ async def market_state(
             detail=f"Piyasa durumu alınamadı: {exc}",
         ) from exc
 
-
-from ...core.swr_cache import SWRCache
 
 _instruments_cache = SWRCache(ttl_seconds=3600)
 

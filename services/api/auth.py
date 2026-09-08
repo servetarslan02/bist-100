@@ -79,7 +79,10 @@ class User:
     is_active: bool = True
 
     def __repr__(self) -> str:
-        return f"User(user_id={self.user_id!r}, username={self.username!r}, role={self.role!r}, is_active={self.is_active!r})"
+        return (
+            f"User(user_id={self.user_id!r}, username={self.username!r}, "
+            f"role={self.role!r}, is_active={self.is_active!r})"
+        )
 
 
 @dataclass

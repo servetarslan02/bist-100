@@ -188,7 +188,10 @@ async def performance_report(
 
     return {
         "success": True,
-        "markdown": "# ALPHA BIST — MLOps Model Öğrenme Raporu\n\nModeller sürekli olarak canlı veriyle güncellenmektedir.",
+        "markdown": (
+            "# ALPHA BIST — MLOps Model Öğrenme Raporu\n\n"
+            "Modeller sürekli olarak canlı veriyle güncellenmektedir."
+        ),
         "generated_at": datetime.now(UTC).isoformat(),
         "models_count": 0,
     }
