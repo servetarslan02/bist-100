@@ -165,6 +165,9 @@ def _market_model(
 
     Returns:
         Model parametreleri sözlüğü
+
+    Raises:
+        ValueError: OLS çözümü başarısız olursa (LinAlgError)
     """
     n = len(stock_returns)
     X = np.column_stack([np.ones(n), market_returns])
@@ -225,6 +228,9 @@ def _fama_french_3(
 
     Returns:
         Model parametreleri sözlüğü
+
+    Raises:
+        ValueError: OLS çözümü başarısız olursa (LinAlgError)
     """
     if smb_returns is None or hml_returns is None:
         logger.warning("beklenen_donuyor_ff3_factor_eksik", smb_eksik=smb_returns is None, hml_eksik=hml_returns is None)
@@ -305,6 +311,9 @@ def _fama_french_5(
 
     Returns:
         Model parametreleri sözlüğü
+
+    Raises:
+        ValueError: OLS çözümü başarısız olursa (LinAlgError)
     """
     if smb_returns is None or hml_returns is None:
         return _market_model(stock_returns, market_returns, hac_lags=hac_lags)
