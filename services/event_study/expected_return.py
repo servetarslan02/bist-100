@@ -51,6 +51,10 @@ def _validate_array(arr: np.ndarray, name: str, min_len: int = 0) -> None:
         logger.error("beklenen_donuyor_dizi_boyut_hatasi", beklenti=ARRAY_DIM, gercek=arr.ndim, dizi=name)
         raise ValueError(f"{name} tek boyutlu olmalı, gelen boyut: {arr.ndim}")
 
+    if len(arr) == 0:
+        logger.error("beklenen_donuyor_dizi_bos", dizi=name, uzunluk=0, minimum=0)
+        raise ValueError(f"{name} dizisi boş.")
+
     if min_len > 0 and len(arr) < min_len:
         logger.error("beklenen_donuyor_dizi_bos", dizi=name, uzunluk=len(arr), minimum=min_len)
         raise ValueError(f"{name} yetersiz veri: {len(arr)} gözlem, minimum {min_len} gerekli.")
