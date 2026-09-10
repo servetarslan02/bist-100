@@ -1,5 +1,3 @@
-from typing import Any
-
 """ALPHA BIST — Expected Return (Multi-Factor Model).
 
 Market Model (OLS) ve Fama-French 3/5-Factor modeli destekler.
@@ -11,9 +9,14 @@ v2.0 Yenilikler:
 - Trading day bazlı estimation window entegrasyonu
 - Newey-West HAC standard errors (otokorelasyon düzeltmesi)
 - Factor verisi yoksa otomatik fallback (Market Model)
+
+Sayısal kararlılık notları:
+- float64 dtype zorunlu
+- Condition number kontrolü (ill-conditioned matris uyarısı)
+- np.isfinite tek traversal NaN/Inf tespiti
 """
 
-from typing import Literal
+from typing import Any, Literal
 
 import numpy as np
 import structlog
@@ -21,6 +24,67 @@ import structlog
 logger = structlog.get_logger()
 
 ModelType = Literal["market", "fama_french_3", "fama_french_5"]
+
+# Varsayılan sabitler
+MIN_OBSERVATIONS: int = 10
+ARRAY_DIM: int = 1
+CONDITION_NUMBER_THRESHOLD: float = 1e12
+
+
+def _validate_array(arr: np.ndarray, name: str, min_len: int = 0) -> None:
+    """Array doğrulama — tip, boyut, NaN/Inf kontrolü.
+
+    Args:
+        arr: Doğrulanacak array
+        name: Array adı
+        min_len: Minimum uzunluk
+
+    Raises:
+        TypeError: numpy array değilse
+        ValueError: Boş, NaN/Inf içeriyorsa veya yanlış boyuttaysa
+    """
+    if not isinstance(arr, np.ndarray):
+        logger.error("beklenen_donuyor_dizi_tip_hatasi", beklenti="np.ndarray", gercek=type(arr).__name__, dizi=name)
+        raise TypeError(f"{name} numpy array olmalı, gelen tip: {type(arr).__name__}")
+
+    if arr.ndim != ARRAY_DIM:
+        logger.error("beklenen_donuyor_dizi_boyut_hatasi", beklenti=ARRAY_DIM, gercek=arr.ndim, dizi=name)
+        raise ValueError(f"{name} tek boyutlu olmalı, gelen boyut: {arr.ndim}")
+
+    if min_len > 0 and len(arr) < min_len:
+        logger.error("beklenen_donuyor_dizi_bos", dizi=name, uzunluk=len(arr), minimum=min_len)
+        raise ValueError(f"{name} yetersiz veri: {len(arr)} gözlem, minimum {min_len} gerekli.")
+
+    if np.issubdtype(arr.dtype, np.number) and not np.all(np.isfinite(arr)):
+        has_nan = bool(np.any(np.isnan(arr)))
+        has_inf = bool(np.any(np.isinf(arr)))
+        logger.error("beklenen_donuyor_dizi_gecersiz_deger", dizi=name, nan_var=has_nan, inf_var=has_inf)
+        raise ValueError(f"{name} dizisinde {'NaN' if has_nan else ''}{' ve ' if has_nan and has_inf else ''}{'Inf' if has_inf else ''} değeri var.")
+
+
+def _ensure_float64(arr: np.ndarray) -> np.ndarray:
+    """Array'i float64'e dönüştür (zaten float64 ise kopyasız döndür)."""
+    if arr.dtype == np.float64:
+        return arr
+    return arr.astype(np.float64, copy=False)
+
+
+def _check_condition_number(X: np.ndarray) -> None:
+    """Condition number kontrolü — ill-conditioned matris uyarısı.
+
+    Args:
+        X: Regresör matrisi
+    """
+    try:
+        cond_num = np.linalg.cond(X)
+        if cond_num > CONDITION_NUMBER_THRESHOLD:
+            logger.warning(
+                "beklenen_donuyor_kotu_durum_matris",
+                condition_number=round(float(cond_num), 2),
+                esik=CONDITION_NUMBER_THRESHOLD,
+            )
+    except np.linalg.LinAlgError:
+        pass
 
 
 def calculate_expected_return(
@@ -48,37 +112,39 @@ def calculate_expected_return(
     Returns:
         Dict with alpha, beta_market, beta_smb, beta_hml, beta_rmw, beta_cma,
         r_squared, residual_se, n_obs, model, hac_se (opsiyonel)
+
+    Raises:
+        TypeError: Girdiler numpy array değilse
+        ValueError: Boş array, uzunluk uyuşmazlığı, NaN/Inf varsa
     """
+    _validate_array(stock_returns, "stock_returns")
+    _validate_array(market_returns, "market_returns")
+
+    if len(stock_returns) != len(market_returns):
+        logger.error(
+            "beklenen_donuyor_uzunluk_uyusmazligi",
+            hisse_uzunluk=len(stock_returns),
+            piyasa_uzunluk=len(market_returns),
+        )
+        raise ValueError(
+            f"stock_returns ve market_returns uzunlukları eşit olmalı: "
+            f"stock={len(stock_returns)}, market={len(market_returns)}"
+        )
+
     n = len(stock_returns)
-
-    if n < 10 or len(market_returns) < 10:
-        logger.warning("insufficient_data_for_expected_return", n=n)
+    if n < MIN_OBSERVATIONS:
+        logger.warning("beklenen_donuyor_yetersiz_veri", n=n, minimum=MIN_OBSERVATIONS)
         return _default_params(model)
 
-    try:
-        if model == "fama_french_3":
-            return _fama_french_3(
-                stock_returns,
-                market_returns,
-                smb_returns,
-                hml_returns,
-                hac_lags=hac_lags,
-            )
-        elif model == "fama_french_5":
-            return _fama_french_5(
-                stock_returns,
-                market_returns,
-                smb_returns,
-                hml_returns,
-                rmw_returns,
-                cma_returns,
-                hac_lags=hac_lags,
-            )
-        else:
-            return _market_model(stock_returns, market_returns, hac_lags=hac_lags)
-    except Exception as e:
-        logger.error("expected_return_calculation_error", error=str(e))
-        return _default_params(model)
+    stock_f64 = _ensure_float64(stock_returns)
+    market_f64 = _ensure_float64(market_returns)
+
+    if model == "fama_french_3":
+        return _fama_french_3(stock_f64, market_f64, smb_returns, hml_returns, hac_lags=hac_lags)
+    elif model == "fama_french_5":
+        return _fama_french_5(stock_f64, market_f64, smb_returns, hml_returns, rmw_returns, cma_returns, hac_lags=hac_lags)
+    else:
+        return _market_model(stock_f64, market_f64, hac_lags=hac_lags)
 
 
 def _market_model(
@@ -86,29 +152,41 @@ def _market_model(
     market_returns: np.ndarray,
     hac_lags: int = 0,
 ) -> dict[str, float]:
-    """Basit Market Model: E[R] = α + β × R_m."""
-    X = np.column_stack([np.ones(len(market_returns)), market_returns])
+    """Basit Market Model: E[R] = α + β × R_m.
+
+    Args:
+        stock_returns: Hisse getirileri (float64)
+        market_returns: Piyasa getirileri (float64)
+        hac_lags: Newey-West HAC lags
+
+    Returns:
+        Model parametreleri sözlüğü
+    """
+    n = len(stock_returns)
+    X = np.column_stack([np.ones(n), market_returns])
     y = stock_returns
 
-    betas, residuals, rank, sv = np.linalg.lstsq(X, y, rcond=None)
+    _check_condition_number(X)
 
-    # R² hesapla
+    try:
+        betas, residuals, rank, sv = np.linalg.lstsq(X, y, rcond=None)
+    except np.linalg.LinAlgError as e:
+        logger.error("beklenen_donuyor_pazar_modeli_hatasi", hata=str(e))
+        raise ValueError(f"Market model OLS hatası: {e}") from e
+
     y_pred = X @ betas
     ss_res = np.sum((y - y_pred) ** 2)
     ss_tot = np.sum((y - np.mean(y)) ** 2)
     r_squared = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0.0
 
-    # Residual standard error
-    n = len(y)
     k = 2  # intercept + beta
     residual_se = np.sqrt(ss_res / (n - k)) if n > k else 0.0
 
-    # Newey-West HAC standard errors
     hac_se = None
     if hac_lags > 0:
         hac_se = _newey_west_se(X, y - y_pred, hac_lags)
 
-    result = {
+    result: dict[str, Any] = {
         "alpha": float(betas[0]),
         "beta_market": float(betas[1]),
         "beta_smb": 0.0,
@@ -132,38 +210,59 @@ def _fama_french_3(
     hml_returns: np.ndarray | None,
     hac_lags: int = 0,
 ) -> dict[str, float]:
-    """Fama-French 3-Factor Model: E[R] = α + β_m×R_m + β_smb×SMB + β_hml×HML."""
+    """Fama-French 3-Factor Model: E[R] = α + β_m×R_m + β_smb×SMB + β_hml×HML.
+
+    Args:
+        stock_returns: Hisse getirileri (float64)
+        market_returns: Piyasa getirileri (float64)
+        smb_returns: SMB factor (opsiyonel)
+        hml_returns: HML factor (opsiyonel)
+        hac_lags: HAC lags
+
+    Returns:
+        Model parametreleri sözlüğü
+    """
     if smb_returns is None or hml_returns is None:
-        logger.warning("fama_french_3_missing_factors_falling_back_to_market")
+        logger.warning("beklenen_donuyor_ff3_factor_eksik", smb_eksik=smb_returns is None, hml_eksik=hml_returns is None)
         return _market_model(stock_returns, market_returns, hac_lags=hac_lags)
 
+    _validate_array(smb_returns, "smb_returns")
+    _validate_array(hml_returns, "hml_returns")
+
     n = min(len(stock_returns), len(market_returns), len(smb_returns), len(hml_returns))
-    X = np.column_stack(
-        [
-            np.ones(n),
-            market_returns[:n],
-            smb_returns[:n],
-            hml_returns[:n],
-        ]
-    )
+    if n < MIN_OBSERVATIONS:
+        logger.warning("beklenen_donuyor_ff3_yetersiz_veri", n=n)
+        return _market_model(stock_returns[:n], market_returns[:n], hac_lags=hac_lags)
+
+    X = np.column_stack([
+        np.ones(n),
+        _ensure_float64(market_returns[:n]),
+        _ensure_float64(smb_returns[:n]),
+        _ensure_float64(hml_returns[:n]),
+    ])
     y = stock_returns[:n]
 
-    betas, _, _, _ = np.linalg.lstsq(X, y, rcond=None)
+    _check_condition_number(X)
+
+    try:
+        betas, _, _, _ = np.linalg.lstsq(X, y, rcond=None)
+    except np.linalg.LinAlgError as e:
+        logger.error("beklenen_donuyor_ff3_hatasi", hata=str(e))
+        raise ValueError(f"FF3 OLS hatası: {e}") from e
 
     y_pred = X @ betas
     ss_res = np.sum((y - y_pred) ** 2)
     ss_tot = np.sum((y - np.mean(y)) ** 2)
     r_squared = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0.0
 
-    n_obs = len(y)
     k = 4
-    residual_se = np.sqrt(ss_res / (n_obs - k)) if n_obs > k else 0.0
+    residual_se = np.sqrt(ss_res / (n - k)) if n > k else 0.0
 
     hac_se = None
     if hac_lags > 0:
         hac_se = _newey_west_se(X, y - y_pred, hac_lags)
 
-    result = {
+    result: dict[str, Any] = {
         "alpha": float(betas[0]),
         "beta_market": float(betas[1]),
         "beta_smb": float(betas[2]),
@@ -172,7 +271,7 @@ def _fama_french_3(
         "beta_cma": 0.0,
         "r_squared": float(r_squared),
         "residual_se": float(residual_se),
-        "n_obs": n_obs,
+        "n_obs": n,
         "model": "fama_french_3",
     }
     if hac_se is not None:
@@ -189,11 +288,29 @@ def _fama_french_5(
     cma_returns: np.ndarray | None,
     hac_lags: int = 0,
 ) -> dict[str, float]:
-    """Fama-French 5-Factor Model."""
+    """Fama-French 5-Factor Model.
+
+    Args:
+        stock_returns: Hisse getirileri (float64)
+        market_returns: Piyasa getirileri (float64)
+        smb_returns: SMB factor (opsiyonel)
+        hml_returns: HML factor (opsiyonel)
+        rmw_returns: RMW factor (opsiyonel)
+        cma_returns: CMA factor (opsiyonel)
+        hac_lags: HAC lags
+
+    Returns:
+        Model parametreleri sözlüğü
+    """
     if smb_returns is None or hml_returns is None:
         return _market_model(stock_returns, market_returns, hac_lags=hac_lags)
     if rmw_returns is None or cma_returns is None:
         return _fama_french_3(stock_returns, market_returns, smb_returns, hml_returns, hac_lags=hac_lags)
+
+    _validate_array(smb_returns, "smb_returns")
+    _validate_array(hml_returns, "hml_returns")
+    _validate_array(rmw_returns, "rmw_returns")
+    _validate_array(cma_returns, "cma_returns")
 
     n = min(
         len(stock_returns),
@@ -203,34 +320,41 @@ def _fama_french_5(
         len(rmw_returns),
         len(cma_returns),
     )
-    X = np.column_stack(
-        [
-            np.ones(n),
-            market_returns[:n],
-            smb_returns[:n],
-            hml_returns[:n],
-            rmw_returns[:n],
-            cma_returns[:n],
-        ]
-    )
+    if n < MIN_OBSERVATIONS:
+        logger.warning("beklenen_donuyor_ff5_yetersiz_veri", n=n)
+        return _fama_french_3(stock_returns[:n], market_returns[:n], smb_returns[:n], hml_returns[:n], hac_lags=hac_lags)
+
+    X = np.column_stack([
+        np.ones(n),
+        _ensure_float64(market_returns[:n]),
+        _ensure_float64(smb_returns[:n]),
+        _ensure_float64(hml_returns[:n]),
+        _ensure_float64(rmw_returns[:n]),
+        _ensure_float64(cma_returns[:n]),
+    ])
     y = stock_returns[:n]
 
-    betas, _, _, _ = np.linalg.lstsq(X, y, rcond=None)
+    _check_condition_number(X)
+
+    try:
+        betas, _, _, _ = np.linalg.lstsq(X, y, rcond=None)
+    except np.linalg.LinAlgError as e:
+        logger.error("beklenen_donuyor_ff5_hatasi", hata=str(e))
+        raise ValueError(f"FF5 OLS hatası: {e}") from e
 
     y_pred = X @ betas
     ss_res = np.sum((y - y_pred) ** 2)
     ss_tot = np.sum((y - np.mean(y)) ** 2)
     r_squared = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0.0
 
-    n_obs = len(y)
     k = 6
-    residual_se = np.sqrt(ss_res / (n_obs - k)) if n_obs > k else 0.0
+    residual_se = np.sqrt(ss_res / (n - k)) if n > k else 0.0
 
     hac_se = None
     if hac_lags > 0:
         hac_se = _newey_west_se(X, y - y_pred, hac_lags)
 
-    result = {
+    result: dict[str, Any] = {
         "alpha": float(betas[0]),
         "beta_market": float(betas[1]),
         "beta_smb": float(betas[2]),
@@ -239,7 +363,7 @@ def _fama_french_5(
         "beta_cma": float(betas[5]),
         "r_squared": float(r_squared),
         "residual_se": float(residual_se),
-        "n_obs": n_obs,
+        "n_obs": n,
         "model": "fama_french_5",
     }
     if hac_se is not None:
@@ -247,16 +371,11 @@ def _fama_french_5(
     return result
 
 
-def _newey_west_se(X: np.ndarray, residuals: np.ndarray, lags: int) -> dict[str, float]:
-    """Newey-West HAC (Heteroskedasticity and Autocorrelation Consistent) standard errors.
+def _newey_west_se(X: np.ndarray, residuals: np.ndarray, lags: int) -> dict[str, Any]:
+    """Newey-West HAC standard errors.
 
     Otokorelasyon ve heteroskedastisite olduğunda OLS standard errors bias'lıdır.
     Newey-West (1987) düzeltmesi bu sorunu giderir.
-
-    S_hat = (1/n) * Σ_t (e_t² * x_t * x_t')
-           + (1/n) * Σ_{j=1}^{lags} w_j * Σ_{t=j+1}^{n} (e_t * e_{t-j}) * (x_t * x_{t-j}' + x_{t-j} * x_t')
-
-    w_j = 1 - j/(lags+1)  (Bartlett kernel)
 
     Args:
         X: Regresör matrisi (n × k)
@@ -264,38 +383,41 @@ def _newey_west_se(X: np.ndarray, residuals: np.ndarray, lags: int) -> dict[str,
         lags: HAC lag sayısı
 
     Returns:
-        Dict with hac_se (parameter standard errors) and hac_t_stats
+        Dict with hac_se and hac_lags
+
+    Raises:
+        ValueError: lags negatif ise
     """
+    if lags < 0:
+        logger.error("beklenen_donuyor_hac_negatif_lags", lags=lags)
+        raise ValueError(f"HAC lags negatif olamaz: {lags}")
+
     n, k = X.shape
     e = residuals
 
     # Bartlett kernel ağırlıkları
-    def w(j) -> Any:
-        """Otomatik eklendi."""
-        return 1 - j / (lags + 1)
-
-    # S_hat hesapla (k × k sandwich matrix)
+    # w_j = 1 - j/(lags+1)
     S = np.zeros((k, k))
 
     # j=0 terimi: Σ e_t² * x_t * x_t'
     for t in range(n):
         S += e[t] ** 2 * np.outer(X[t], X[t])
 
-    # j>0 terimleri: Σ w_j * e_t * e_{t-j} * (x_t * x_{t-j}' + x_{t-j} * x_t')
+    # j>0 terimleri
     for j in range(1, lags + 1):
-        wj = w(j)
+        wj = 1.0 - j / (lags + 1.0)
         for t in range(j, n):
             cross = e[t] * e[t - j] * (np.outer(X[t], X[t - j]) + np.outer(X[t - j], X[t]))
             S += wj * cross
 
     S /= n
 
-    # Var(kovaryans) = (X'X)^{-1} S (X'X)^{-1}
     try:
         XtX_inv = np.linalg.inv(X.T @ X / n)
         V = XtX_inv @ S @ XtX_inv / n
         hac_se = np.sqrt(np.maximum(np.diag(V), 0))
     except np.linalg.LinAlgError:
+        logger.warning("beklenen_donuyor_hac_ters_hatasi")
         hac_se = np.zeros(k)
 
     return {
@@ -315,6 +437,17 @@ def calculate_expected_return_value(
     """Parametrelerden expected return hesapla.
 
     E[R] = α + β_m×R_m + β_smb×SMB + β_hml×HML + β_rmw×RMW + β_cma×CMA
+
+    Args:
+        params: Model parametreleri
+        market_return: Piyasa getirisi
+        smb: SMB factor
+        hml: HML factor
+        rmw: RMW factor
+        cma: CMA factor
+
+    Returns:
+        Expected return değeri
     """
     return (
         params["alpha"]
@@ -327,7 +460,14 @@ def calculate_expected_return_value(
 
 
 def _default_params(model: ModelType) -> dict[str, float]:
-    """Varsayılan parametreler (yeterli veri yoksa)."""
+    """Varsayılan parametreler (yeterli veri yoksa).
+
+    Args:
+        model: Model tipi
+
+    Returns:
+        Varsayılan parametre sözlüğü
+    """
     return {
         "alpha": 0.0,
         "beta_market": 1.0,
@@ -342,8 +482,15 @@ def _default_params(model: ModelType) -> dict[str, float]:
     }
 
 
-# Backward compatibility — eski API
 def calculate_expected_return_simple(stock_returns: np.ndarray, market_returns: np.ndarray) -> tuple[float, float]:
-    """Eski API uyumluluğu — (alpha, beta) döndür."""
+    """Eski API uyumluluğu — (alpha, beta) döndür.
+
+    Args:
+        stock_returns: Hisse getirileri
+        market_returns: Piyasa getirileri
+
+    Returns:
+        (alpha, beta_market) tuple
+    """
     result = calculate_expected_return(stock_returns, market_returns, model="market")
     return result["alpha"], result["beta_market"]
