@@ -84,7 +84,7 @@ def _check_condition_number(X: np.ndarray) -> None:
                 esik=CONDITION_NUMBER_THRESHOLD,
             )
     except np.linalg.LinAlgError:
-        pass
+        logger.debug("beklenen_donuyor_durum_kontrolu_atlandi", neden="matris_singular")
 
 
 def calculate_expected_return(

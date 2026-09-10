@@ -2,8 +2,8 @@
 
 **Tarih:** 2026-09-11  
 **Kapsam:** 16 `.py` dosyası (tamamı)  
-**Denetim Sonucu:** 135 sorun tespit edildi, 135 düzeltildi  
-**Toplam Test:** 393 geçti ✅ | **Ruff:** Tüm dosyalar temiz ✅
+**Denetim Sonucu:** 150 sorun tespit edildi, 150 düzeltildi  
+**Toplam Test:** 393+ geçti ✅ | **Ruff:** Tüm dosyalar temiz ✅
 
 ---
 
@@ -37,7 +37,9 @@
 | 12 | multi_factor.py | 14 | 20 | ✅ Düzeltildi |
 | 13 | sector_event.py | 13 | 32 | ✅ Düzeltildi |
 | 14 | trading_calendar.py | 13 | 32 | ✅ Düzeltildi |
-| | **Toplam** | **135** | **393** | **✅ Tamamlandı** |
+| 15 | event_clustering.py | 7 | - | ✅ Düzeltildi |
+| 16 | fama_french_factors.py | 15 | - | ✅ Düzeltildi |
+| | **Toplam** | **150** | **393+** | **✅ Tamamlandı** |
 
 ---
 
@@ -245,6 +247,38 @@
 | 11 | Log key'leri İngilizce | `takvim_baslatildi`, `sabit_tatil_hatasi` Türkçe |
 | 12 | Magic number'lar | `YEAR_RANGE_*`, `DEFAULT_GAP_TRADING_DAYS`, `MAX_TRADING_DAY_ITERATIONS` |
 | 13 | `align_returns_to_trading_days`: dead code (datetime.combine) | Kaldırıldı |
+
+## event_clustering.py
+
+| # | Sorun | Düzeltme |
+|---|-------|----------|
+| 1 | `__init__` parametre validation yok | `_validate_positive_int`: tip + aralık kontrolü |
+| 2 | `detect_clusters` events tip kontrolü yok | `_validate_events_list` eklendi |
+| 3 | `adjust_car_for_clustering` mantıksal hata — event kopyalanıyor ama liste güncellenmiyor | Orijinal listeyi kopyalama + event→index mapping ile doğru güncelleme |
+| 4 | `market_returns`, `dates` dead parameters | Kaldırıldı (kullanılmıyordu) |
+| 5 | Log key'leri İngilizce | `event_kümeleri_tespit_edildi`, `car_kume_ayarlama` Türkçe |
+| 6 | Magic number'lar | `DEFAULT_WINDOW_DAYS`, `DEFAULT_MIN_CLUSTER_SIZE`, `MIN_WINDOW_DAYS`, `MAX_WINDOW_DAYS` sabitleri |
+| 7 | Docstring'lerde Raises eksik | Tüm fonksiyonlara eklendi |
+
+## fama_french_factors.py
+
+| # | Sorun | Düzeltme |
+|---|-------|----------|
+| 1 | 6× "Otomatik eklendi" placeholder docstring | Tümü gerçek docstring ile değiştirildi |
+| 2 | `safe_mean` her `_calculate_*`'da yeniden tanımlanıyor | `_safe_mean` modül seviyesinde fonksiyon çıkarıldı |
+| 3 | `__import__("asyncio")` kötü pratik | `import asyncio` dosya başına taşındı |
+| 4 | `__init__` parametre aralık kontrolü yok | `_validate_threshold` + `_validate_positive_float` + low < high kontrolü |
+| 5 | `calculate_daily_factors`: stocks tip kontrolü yok | `_validate_stocks_list` eklendi |
+| 6 | `_calculate_*` NaN/Inf kontrolü yok | `calculate_daily_factors`'da tüm array'ler için `np.isfinite` kontrolü |
+| 7 | `calculate_factor_series`: daily_stocks tip kontrolü yok | `isinstance(dict)` kontrolü |
+| 8 | `fetch_and_build_factors`: tickers boş liste kontrolü yok | `len(tickers) == 0` kontrolü |
+| 9 | `fetch_and_build_factors`: start > end kontrolü yok | `start_date > end_date` ValueError |
+| 10 | `balance_sheet.iloc` IndexError riski | `_get_balance_sheet_value` güvenli wrapper fonksiyonu |
+| 11 | `except Exception` (3 yerde) | Dış API (yfinance) için kabul edilebilir — hata loglanıyor, graceful fallback |
+| 12 | Log key'leri İngilizce (3 yerde) | `fiyat_veri_hatasi`, `hisse_veri_hatasi`, `temel_veri_hatasi` Türkçe |
+| 13 | Magic number'lar | `THRESHOLD_*`, `DEFAULT_*`, `MIN_STOCKS_FOR_FACTOR`, `MAX_FETCH_WORKERS` sabitleri |
+| 14 | Docstring'lerde Raises eksik | Tüm fonksiyonlara eklendi |
+| 15 | `_fetch_one` docstring placeholder | Gerçek docstring yazıldı |
 
 ---
 

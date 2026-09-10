@@ -41,6 +41,7 @@ BIST'e Özel Düzeltmeler:
 - Sektör kontrolü: BIST'te bankacılık/holding ağırlığı yüksek
 """
 
+import asyncio
 import concurrent.futures
 from dataclasses import dataclass
 from datetime import date
@@ -51,6 +52,110 @@ import structlog
 import yfinance as yf
 
 logger = structlog.get_logger()
+
+# --- Sabitler ---
+THRESHOLD_MIN: float = 0.0
+THRESHOLD_MAX: float = 1.0
+DEFAULT_SIZE_BREAKPOINT: float = 0.5
+DEFAULT_BM_LOW: float = 0.30
+DEFAULT_BM_HIGH: float = 0.70
+DEFAULT_ROE_LOW: float = 0.30
+DEFAULT_ROE_HIGH: float = 0.70
+DEFAULT_AG_LOW: float = 0.30
+DEFAULT_AG_HIGH: float = 0.70
+DEFAULT_MIN_VOLUME_TL: float = 100_000
+DEFAULT_MIN_MARKET_CAP: float = 50_000_000
+MIN_STOCKS_FOR_FACTOR: int = 10
+MAX_FETCH_WORKERS: int = 4
+
+
+def _validate_threshold(value: float, name: str) -> None:
+    """Threshold aralık kontrolü.
+
+    Args:
+        value: Kontrol edilecek değer
+        name: Parametre adı
+
+    Raises:
+        TypeError: Sayısal değilse
+        ValueError: [0, 1] aralığında değilse
+    """
+    if not isinstance(value, (int, float, np.integer, np.floating)):
+        raise TypeError(f"{name} sayısal olmalı, alınan: {type(value).__name__}")
+    if not (THRESHOLD_MIN <= value <= THRESHOLD_MAX):
+        raise ValueError(f"{name} [{THRESHOLD_MIN}, {THRESHOLD_MAX}] aralığında olmalı, alınan: {value}")
+
+
+def _validate_positive_float(value: float, name: str) -> None:
+    """Pozitif float doğrulama.
+
+    Args:
+        value: Kontrol edilecek değer
+        name: Parametre adı
+
+    Raises:
+        TypeError: Sayısal değilse
+        ValueError: Negatif veya sıfır ise
+    """
+    if not isinstance(value, (int, float, np.integer, np.floating)):
+        raise TypeError(f"{name} sayısal olmalı, alınan: {type(value).__name__}")
+    if value <= 0:
+        raise ValueError(f"{name} pozitif olmalı, alınan: {value}")
+
+
+def _validate_stocks_list(stocks: Any) -> list:
+    """Stocks listesi doğrulama.
+
+    Args:
+        stocks: Kontrol edilecek liste
+
+    Returns:
+        Doğrulanmış liste
+
+    Raises:
+        TypeError: Liste değilse
+    """
+    if not isinstance(stocks, list):
+        raise TypeError(f"stocks liste olmalı, alınan: {type(stocks).__name__}")
+    return stocks
+
+
+def _safe_mean(returns: np.ndarray, mask: np.ndarray) -> float:
+    """Maskelenmiş getirilerin ortalaması (güvenli).
+
+    Args:
+        returns: Getiri serisi
+        mask: Boolean mask
+
+    Returns:
+        Ortalama getiri veya 0.0 (boş portföy)
+    """
+    if np.sum(mask) == 0:
+        return 0.0
+    return float(np.mean(returns[mask]))
+
+
+def _get_balance_sheet_value(balance_sheet: Any, row_name: str, col_index: int = 0) -> float:
+    """Bilanço değerini güvenli şekilde al.
+
+    Args:
+        balance_sheet: yfinance balance_sheet DataFrame
+        row_name: Satır adı (ör: "Total Assets")
+        col_index: Sütun indeksi (0=en son, 1=bir önceki)
+
+    Returns:
+        Değer veya 0.0
+    """
+    try:
+        if balance_sheet is None or balance_sheet.empty:
+            return 0.0
+        if row_name not in balance_sheet.index:
+            return 0.0
+        if len(balance_sheet.columns) <= col_index:
+            return 0.0
+        return float(balance_sheet.iloc[balance_sheet.index.get_loc(row_name)].iloc[col_index])
+    except (IndexError, ValueError, TypeError):
+        return 0.0
 
 
 @dataclass
@@ -99,17 +204,50 @@ class FamaFrenchFactorBuilder:
 
     def __init__(
         self,
-        size_breakpoint: float = 0.5,  # Median
-        bm_low: float = 0.30,  # B/M alt eşik
-        bm_high: float = 0.70,  # B/M üst eşik
-        roe_low: float = 0.30,  # ROE alt eşik
-        roe_high: float = 0.70,  # ROE üst eşik
-        ag_low: float = 0.30,  # Asset Growth alt eşik
-        ag_high: float = 0.70,  # Asset Growth üst eşik
-        min_volume_tl: float = 100_000,  # Minimum günlük hacim (TL)
-        min_market_cap: float = 50_000_000,  # Minimum piyasa değeri (50M TL)
-    ):
-        """Otomatik eklendi."""
+        size_breakpoint: float = DEFAULT_SIZE_BREAKPOINT,
+        bm_low: float = DEFAULT_BM_LOW,
+        bm_high: float = DEFAULT_BM_HIGH,
+        roe_low: float = DEFAULT_ROE_LOW,
+        roe_high: float = DEFAULT_ROE_HIGH,
+        ag_low: float = DEFAULT_AG_LOW,
+        ag_high: float = DEFAULT_AG_HIGH,
+        min_volume_tl: float = DEFAULT_MIN_VOLUME_TL,
+        min_market_cap: float = DEFAULT_MIN_MARKET_CAP,
+    ) -> None:
+        """Fama-French factor builder başlat.
+
+        Args:
+            size_breakpoint: Boyut eşik değeri (median)
+            bm_low: B/M alt eşik
+            bm_high: B/M üst eşik
+            roe_low: ROE alt eşik
+            roe_high: ROE üst eşik
+            ag_low: Asset Growth alt eşik
+            ag_high: Asset Growth üst eşik
+            min_volume_tl: Minimum günlük hacim (TL)
+            min_market_cap: Minimum piyasa değeri (TL)
+
+        Raises:
+            TypeError: Parametre tipleri uygun değilse
+            ValueError: Threshold [0,1] aralığında değilse veya low >= high ise
+        """
+        _validate_threshold(size_breakpoint, "size_breakpoint")
+        _validate_threshold(bm_low, "bm_low")
+        _validate_threshold(bm_high, "bm_high")
+        _validate_threshold(roe_low, "roe_low")
+        _validate_threshold(roe_high, "roe_high")
+        _validate_threshold(ag_low, "ag_low")
+        _validate_threshold(ag_high, "ag_high")
+        _validate_positive_float(min_volume_tl, "min_volume_tl")
+        _validate_positive_float(min_market_cap, "min_market_cap")
+
+        if bm_low >= bm_high:
+            raise ValueError(f"bm_low ({bm_low}) < bm_high ({bm_high}) olmalı")
+        if roe_low >= roe_high:
+            raise ValueError(f"roe_low ({roe_low}) < roe_high ({roe_high}) olmalı")
+        if ag_low >= ag_high:
+            raise ValueError(f"ag_low ({ag_low}) < ag_high ({ag_high}) olmalı")
+
         self.size_breakpoint = size_breakpoint
         self.bm_low = bm_low
         self.bm_high = bm_high
@@ -139,19 +277,23 @@ class FamaFrenchFactorBuilder:
 
         Returns:
             FactorReturns veya None (yetersiz veri)
+
+        Raises:
+            TypeError: stocks liste değilse
         """
+        stocks = _validate_stocks_list(stocks)
         if trade_date is None:
             trade_date = date.today()
 
         # Likidite ve minimum boyut filtresi
         filtered = self._filter_stocks(stocks)
 
-        if len(filtered) < 10:
+        if len(filtered) < MIN_STOCKS_FOR_FACTOR:
             logger.warning(
-                "insufficient_stocks_for_factor_calc",
-                n_stocks=len(filtered),
-                min_required=10,
-                date=trade_date.isoformat(),
+                "faktor_hesaplama_yetersiz_hisse",
+                hisse_sayisi=len(filtered),
+                minimum=MIN_STOCKS_FOR_FACTOR,
+                tarih=trade_date.isoformat(),
             )
             return None
 
@@ -161,6 +303,13 @@ class FamaFrenchFactorBuilder:
         roes = np.array([s.roe for s in filtered])
         asset_growths = np.array([s.asset_growth for s in filtered])
         returns = np.array([s.daily_return for s in filtered])
+
+        # NaN/Inf kontrolü
+        for name, arr in [("market_caps", market_caps), ("bm_ratios", bm_ratios),
+                          ("roes", roes), ("asset_growths", asset_growths), ("returns", returns)]:
+            if not np.all(np.isfinite(arr)):
+                logger.warning("faktor_dizi_gecersiz_deger", dizi=name, tarih=trade_date.isoformat())
+                return None
 
         # ═══ SMB (Small Minus Big) ═══
         smb = self._calculate_smb(market_caps, returns)
@@ -194,13 +343,13 @@ class FamaFrenchFactorBuilder:
         )
 
         logger.debug(
-            "fama_french_factors_calculated",
-            date=trade_date.isoformat(),
+            "fama_french_faktorler_hesaplandi",
+            tarih=trade_date.isoformat(),
             smb=f"{smb:.4f}",
             hml=f"{hml:.4f}",
             rmw=f"{rmw:.4f}",
             cma=f"{cma:.4f}",
-            n_stocks=len(filtered),
+            hisse_sayisi=len(filtered),
         )
 
         return result
@@ -216,18 +365,24 @@ class FamaFrenchFactorBuilder:
 
         Returns:
             Tarihe göre sıralanmış FactorReturns listesi
+
+        Raises:
+            TypeError: daily_stocks sözlük değilse
         """
-        results = []
+        if not isinstance(daily_stocks, dict):
+            raise TypeError(f"daily_stocks sözlük olmalı, alınan: {type(daily_stocks).__name__}")
+
+        results: list[FactorReturns] = []
         for trade_date in sorted(daily_stocks.keys()):
             factors = self.calculate_daily_factors(daily_stocks[trade_date], trade_date)
             if factors is not None:
                 results.append(factors)
 
-        logger.info(
-            "factor_series_calculated",
-            n_days=len(results),
-            start=results[0].date.isoformat() if results else "N/A",
-            end=results[-1].date.isoformat() if results else "N/A",
+        logger.debug(
+            "faktor_serisi_hesaplandi",
+            gun_sayisi=len(results),
+            baslangic=results[0].date.isoformat() if results else "YOK",
+            bitis=results[-1].date.isoformat() if results else "YOK",
         )
 
         return results
@@ -244,7 +399,7 @@ class FamaFrenchFactorBuilder:
         - book_to_market <= 0 (negatif defter değeri)
         - daily_return eksik/NaN
         """
-        filtered = []
+        filtered: list[StockData] = []
         for s in stocks:
             if s.market_cap < self.min_market_cap:
                 continue
@@ -270,16 +425,20 @@ class FamaFrenchFactorBuilder:
 
         Basitleştirilmiş versiyon (tek boyut):
         - SMB = mean(Small returns) - mean(Big returns)
+
+        Args:
+            market_caps: Piyasa değerleri
+            returns: Getiri serisi
+
+        Returns:
+            SMB değeri
         """
         median_cap = np.median(market_caps)
         small_mask = market_caps <= median_cap
         big_mask = market_caps > median_cap
 
-        if np.sum(small_mask) == 0 or np.sum(big_mask) == 0:
-            return 0.0
-
-        small_return = np.mean(returns[small_mask])
-        big_return = np.mean(returns[big_mask])
+        small_return = _safe_mean(returns, small_mask)
+        big_return = _safe_mean(returns, big_mask)
 
         return small_return - big_return
 
@@ -299,38 +458,30 @@ class FamaFrenchFactorBuilder:
         BH = Big + High B/M (büyük value)
         SL = Small + Low B/M (küçük growth)
         BL = Big + Low B/M (büyük growth)
+
+        Args:
+            market_caps: Piyasa değerleri
+            bm_ratios: Book-to-Market oranları
+            returns: Getiri serisi
+
+        Returns:
+            HML değeri
         """
         bm_low_threshold = np.percentile(bm_ratios, self.bm_low * 100)
         bm_high_threshold = np.percentile(bm_ratios, self.bm_high * 100)
         median_cap = np.median(market_caps)
 
-        # 6 portföy
         small = market_caps <= median_cap
         big = market_caps > median_cap
         high_bm = bm_ratios >= bm_high_threshold
         low_bm = bm_ratios <= bm_low_threshold
 
-        # Small High (SH), Big High (BH), Small Low (SL), Big Low (BL)
-        sh_mask = small & high_bm
-        bh_mask = big & high_bm
-        sl_mask = small & low_bm
-        bl_mask = big & low_bm
+        sh_ret = _safe_mean(returns, small & high_bm)
+        bh_ret = _safe_mean(returns, big & high_bm)
+        sl_ret = _safe_mean(returns, small & low_bm)
+        bl_ret = _safe_mean(returns, big & low_bm)
 
-        # Her portföyün ortalama getirisi
-        def safe_mean(mask) -> Any:
-            """Otomatik eklendi."""
-            if np.sum(mask) == 0:
-                return 0.0
-            return float(np.mean(returns[mask]))
-
-        sh_ret = safe_mean(sh_mask)
-        bh_ret = safe_mean(bh_mask)
-        sl_ret = safe_mean(sl_mask)
-        bl_ret = safe_mean(bl_mask)
-
-        # HML = (SH + BH)/2 - (SL + BL)/2
-        hml = (sh_ret + bh_ret) / 2 - (sl_ret + bl_ret) / 2
-        return hml
+        return (sh_ret + bh_ret) / 2 - (sl_ret + bl_ret) / 2
 
     def _calculate_rmw(
         self,
@@ -344,10 +495,13 @@ class FamaFrenchFactorBuilder:
         - ROE breakpoints: %30 ve %70 percentil
         - RMW = (SR + BR)/2 - (SW + BW)/2
 
-        SR = Small + Robust (küçük karlı)
-        BR = Big + Robust (büyük karlı)
-        SW = Small + Weak (küçük zayıf)
-        BW = Big + Weak (büyük zayıf)
+        Args:
+            market_caps: Piyasa değerleri
+            roes: ROE değerleri
+            returns: Getiri serisi
+
+        Returns:
+            RMW değeri
         """
         roe_low_threshold = np.percentile(roes, self.roe_low * 100)
         roe_high_threshold = np.percentile(roes, self.roe_high * 100)
@@ -358,24 +512,12 @@ class FamaFrenchFactorBuilder:
         robust = roes >= roe_high_threshold
         weak = roes <= roe_low_threshold
 
-        sr_mask = small & robust
-        br_mask = big & robust
-        sw_mask = small & weak
-        bw_mask = big & weak
+        sr_ret = _safe_mean(returns, small & robust)
+        br_ret = _safe_mean(returns, big & robust)
+        sw_ret = _safe_mean(returns, small & weak)
+        bw_ret = _safe_mean(returns, big & weak)
 
-        def safe_mean(mask) -> Any:
-            """Otomatik eklendi."""
-            if np.sum(mask) == 0:
-                return 0.0
-            return float(np.mean(returns[mask]))
-
-        sr_ret = safe_mean(sr_mask)
-        br_ret = safe_mean(br_mask)
-        sw_ret = safe_mean(sw_mask)
-        bw_ret = safe_mean(bw_mask)
-
-        rmw = (sr_ret + br_ret) / 2 - (sw_ret + bw_ret) / 2
-        return rmw
+        return (sr_ret + br_ret) / 2 - (sw_ret + bw_ret) / 2
 
     def _calculate_cma(
         self,
@@ -389,10 +531,13 @@ class FamaFrenchFactorBuilder:
         - Asset Growth breakpoints: %30 ve %70 percentil
         - CMA = (SC + BC)/2 - (SA + BA)/2
 
-        SC = Small + Conservative (küçük muhafazakâr)
-        BC = Big + Conservative (büyük muhafazakâr)
-        SA = Small + Aggressive (küçük agresif)
-        BA = Big + Aggressive (büyük agresif)
+        Args:
+            market_caps: Piyasa değerleri
+            asset_growths: Asset Growth değerleri
+            returns: Getiri serisi
+
+        Returns:
+            CMA değeri
         """
         ag_low_threshold = np.percentile(asset_growths, self.ag_low * 100)
         ag_high_threshold = np.percentile(asset_growths, self.ag_high * 100)
@@ -400,27 +545,15 @@ class FamaFrenchFactorBuilder:
 
         small = market_caps <= median_cap
         big = market_caps > median_cap
-        conservative = asset_growths <= ag_low_threshold  # Düşük büyüme = muhafazakâr
-        aggressive = asset_growths >= ag_high_threshold  # Yüksek büyüme = agresif
+        conservative = asset_growths <= ag_low_threshold
+        aggressive = asset_growths >= ag_high_threshold
 
-        sc_mask = small & conservative
-        bc_mask = big & conservative
-        sa_mask = small & aggressive
-        ba_mask = big & aggressive
+        sc_ret = _safe_mean(returns, small & conservative)
+        bc_ret = _safe_mean(returns, big & conservative)
+        sa_ret = _safe_mean(returns, small & aggressive)
+        ba_ret = _safe_mean(returns, big & aggressive)
 
-        def safe_mean(mask) -> Any:
-            """Otomatik eklendi."""
-            if np.sum(mask) == 0:
-                return 0.0
-            return float(np.mean(returns[mask]))
-
-        sc_ret = safe_mean(sc_mask)
-        bc_ret = safe_mean(bc_mask)
-        sa_ret = safe_mean(sa_mask)
-        ba_ret = safe_mean(ba_mask)
-
-        cma = (sc_ret + bc_ret) / 2 - (sa_ret + ba_ret) / 2
-        return cma
+        return (sc_ret + bc_ret) / 2 - (sa_ret + ba_ret) / 2
 
     def get_factor_arrays(
         self,
@@ -429,6 +562,9 @@ class FamaFrenchFactorBuilder:
         """Factor return listesini numpy array'lere çevir.
 
         expected_return.py ile uyumlu format.
+
+        Args:
+            factor_series: FactorReturns listesi
 
         Returns:
             {
@@ -468,8 +604,8 @@ class FamaFrenchDataFetcher:
     - Daily returns: yfinance (adjusted close)
     """
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """Fama-French data fetcher başlat."""
         self._cache: dict[str, Any] = {}
 
     async def fetch_and_build_factors(
@@ -487,17 +623,25 @@ class FamaFrenchDataFetcher:
 
         Returns:
             Günlük FactorReturns listesi
+
+        Raises:
+            TypeError: Parametre tipleri uygun değilse
+            ValueError: Boş liste veya start > end ise
         """
+        if not isinstance(tickers, list) or len(tickers) == 0:
+            raise ValueError("tickers boş olamaz")
+        if start_date > end_date:
+            raise ValueError(f"start_date ({start_date}) <= end_date ({end_date}) olmalı")
+
         builder = FamaFrenchFactorBuilder()
 
-        # yfinance ticker'larını hazırla
         yf_tickers = [f"{t}.IS" for t in tickers]
 
-        logger.info(
-            "fetching_fama_french_data",
-            n_tickers=len(tickers),
-            start=start_date.isoformat(),
-            end=end_date.isoformat(),
+        logger.debug(
+            "fama_french_veri_cekiliyor",
+            hisse_sayisi=len(tickers),
+            baslangic=start_date.isoformat(),
+            bitis=end_date.isoformat(),
         )
 
         # Fiyat verilerini çek (toplu)
@@ -510,15 +654,15 @@ class FamaFrenchDataFetcher:
                 auto_adjust=True,
                 progress=False,
             )
-        except Exception as e:
-            logger.error("price_data_fetch_error", error=str(e))
+        except Exception as exc:
+            logger.error("fiyat_veri_hatasi", hata=str(exc))
             return []
 
         # Fundamental verileri çek (her hisse için)
         fundamentals = await self._fetch_fundamentals(tickers)
 
         # Günlük factor return'leri hesapla
-        factor_series = []
+        factor_series: list[FactorReturns] = []
 
         # Trading günlerini belirle (fiyat verisinden)
         if hasattr(price_data.index, "date"):
@@ -527,30 +671,29 @@ class FamaFrenchDataFetcher:
             trading_dates = [d for d in price_data.index]
 
         for trade_date in trading_dates:
-            daily_stocks = []
+            daily_stocks: list[StockData] = []
 
             for ticker in tickers:
                 yf_ticker = f"{ticker}.IS"
 
                 try:
-                    # Günlük getiri
-                    if yf_ticker in price_data.columns.get_level_values(0):
-                        close_prices = price_data[yf_ticker]["Close"]
-                        # Bugünkü ve dünkü kapanış
-                        date_idx = trading_dates.index(trade_date)
-                        if date_idx < 1:
-                            continue
-                        today_close = close_prices.iloc[date_idx]
-                        yesterday_close = close_prices.iloc[date_idx - 1]
-
-                        if np.isnan(today_close) or np.isnan(yesterday_close):
-                            continue
-                        if yesterday_close == 0:
-                            continue
-
-                        daily_return = (today_close - yesterday_close) / yesterday_close
-                    else:
+                    if yf_ticker not in price_data.columns.get_level_values(0):
                         continue
+
+                    close_prices = price_data[yf_ticker]["Close"]
+                    date_idx = trading_dates.index(trade_date)
+                    if date_idx < 1:
+                        continue
+
+                    today_close = close_prices.iloc[date_idx]
+                    yesterday_close = close_prices.iloc[date_idx - 1]
+
+                    if np.isnan(today_close) or np.isnan(yesterday_close):
+                        continue
+                    if yesterday_close == 0:
+                        continue
+
+                    daily_return = (today_close - yesterday_close) / yesterday_close
 
                     # Fundamental veriler
                     fund = fundamentals.get(ticker, {})
@@ -561,11 +704,8 @@ class FamaFrenchDataFetcher:
                     prev_total_assets = fund.get("prev_total_assets", 0)
                     avg_volume = fund.get("avg_volume", 0)
 
-                    # Book-to-Market hesapla
                     bm = book_value / market_cap if market_cap > 0 else 0
-
-                    # Asset Growth hesapla
-                    asset_growth = 0
+                    asset_growth = 0.0
                     if prev_total_assets > 0:
                         asset_growth = (total_assets - prev_total_assets) / prev_total_assets
 
@@ -582,72 +722,61 @@ class FamaFrenchDataFetcher:
                     )
                     daily_stocks.append(stock_data)
 
-                except Exception as e:
-                    logger.debug("stock_data_error", ticker=ticker, error=str(e))
+                except (ValueError, KeyError, IndexError) as exc:
+                    logger.debug("hisse_veri_hatasi", ticker=ticker, hata=str(exc))
                     continue
 
-            # Günlük factor'leri hesapla
             factors = builder.calculate_daily_factors(daily_stocks, trade_date)
             if factors is not None:
                 factor_series.append(factors)
 
-        logger.info(
-            "fama_french_factors_built",
-            n_days=len(factor_series),
-            n_tickers=len(tickers),
+        logger.debug(
+            "fama_french_faktorler_olusturuldu",
+            gun_sayisi=len(factor_series),
+            hisse_sayisi=len(tickers),
         )
 
         return factor_series
 
     async def _fetch_fundamentals(self, tickers: list[str]) -> dict[str, dict[str, float]]:
-        """Hisse fundamental verilerini çek."""
+        """Hisse fundamental verilerini çek.
 
-        fundamentals = {}
-        executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
+        Args:
+            tickers: Hisse listesi
 
-        def _fetch_one(ticker: str) -> tuple[str, dict]:
-            """Otomatik eklendi."""
+        Returns:
+            {ticker: {market_cap, book_value, ...}} sözlüğü
+        """
+        fundamentals: dict[str, dict[str, float]] = {}
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=MAX_FETCH_WORKERS)
+
+        def _fetch_one(ticker: str) -> tuple[str, dict[str, float]]:
+            """Tek hisse için fundamental veri çek.
+
+            Args:
+                ticker: Hisse kodu
+
+            Returns:
+                (ticker, data) tuple'ı
+            """
             try:
                 stock = yf.Ticker(f"{ticker}.IS")
                 info = stock.info or {}
 
                 # Bilanço verileri
                 balance_sheet = stock.balance_sheet
-                book_value = 0
-                total_assets = 0
-                prev_total_assets = 0
-
-                if balance_sheet is not None and not balance_sheet.empty:
-                    if "Total Assets" in balance_sheet.index:
-                        total_assets = (
-                            float(balance_sheet.iloc[balance_sheet.index.get_loc("Total Assets")].iloc[0])
-                            if len(balance_sheet.columns) > 0
-                            else 0
-                        )
-                        if len(balance_sheet.columns) > 1:
-                            prev_total_assets = float(
-                                balance_sheet.iloc[balance_sheet.index.get_loc("Total Assets")].iloc[1]
-                            )
-
-                    if "Stockholders Equity" in balance_sheet.index:
-                        book_value = (
-                            float(balance_sheet.iloc[balance_sheet.index.get_loc("Stockholders Equity")].iloc[0])
-                            if len(balance_sheet.columns) > 0
-                            else 0
-                        )
+                book_value = _get_balance_sheet_value(balance_sheet, "Stockholders Equity", 0)
+                total_assets = _get_balance_sheet_value(balance_sheet, "Total Assets", 0)
+                prev_total_assets = _get_balance_sheet_value(balance_sheet, "Total Assets", 1)
 
                 # Gelir tablosu
                 income = stock.income_stmt
-                roe = 0
+                roe = 0.0
                 operating_margin = info.get("operatingMargins", 0) or 0
 
                 if income is not None and not income.empty:
                     if "Net Income" in income.index and book_value > 0:
-                        net_income = (
-                            float(income.iloc[income.index.get_loc("Net Income")].iloc[0])
-                            if len(income.columns) > 0
-                            else 0
-                        )
+                        net_income = _get_balance_sheet_value(income, "Net Income", 0)
                         roe = net_income / book_value
 
                 return ticker, {
@@ -660,14 +789,13 @@ class FamaFrenchDataFetcher:
                     "sector": info.get("sector", ""),
                     "avg_volume": info.get("averageVolume", 0) or 0,
                 }
-            except Exception as e:
-                logger.debug("fundamental_fetch_error", ticker=ticker, error=str(e))
+            except Exception as exc:
+                logger.debug("temel_veri_hatasi", ticker=ticker, hata=str(exc))
                 return ticker, {}
 
-        # Paralel çek
-        loop = __import__("asyncio").get_event_loop()
+        loop = asyncio.get_event_loop()
         futures = [loop.run_in_executor(executor, _fetch_one, t) for t in tickers]
-        results = await __import__("asyncio").gather(*futures, return_exceptions=True)
+        results = await asyncio.gather(*futures, return_exceptions=True)
 
         for result in results:
             if isinstance(result, Exception):
@@ -679,10 +807,16 @@ class FamaFrenchDataFetcher:
         return fundamentals
 
 
-# Kolaylık fonksiyonu
 def build_factor_arrays_from_series(
     factor_series: list[FactorReturns],
 ) -> dict[str, np.ndarray]:
-    """Factor series'den numpy array'ler oluştur (expected_return.py uyumlu)."""
+    """Factor series'den numpy array'ler oluştur (expected_return.py uyumlu).
+
+    Args:
+        factor_series: FactorReturns listesi
+
+    Returns:
+        Numpy array sözlüğü
+    """
     builder = FamaFrenchFactorBuilder()
     return builder.get_factor_arrays(factor_series)
