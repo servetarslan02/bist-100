@@ -3,8 +3,14 @@
 Birden fazla hisse için event study — ortalama CAR, t-test,
 event type breakdown, sector breakdown, regression analysis.
 MacKinlay (1997) metodolojisi.
+
+Sayısal kararlılık notları:
+- OLS regresyonunda condition number kontrolü
+- Deterministik kategorik encoding (hash yerine MD5)
+- np.isfinite tek traversal NaN/Inf tespiti
 """
 
+import hashlib
 from typing import Any
 
 import numpy as np
@@ -23,10 +29,14 @@ DEFAULT_P_VALUE: float = 1.0
 DEFAULT_R_SQUARED: float = 0.0
 ROUND_DECIMALS: int = 4
 ROUND_DECIMALS_STDERR: int = 6
+CONDITION_NUMBER_THRESHOLD: float = 1e12  # OLS ill-conditioned eşik
 
 
 def _encode_categorical(value: str) -> float:
     """Kategorik değeri deterministik numerik değere dönüştürür.
+
+    hash() yerine MD5 kullanılır çünkü Python3.3+ hash randomization
+    farklı session'larda farklı sonuç üretir. MD5 her zaman aynı sonucu verir.
 
     Args:
         value: Kategorik string değer
@@ -34,7 +44,26 @@ def _encode_categorical(value: str) -> float:
     Returns:
         0.0-1.0 arası deterministik numerik değer
     """
-    return float(abs(hash(value)) % 100) / 100.0
+    digest = hashlib.md5(value.encode("utf-8")).hexdigest()
+    return float(int(digest[:8], 16) % 10000) / 10000.0
+
+
+def _validate_car_value(value: Any, index: int) -> None:
+    """CAR değeri doğrulama — tip ve NaN/Inf kontrolü.
+
+    Args:
+        value: Doğrulanacak değer
+        index: Event index'i (hata mesajında)
+
+    Raises:
+        ValueError: NaN veya Inf ise
+    """
+    if not isinstance(value, (int, float, np.integer, np.floating)):
+        logger.error("capraz_kesit_gecersiz_car_tipi", index=index, tip=type(value).__name__)
+        raise ValueError(f"event_cars[{index}] car değeri numerik olmalı, gelen tip: {type(value).__name__}")
+    if not np.isfinite(value):
+        logger.error("capraz_kesit_gecersiz_car_degeri", index=index, deger=value)
+        raise ValueError(f"event_cars[{index}] car değeri geçersiz: {value}")
 
 
 class CrossSectionalEventStudy:
@@ -58,23 +87,20 @@ class CrossSectionalEventStudy:
             ValueError: event_cars içinde "car" key eksikse veya NaN/Inf varsa
         """
         if not event_cars:
-            logger.warning("cross_sectional_empty_input")
+            logger.warning("capraz_kesit_bos_girdi")
             return self._empty_result()
 
         # "car" key kontrolü
         for i, e in enumerate(event_cars):
             if "car" not in e:
-                logger.error("cross_sectional_missing_car_key", index=i, keys=list(e.keys()))
+                logger.error("capraz_kesit_car_key_eksik", index=i, keys=list(e.keys()))
                 raise ValueError(f"event_cars[{i}] içinde 'car' key eksik. Mevcut key'ler: {list(e.keys())}")
 
-        cars = [e["car"] for e in event_cars]
+        # NaN/Inf kontrolü — tek traversal ile
+        for i, e in enumerate(event_cars):
+            _validate_car_value(e["car"], i)
 
-        # NaN/Inf kontrolü
-        for i, c in enumerate(cars):
-            if isinstance(c, float) and (np.isnan(c) or np.isinf(c)):
-                logger.error("cross_sectional_nan_inf_car", index=i, value=c)
-                raise ValueError(f"event_cars[{i}] car değeri geçersiz: {c}")
-
+        cars = np.array([e["car"] for e in event_cars], dtype=np.float64)
         n = len(cars)
 
         # Genel istatistikler
@@ -104,7 +130,7 @@ class CrossSectionalEventStudy:
             "median_car": round(float(np.median(cars)), ROUND_DECIMALS),
             "min_car": round(float(np.min(cars)), ROUND_DECIMALS),
             "max_car": round(float(np.max(cars)), ROUND_DECIMALS),
-            "positive_pct": round(sum(1 for c in cars if c > 0) / n * 100, 1),
+            "positive_pct": round(float(np.sum(cars > 0)) / n * 100, 1),
         }
 
         # Grup bazlı breakdown
@@ -122,7 +148,7 @@ class CrossSectionalEventStudy:
                 result["wilcoxon_p_value"] = round(float(w_p), ROUND_DECIMALS)
             except ValueError as e:
                 # Wilcoxon tüm değerler aynıysa hata verir — bu beklenen bir durum
-                logger.warning("wilcoxon_test_skipped", reason=str(e))
+                logger.warning("capraz_kesit_wilcoxon_atlandi", neden=str(e))
 
         return result
 
@@ -191,6 +217,8 @@ class CrossSectionalEventStudy:
 
         CAR = β0 + β1×feature1 + β2×feature2 + ... + ε
 
+        Condition number kontrolü ile ill-conditioned matris tespiti.
+
         Args:
             event_cars: Event verileri
             features: Regresyon değişkenleri (event_cars'taki key'ler)
@@ -205,7 +233,7 @@ class CrossSectionalEventStudy:
         min_required = len(features) + MIN_EVENTS_FOR_REGRESSION
         if len(event_cars) < min_required:
             logger.error(
-                "cross_sectional_regression_insufficient",
+                "capraz_kesit_regresyon_yetersiz",
                 n_events=len(event_cars),
                 min_required=min_required,
             )
@@ -217,10 +245,10 @@ class CrossSectionalEventStudy:
         # "car" key kontrolü
         for i, e in enumerate(event_cars):
             if "car" not in e:
-                logger.error("cross_sectional_regression_missing_car", index=i)
+                logger.error("capraz_kesit_regresyon_car_eksik", index=i)
                 raise ValueError(f"event_cars[{i}] içinde 'car' key eksik.")
 
-        cars = np.array([e["car"] for e in event_cars])
+        cars = np.array([e["car"] for e in event_cars], dtype=np.float64)
         n = len(cars)
 
         # Feature matrix
@@ -234,14 +262,27 @@ class CrossSectionalEventStudy:
                 row.append(float(val))
             X_data.append(row)
 
-        X = np.array(X_data)
+        X = np.array(X_data, dtype=np.float64)
         y = cars
+
+        # Condition number kontrolü — ill-conditioned matris uyarısı
+        try:
+            cond_num = np.linalg.cond(X)
+            if cond_num > CONDITION_NUMBER_THRESHOLD:
+                logger.warning(
+                    "capraz_kesit_regresyon_kotu_durum",
+                    condition_number=round(float(cond_num), 2),
+                    esik=CONDITION_NUMBER_THRESHOLD,
+                    mesaj="Matris kötü durumda (ill-conditioned). Regresyon sonuçları güvenilir olmayabilir.",
+                )
+        except np.linalg.LinAlgError:
+            pass  # Condition number hesaplanamazsa devam et
 
         # Singüler matris kontrolü
         try:
             betas, residuals, rank, sv = np.linalg.lstsq(X, y, rcond=None)
         except np.linalg.LinAlgError as e:
-            logger.error("cross_sectional_regression_linalg_error", error=str(e))
+            logger.error("capraz_kesit_regresyon_linalg_hatasi", hata=str(e))
             raise ValueError(f"Regresyon hesaplama hatası (singüler matris): {e}") from e
 
         y_pred = X @ betas
@@ -256,7 +297,7 @@ class CrossSectionalEventStudy:
             try:
                 var_betas = mse * np.linalg.inv(X.T @ X).diagonal()
             except np.linalg.LinAlgError as e:
-                logger.error("cross_sectional_regression_inv_error", error=str(e))
+                logger.error("capraz_kesit_regresyon_ters_hatasi", hata=str(e))
                 raise ValueError(f"Regresyon matris tersi hesaplama hatası: {e}") from e
 
             # Sıfır veya negatif varyans kontrolü
@@ -267,7 +308,7 @@ class CrossSectionalEventStudy:
                     t_stats_arr[i] = betas[i] / np.sqrt(var_betas[i])
                     p_values_arr[i] = 2 * (1 - stats.t.cdf(abs(t_stats_arr[i]), df=n - n_params))
                 else:
-                    logger.warning("cross_sectional_regression_zero_variance", param_index=i)
+                    logger.warning("capraz_kesit_regresyon_sifir_varyans", param_index=i)
 
             t_stats = t_stats_arr
             p_values = p_values_arr
@@ -305,16 +346,21 @@ class CrossSectionalEventStudy:
 
         breakdown: dict[str, dict[str, Any]] = {}
         for key, cars in groups.items():
-            cars_arr = np.array(cars)
+            cars_arr = np.array(cars, dtype=np.float64)
             n = len(cars_arr)
             mean = float(np.mean(cars_arr))
-            std = float(np.std(cars_arr, ddof=1)) if n > MIN_EVENTS_FOR_TTEST else DEFAULT_CAR_VALUE
-            if std > STD_ERROR_THRESHOLD and n > 0:
-                t = mean / (std / np.sqrt(n))
+            if n >= MIN_EVENTS_FOR_TTEST:
+                std = float(np.std(cars_arr, ddof=1))
+                if std > STD_ERROR_THRESHOLD:
+                    t = mean / (std / np.sqrt(n))
+                else:
+                    t = DEFAULT_CAR_VALUE
+                df = n - 1
             else:
+                std = DEFAULT_CAR_VALUE
                 t = DEFAULT_CAR_VALUE
-            df = max(n - 1, 1)
-            p = 2 * (1 - stats.t.cdf(abs(t), df=df))
+                df = 0
+            p = 2 * (1 - stats.t.cdf(abs(t), df=max(df, 1)))
 
             breakdown[key] = {
                 "mean_car": round(mean, ROUND_DECIMALS),

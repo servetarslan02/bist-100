@@ -13,8 +13,11 @@ Calendar day kullanımının sorunları:
 3. t-statistic'in paydası büyüyüş → false negative artar
 
 Çözüm: Tüm uzunluklar trading day cinsinden, BIST takvimi ile dönüştürülür.
+
+Thread-safety: _get_calendar() threading.Lock ile korunur.
 """
 
+import threading
 from datetime import datetime
 from typing import Any
 
@@ -24,8 +27,6 @@ import structlog
 logger = structlog.get_logger()
 
 # Event type → estimation window uzunluğu (TRADING DAY)
-# Not: Eski calendar day değerleri trading day olarak yeniden yorumlandı
-# 120 calendar gün ≈ 85 trading gün, ama burada doğrudan trading day veriyoruz
 ESTIMATION_WINDOWS: dict[str, int] = {
     "FINANCIAL_RESULTS": 120,  # ~6 ay trading data
     "DIVIDEND": 60,  # ~3 ay
@@ -59,21 +60,25 @@ DEFAULT_MIN_COVERAGE: float = 0.7
 ARRAY_DIM: int = 1
 MIN_ARRAY_LENGTH: int = 1
 
-# Cache'lenmiş takvim referansı
+# Thread-safe takvim cache
 _calendar_cache: Any = None
+_calendar_lock: threading.Lock = threading.Lock()
 
 
 def _get_calendar() -> Any:
-    """Trading calendar'ı lazy import et (cache'li).
+    """Trading calendar'ı lazy import et (thread-safe, double-checked locking).
 
     Returns:
         BISTTradingCalendar örneği
     """
     global _calendar_cache
     if _calendar_cache is None:
-        from .trading_calendar import get_trading_calendar
+        with _calendar_lock:
+            # Double-checked locking: lock sonrası tekrar kontrol
+            if _calendar_cache is None:
+                from .trading_calendar import get_trading_calendar
 
-        _calendar_cache = get_trading_calendar()
+                _calendar_cache = get_trading_calendar()
     return _calendar_cache
 
 
@@ -97,7 +102,10 @@ def _validate_datetime(value: datetime, name: str) -> None:
 
 
 def _validate_array(arr: np.ndarray, name: str, min_len: int = MIN_ARRAY_LENGTH) -> None:
-    """Array doğrulama.
+    """Array doğrulama — tip, boyut, boşluk, NaN/Inf kontrolü.
+
+    NaN ve Inf tek traversal ile kontrol edilir (np.isfinite).
+    Sadece numerik dtype'larda NaN/Inf kontrolü yapılır.
 
     Args:
         arr: Doğrulanacak array
@@ -120,14 +128,12 @@ def _validate_array(arr: np.ndarray, name: str, min_len: int = MIN_ARRAY_LENGTH)
         logger.error("tahmin_penceresi_dizi_bos", dizi=name, uzunluk=len(arr))
         raise ValueError(f"{name} boş olamaz (minimum {min_len} eleman gerekli).")
 
-    # NaN/Inf kontrolü — sadece numerik array'lerde
-    if np.issubdtype(arr.dtype, np.number):
-        if np.any(np.isnan(arr)):
-            logger.error("tahmin_penceresi_dizi_nan", dizi=name)
-            raise ValueError(f"{name} dizisinde NaN değeri var.")
-        if np.any(np.isinf(arr)):
-            logger.error("tahmin_penceresi_dizi_inf", dizi=name)
-            raise ValueError(f"{name} dizisinde Inf değeri var.")
+    # Tek traversal ile NaN ve Inf kontrolü (sadece numerik array'lerde)
+    if np.issubdtype(arr.dtype, np.number) and not np.all(np.isfinite(arr)):
+        has_nan = bool(np.any(np.isnan(arr)))
+        has_inf = bool(np.any(np.isinf(arr)))
+        logger.error("tahmin_penceresi_dizi_gecersiz_deger", dizi=name, nan_var=has_nan, inf_var=has_inf)
+        raise ValueError(f"{name} dizisinde {'NaN' if has_nan else ''}{' ve ' if has_nan and has_inf else ''}{'Inf' if has_inf else ''} değeri var.")
 
 
 class EstimationWindowManager:
@@ -229,7 +235,7 @@ class EstimationWindowManager:
 
         Raises:
             TypeError: returns numpy array değilse
-            ValueError: min_coverage aralık dışı ise
+            ValueError: min_coverage aralık dışı ise veya boş array ise
         """
         if not isinstance(returns, np.ndarray):
             logger.error("tahmin_penceresi_validate_tip_hatasi", tip=type(returns).__name__)
@@ -238,6 +244,11 @@ class EstimationWindowManager:
         if len(returns) < MIN_ARRAY_LENGTH:
             logger.error("tahmin_penceresi_validate_bos_dizi")
             raise ValueError("returns dizisi boş olamaz.")
+
+        # NaN/Inf kontrolü — tek traversal
+        if not np.all(np.isfinite(returns)):
+            logger.error("tahmin_penceresi_validate_gecersiz_deger")
+            raise ValueError("returns dizisinde NaN veya Inf değeri var.")
 
         if not (MIN_COVERAGE_MIN <= min_coverage <= MIN_COVERAGE_MAX):
             logger.error(

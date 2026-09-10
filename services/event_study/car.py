@@ -2,7 +2,14 @@
 
 CAR[t1, t2] = Σ AR_it (t1'den t2'ye)
 MacKinlay (1997) metodolojisi.
+
+Sayısal kararlılık notları:
+- float64 dtype zorunlu (kümülatif toplamda precision kaybı önler)
+- Integer offset zorunlu (float mask hatalı sonuç verir)
+- np.isfinite tek traversal NaN/Inf tespiti
 """
+
+import numbers
 
 import numpy as np
 import structlog
@@ -12,16 +19,17 @@ logger = structlog.get_logger()
 # Varsayılan sabitler
 MIN_ARRAY_LENGTH: int = 1
 DEFAULT_EMPTY_CAR: float = 0.0
-EXPECTED_DTYPE: type = np.floating
 ARRAY_DIM: int = 1
 
 
 def _validate_array(arr: np.ndarray, name: str, min_len: int = MIN_ARRAY_LENGTH) -> None:
     """Array doğrulama — tip, boyut, boşluk, NaN/Inf kontrolü.
 
+    NaN ve Inf tek traversal ile kontrol edilir (np.isfinite).
+
     Args:
         arr: Doğrulanacak array
-        name: Array adı (hata mesajlarında kullanılır)
+        name: Array adı
         min_len: Minimum uzunluk
 
     Raises:
@@ -40,16 +48,18 @@ def _validate_array(arr: np.ndarray, name: str, min_len: int = MIN_ARRAY_LENGTH)
         logger.error("kumulatif_anormal_donuyor_bos_dizi", dizi=name, uzunluk=len(arr))
         raise ValueError(f"{name} boş olamaz (minimum {min_len} eleman gerekli).")
 
-    if np.any(np.isnan(arr)):
-        logger.error("kumulatif_anormal_donuyor_nan_var", dizi=name)
-        raise ValueError(f"{name} dizisinde NaN değeri var.")
-    if np.any(np.isinf(arr)):
-        logger.error("kumulatif_anormal_donuyor_inf_var", dizi=name)
-        raise ValueError(f"{name} dizisinde Inf değeri var.")
+    # Tek traversal ile NaN ve Inf kontrolü (sadece numerik dtype'larda)
+    if np.issubdtype(arr.dtype, np.number) and not np.all(np.isfinite(arr)):
+        has_nan = bool(np.any(np.isnan(arr)))
+        has_inf = bool(np.any(np.isinf(arr)))
+        logger.error("kumulatif_anormal_donuyor_gecersiz_deger", dizi=name, nan_var=has_nan, inf_var=has_inf)
+        raise ValueError(f"{name} dizisinde {'NaN' if has_nan else ''}{' ve ' if has_nan and has_inf else ''}{'Inf' if has_inf else ''} değeri var.")
 
 
 def _validate_offsets(offsets: np.ndarray, name: str = "day_offsets") -> None:
     """Day offset array doğrulama — integer tip kontrolü.
+
+    Integer array'lerde NaN/Inf olamaz, bu nedenle sadece tip kontrolü yapılır.
 
     Args:
         offsets: Gün offset dizisi
@@ -57,17 +67,44 @@ def _validate_offsets(offsets: np.ndarray, name: str = "day_offsets") -> None:
 
     Raises:
         TypeError: numpy array değilse
-        ValueError: Boş veya NaN/Inf içeriyorsa
-        ValueError: Integer olmayan değer içeriyorsa
+        ValueError: Boş veya integer olmayan dtype ise
     """
-    _validate_array(offsets, name)
+    if not isinstance(offsets, np.ndarray):
+        logger.error("kumulatif_anormal_donuyor_tip_hatasi", beklenti="np.ndarray", gercek=type(offsets).__name__, dizi=name)
+        raise TypeError(f"{name} numpy array olmalı, gelen tip: {type(offsets).__name__}")
+
+    if offsets.ndim != ARRAY_DIM:
+        logger.error("kumulatif_anormal_donuyor_boyut_hatasi", beklenti=ARRAY_DIM, gercek=offsets.ndim, dizi=name)
+        raise ValueError(f"{name} tek boyutlu olmalı, gelen boyut: {offsets.ndim}")
+
+    if len(offsets) < MIN_ARRAY_LENGTH:
+        logger.error("kumulatif_anormal_donuyor_bos_dizi", dizi=name, uzunluk=len(offsets))
+        raise ValueError(f"{name} boş olamaz.")
+
     if not np.issubdtype(offsets.dtype, np.integer):
         logger.error("kumulatif_anormal_donuyor_offset_tip_hatasi", dtype=str(offsets.dtype))
         raise ValueError(f"{name} integer dtype olmalı, gelen dtype: {offsets.dtype}")
 
 
+def _ensure_float64(arr: np.ndarray) -> np.ndarray:
+    """Array'i float64'e dönüştür (zaten float64 ise kopyasız döndür).
+
+    Args:
+        arr: Dönüştürülecek array
+
+    Returns:
+        float64 dtype array
+    """
+    if arr.dtype == np.float64:
+        return arr
+    return arr.astype(np.float64, copy=False)
+
+
 def calculate_car(abnormal_returns: np.ndarray) -> float:
     """CAR = Σ AR (tüm window).
+
+    Kümülatif toplamda float64 dtype zorunlu — büyük array'lerde
+    float32 ile kümülatif toplam precision kaybı yapar.
 
     Args:
         abnormal_returns: Abnormal return dizisi (tek boyutlu numpy array)
@@ -194,6 +231,8 @@ def calculate_car_sub_windows(
 def calculate_car_series(abnormal_returns: np.ndarray) -> np.ndarray:
     """CAR serisi (kümülatif toplam).
 
+    Kümülatif toplamda float64 dtype zorunlu.
+
     Args:
         abnormal_returns: AR dizisi (tek boyutlu numpy array)
 
@@ -212,7 +251,7 @@ def calculate_aar(car_dict: dict[str, float]) -> float:
     """Average Abnormal Return (AAR) — birden fazla event'in ortalaması.
 
     Args:
-        car_dict: {event_id: car_value} sözlüğü (float değerler)
+        car_dict: {event_id: car_value} sözlüğü (float veya int değerler)
 
     Returns:
         Ortalama CAR değeri (float64)
@@ -227,10 +266,11 @@ def calculate_aar(car_dict: dict[str, float]) -> float:
 
     values = list(car_dict.values())
     for i, v in enumerate(values):
-        if not isinstance(v, (int, float)):
+        # numbers.Number ile numpy scalar dahil tüm numerik tipleri kabul et
+        if not isinstance(v, numbers.Number):
             logger.error("kumulatif_anormal_donuyor_aar_tip_hatasi", index=i, tip=type(v).__name__)
             raise TypeError(f"AAR hesaplamasında {i}. değer numerik olmalı, gelen tip: {type(v).__name__}")
-        if np.isnan(v) or np.isinf(v):
+        if not np.isfinite(v):
             logger.error("kumulatif_anormal_donuyor_aar_nan_inf", index=i, deger=v)
             raise ValueError(f"AAR hesaplamasında {i}. değer geçersiz: {v}")
 
@@ -241,6 +281,8 @@ def calculate_caar(
     car_dict: dict[str, np.ndarray],
 ) -> np.ndarray:
     """Cumulative Average Abnormal Return (CAAR).
+
+    Farklı uzunluktaki serileri en kısa olana göre keser ve ortalamasını alır.
 
     Args:
         car_dict: {event_id: car_series} sözlüğü (numpy array seriler)
@@ -267,12 +309,12 @@ def calculate_caar(
         if len(s) < MIN_ARRAY_LENGTH:
             logger.error("kumulatif_anormal_donuyor_caar_bos_seri", index=i)
             raise ValueError(f"CAAR hesaplamasında {i}. seri boş.")
-        if np.any(np.isnan(s)):
-            logger.error("kumulatif_anormal_donuyor_caar_nan_var", index=i)
-            raise ValueError(f"CAAR hesaplamasında {i}. seride NaN değeri var.")
-        if np.any(np.isinf(s)):
-            logger.error("kumulatif_anormal_donuyor_caar_inf_var", index=i)
-            raise ValueError(f"CAAR hesaplamasında {i}. seride Inf değeri var.")
+        # Tek traversal ile NaN/Inf kontrolü
+        if np.issubdtype(s.dtype, np.number) and not np.all(np.isfinite(s)):
+            has_nan = bool(np.any(np.isnan(s)))
+            has_inf = bool(np.any(np.isinf(s)))
+            logger.error("kumulatif_anormal_donuyor_caar_gecersiz_deger", index=i, nan_var=has_nan, inf_var=has_inf)
+            raise ValueError(f"CAAR hesaplamasında {i}. seride {'NaN' if has_nan else ''}{' ve ' if has_nan and has_inf else ''}{'Inf' if has_inf else ''} değeri var.")
 
     min_len = min(series_lengths)
 
@@ -284,5 +326,5 @@ def calculate_caar(
             kisaltilmis=min_len,
         )
 
-    stacked = np.array([np.asarray(s[:min_len], dtype=np.float64) for s in series_list])
+    stacked = np.array([_ensure_float64(s[:min_len]) for s in series_list])
     return np.mean(stacked, axis=0)

@@ -2,6 +2,11 @@
 
 AR = R_actual - E[R_expected]
 MacKinlay (1997) metodolojisi ile abnormal return hesaplama.
+
+Sayısal kararlılık notları:
+- float64 dtype zorunlu (float32 precision kaybı önler)
+- beta amplifikasyon kontrolü (beta > 50 uyarı)
+- np.isfinite ile tek traversal NaN/Inf tespiti
 """
 
 import numpy as np
@@ -17,9 +22,15 @@ MIN_ARRAY_LENGTH: int = 1
 EXPECTED_DTYPE: type = np.floating
 ARRAY_DIM: int = 1
 
+# Sayısal kararlılık eşikleri
+BETA_AMPLIFICATION_THRESHOLD: float = 50.0
+MARKET_RETURN_NOISE_THRESHOLD: float = 1e-10
+
 
 def _validate_array(arr: np.ndarray, name: str, min_len: int = MIN_ARRAY_LENGTH) -> None:
     """Array doğrulama — tip, boyut, boşluk, NaN/Inf kontrolü.
+
+    NaN ve Inf tek traversal ile kontrol edilir (np.isfinite).
 
     Args:
         arr: Doğrulanacak array
@@ -42,12 +53,13 @@ def _validate_array(arr: np.ndarray, name: str, min_len: int = MIN_ARRAY_LENGTH)
         logger.error("anormal_donuyor_bos_dizi", dizi=name, uzunluk=len(arr))
         raise ValueError(f"{name} boş olamaz (minimum {min_len} eleman gerekli).")
 
-    if np.any(np.isnan(arr)):
-        logger.error("anormal_donuyor_nan_var", dizi=name)
-        raise ValueError(f"{name} dizisinde NaN değeri var.")
-    if np.any(np.isinf(arr)):
-        logger.error("anormal_donuyor_inf_var", dizi=name)
-        raise ValueError(f"{name} dizisinde Inf değeri var.")
+    # Tek traversal ile NaN ve Inf kontrolü
+    if not np.all(np.isfinite(arr)):
+        # Hangisinin olduğunu belirle (log için)
+        has_nan = np.any(np.isnan(arr))
+        has_inf = np.any(np.isinf(arr))
+        logger.error("anormal_donuyor_gecersiz_deger", dizi=name, nan_var=has_nan, inf_var=has_inf)
+        raise ValueError(f"{name} dizisinde {'NaN' if has_nan else ''}{' ve ' if has_nan and has_inf else ''}{'Inf' if has_inf else ''} değeri var.")
 
 
 def _validate_scalar(value: float, name: str) -> None:
@@ -60,9 +72,54 @@ def _validate_scalar(value: float, name: str) -> None:
     Raises:
         ValueError: NaN veya Inf ise
     """
-    if np.isnan(value) or np.isinf(value):
+    if not np.isfinite(value):
         logger.error("anormal_donuyor_skaler_hatasi", deger_ad=name, deger=value)
         raise ValueError(f"{name} değeri NaN veya Inf olamaz: {value}")
+
+
+def _ensure_float64(arr: np.ndarray) -> np.ndarray:
+    """Array'i float64'e dönüştür (zaten float64 ise kopyasız döndür).
+
+    Args:
+        arr: Dönüştürülecek array
+
+    Returns:
+        float64 dtype array
+    """
+    if arr.dtype == np.float64:
+        return arr
+    return arr.astype(np.float64, copy=False)
+
+
+def _check_numerical_stability(alpha: float, beta: float, market_returns: np.ndarray) -> None:
+    """Sayısal kararlılık uyarısı — beta amplifikasyon ve piyasa gürültü kontrolü.
+
+    Büyük beta değerleri küçük piyasa getirilerini amplifiye edebilir,
+    bu da AR hesabında gürültüye yol açar.
+
+    Args:
+        alpha: Intercept
+        beta: Market beta
+        market_returns: Piyasa getirileri
+    """
+    if abs(beta) > BETA_AMPLIFICATION_THRESHOLD:
+        logger.warning(
+            "anormal_donuyor_buyuk_beta_uyarisi",
+            beta=beta,
+            esik=BETA_AMPLIFICATION_THRESHOLD,
+            mesaj="Yuksek beta degeri kucuk piyasa getirilerini amplifiye edebilir.",
+        )
+
+    # Piyasa getirilerinin çoğu çok küçükse (gürültü seviyesinde)
+    if len(market_returns) > 0:
+        small_ratio = np.sum(np.abs(market_returns) < MARKET_RETURN_NOISE_THRESHOLD) / len(market_returns)
+        if small_ratio > 0.5:
+            logger.warning(
+                "anormal_donuyor_piyasa_gurultu_uyarisi",
+                kucuk_oran=round(small_ratio, 2),
+                esik=MARKET_RETURN_NOISE_THRESHOLD,
+                mesaj="Piyasa getirilerinin yarısından fazlası gürültü seviyesinde. AR hesabı yanıltıcı olabilir.",
+            )
 
 
 def calculate_abnormal_return(
@@ -115,9 +172,12 @@ def calculate_abnormal_return(
             f"stock={len(stock_returns)}, market={len(market_returns)}"
         )
 
-    # dtype kontrolü — float64'e çevir (precision kaybı önleme)
-    stock_f64 = np.asarray(stock_returns, dtype=np.float64)
-    market_f64 = np.asarray(market_returns, dtype=np.float64)
+    # Sayısal kararlılık uyarısı
+    _check_numerical_stability(alpha, beta, market_returns)
+
+    # dtype kontrolü — float64'e çevir (kopyasız eğer zaten float64)
+    stock_f64 = _ensure_float64(stock_returns)
+    market_f64 = _ensure_float64(market_returns)
 
     expected = alpha + beta * market_f64
 
@@ -132,7 +192,7 @@ def calculate_abnormal_return(
             raise ValueError(
                 f"SMB dizisi uzunluğu uyuşmuyor: smb={len(smb_returns)}, stock={len(stock_returns)}"
             )
-        expected += beta_smb * np.asarray(smb_returns, dtype=np.float64)
+        expected += beta_smb * _ensure_float64(smb_returns)
 
     if hml_returns is not None:
         _validate_array(hml_returns, "hml_returns")
@@ -145,7 +205,7 @@ def calculate_abnormal_return(
             raise ValueError(
                 f"HML dizisi uzunluğu uyuşmuyor: hml={len(hml_returns)}, stock={len(stock_returns)}"
             )
-        expected += beta_hml * np.asarray(hml_returns, dtype=np.float64)
+        expected += beta_hml * _ensure_float64(hml_returns)
 
     ar = stock_f64 - expected
 
@@ -186,7 +246,7 @@ def calculate_abnormal_return_batch(
 
     _validate_array(market_returns, "market_returns")
 
-    market_f64 = np.asarray(market_returns, dtype=np.float64)
+    market_f64 = _ensure_float64(market_returns)
 
     results: dict[str, np.ndarray] = {}
     for ticker, stock_ret in stocks_returns.items():
@@ -218,7 +278,7 @@ def calculate_abnormal_return_batch(
 
         try:
             ar = calculate_abnormal_return(
-                np.asarray(stock_ret[:n], dtype=np.float64),
+                _ensure_float64(stock_ret[:n]),
                 market_f64[:n],
                 p["alpha"],
                 p["beta_market"],
