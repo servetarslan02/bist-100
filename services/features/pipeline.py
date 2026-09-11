@@ -127,14 +127,24 @@ class FeaturePipeline:
         targets: dict[str, float] = {}
         try:
             if ohlcv_df is not None:
-                # DataFrame desteği (polars veya pandas)
+                # Polars-native dönüşüm
+                pdf: pl.DataFrame | None = None
                 if isinstance(ohlcv_df, pl.DataFrame):
                     pdf = ohlcv_df
-                elif hasattr(ohlcv_df, "to_pandas"):
-                    pdf = pl.from_pandas(ohlcv_df.to_pandas())
-                else:
+                elif isinstance(ohlcv_df, dict):
                     try:
-                        pdf = pl.from_pandas(ohlcv_df)
+                        pdf = pl.DataFrame(ohlcv_df)
+                    except Exception:
+                        pdf = None
+                elif hasattr(ohlcv_df, "to_pandas"):
+                    # Legacy Pandas uyumluluk
+                    logger.warning(
+                        "legacy_pandas_donüşümü",
+                        tip=type(ohlcv_df).__name__,
+                        mesaj="Polars DataFrame kullanın.",
+                    )
+                    try:
+                        pdf = pl.from_pandas(ohlcv_df.to_pandas())
                     except Exception:
                         pdf = None
 

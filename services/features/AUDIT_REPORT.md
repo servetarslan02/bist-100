@@ -3,6 +3,7 @@
 **Tarih:** 2026-09-11
 **Kapsam:** 18 `.py` dosyası (4761 satır)
 **Denetim Sonucu:** 47 sorun tespit edildi, **47 düzeltildi** ✅
+**Kurumsal Seviye İnceleme:** 6/18 dosya tamamlandı (satır satır)
 
 ---
 
@@ -300,3 +301,30 @@ Aşağıdaki fonksiyonlarda `"Otomatik eklendi"` placeholder docstring var — h
 ~~6. **Orta:** `__all__` listesinin genişletilmesi~~ ✅
 
 **Tüm 47 sorun düzeltildi.** ✅
+
+---
+
+## 🏢 KURUMSAL SEVİYE İNCELEME DURUMU
+
+Her dosya satır satır incelenip ruff check + smoke test + syntax ile doğrulanmıştır.
+
+| # | Dosya | Durum | Düzeltilen Sorunlar |
+|---|-------|-------|--------------------|
+| 1 | `__init__.py` | ✅ Tamamlandı | Import sıralaması, __all__ sıralaması, eksik motor importları, docstring genişletme, ruff config |
+| 2 | `bist_features.py` | ✅ Tamamlandı | Eksik import (Any/Literal), __name__ eksik, docstring kısa, validate_all_definitions eklendi, _FEATURE_BY_NAME eklendi |
+| 3 | `cache_manager.py` | ✅ Tamamlandı | Internal dict referans sızıntısı (2×), fail-closed boyut sınırı, matrix boyut doğrulaması, sayaç sıfırlama, kopya dönüşü |
+| 4 | `calculator.py` | ✅ Tamamlandı | __name__ eksik, return tipi uyuşmazlığı, sessiz return, exception korumasız, Polars-first dönüşüm, yardımcı methodlar |
+| 5 | `contract.py` | ✅ Tamamlandı | __name__ eksik, import math konumu, Literal tipler, 12 docstring kısa, İngilizce log mesajları |
+| 6 | `pipeline.py` | ✅ Tamamlandı | Pandas-first dönüşüm → Polars-first + legacy warning |
+| 7 | `cross_sectional.py` | ⏳ Bekliyor | |
+| 8 | `doc_generator.py` | ⏳ Bekliyor | |
+| 9 | `feature_store_feast.py` | ⏳ Bekliyor | |
+| 10 | `feature_tests.py` | ⏳ Bekliyor | |
+| 11 | `incremental_state.py` | ⏳ Bekliyor | |
+| 12 | `lineage.py` | ⏳ Bekliyor | |
+| 13 | `macro.py` | ⏳ Bekliyor | |
+| 14 | `main.py` | ⏳ Bekliyor | |
+| 15 | `quality_monitor.py` | ⏳ Bekliyor | |
+| 16 | `selection.py` | ⏳ Bekliyor | |
+| 17 | `seven_motors.py` | ⏳ Bekliyor | |
+| 18 | `store.py` | ⏳ Bekliyor | |

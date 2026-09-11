@@ -7,22 +7,54 @@ Kaynak: Borsa İstanbul kuralları, SPK mevzuatı
 """
 
 from dataclasses import dataclass
+from typing import Literal
 
 import structlog
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+
+# Feature kategorileri — Literal ile sınırlı
+FeatureCategory = Literal[
+    "session",
+    "circuit_breaker",
+    "settlement",
+    "compliance",
+    "microstructure",
+    "market",
+    "institutional",
+    "viop",
+]
+
+# Feature önem seviyeleri
+FeatureImportance = Literal["high", "medium", "low"]
+
+# Feature veri tipleri
+FeatureDtype = Literal["float", "int", "bool"]
 
 
 @dataclass
 class BISTFeatureDef:
-    """BIST-specific feature tanımı."""
+    """BIST-specific feature tanımı.
+
+    Borsa İstanbul'un seans fazları, devre kesiciler, takas kuralları,
+    uyumluluk gereksinimleri ve piyasa mikro yapısına özgü feature'ları
+    tanımlar.
+
+    Attributes:
+        name: Feature adı (benzersiz, snake_case).
+        description: Türkçe açıklama.
+        category: Feature kategorisi.
+        dtype: Veri tipi ("float", "int", "bool").
+        default_value: Varsayılan değer.
+        importance: Önem seviyesi ("high", "medium", "low").
+    """
 
     name: str
     description: str
-    category: str  # "session", "circuit_breaker", "settlement", "compliance", "microstructure"
-    dtype: str = "float"  # "float", "int", "bool"
+    category: FeatureCategory
+    dtype: FeatureDtype = "float"
     default_value: float = 0.0
-    importance: str = "high"  # "high", "medium", "low"
+    importance: FeatureImportance = "high"
 
 
 # BIST-specific feature tanımları
@@ -274,32 +306,98 @@ BIST_FEATURE_DEFINITIONS: list[BISTFeatureDef] = [
     ),
 ]
 
+# Hızlı erişim için isim → tanım sözlüğü
+_FEATURE_BY_NAME: dict[str, BISTFeatureDef] = {
+    f.name: f for f in BIST_FEATURE_DEFINITIONS
+}
 
-def get_feature_names_by_category(category: str) -> list[str]:
-    """Belirli kategorideki feature isimlerini döndür."""
+
+def get_feature_def(name: str) -> BISTFeatureDef | None:
+    """Feature tanımını adına göre döndür.
+
+    Args:
+        name: Feature adı.
+
+    Returns:
+        BISTFeatureDef veya None (bulunamazsa).
+    """
+    return _FEATURE_BY_NAME.get(name)
+
+
+def get_feature_names_by_category(category: FeatureCategory) -> list[str]:
+    """Belirli kategorideki feature isimlerini döndür.
+
+    Args:
+        category: Feature kategorisi.
+
+    Returns:
+        Bu kategorideki feature isimlerinin listesi.
+    """
     return [f.name for f in BIST_FEATURE_DEFINITIONS if f.category == category]
 
 
 def get_high_importance_features() -> list[str]:
-    """Yüksek önemdeki feature isimlerini döndür."""
+    """Yüksek önemdeki feature isimlerini döndür.
+
+    Returns:
+        importance="high" olan feature isimlerinin listesi.
+    """
     return [f.name for f in BIST_FEATURE_DEFINITIONS if f.importance == "high"]
 
 
 def get_all_feature_names() -> list[str]:
-    """Tüm BIST-specific feature isimlerini döndür."""
+    """Tüm BIST-specific feature isimlerini döndür.
+
+    Returns:
+        Tüm feature isimlerinin listesi.
+    """
     return [f.name for f in BIST_FEATURE_DEFINITIONS]
 
 
 def get_feature_count() -> dict[str, int]:
-    """Kategori bazında feature sayısı."""
+    """Kategori bazında feature sayısı.
+
+    Returns:
+        Kategori adı → feature sayısı dict'i.
+    """
     counts: dict[str, int] = {}
     for f in BIST_FEATURE_DEFINITIONS:
         counts[f.category] = counts.get(f.category, 0) + 1
     return counts
 
 
-def print_feature_summary() -> Any:
-    """Feature özetini yazdır."""
+def validate_all_definitions() -> list[str]:
+    """Tüm feature tanımlarını doğrula.
+
+    Returns:
+        Hata mesajlarının listesi. Boş liste = tümü geçerli.
+    """
+    errors: list[str] = []
+    seen_names: set[str] = set()
+
+    for f in BIST_FEATURE_DEFINITIONS:
+        # Tekrar kontrolü
+        if f.name in seen_names:
+            errors.append(f"Tekrar feature adı: {f.name}")
+        seen_names.add(f.name)
+
+        # Boş alan kontrolü
+        if not f.name:
+            errors.append("Boş feature adı")
+        if not f.description:
+            errors.append(f"Boş açıklama: {f.name}")
+        if not f.category:
+            errors.append(f"Boş kategori: {f.name}")
+
+    return errors
+
+
+def print_feature_summary() -> None:
+    """Feature özetini structlog ile yazdır.
+
+    Her kategori için feature sayısını ve toplam/yüksek önem
+    sayılarını loglar.
+    """
     counts = get_feature_count()
     total = len(BIST_FEATURE_DEFINITIONS)
     high = len(get_high_importance_features())

@@ -1,6 +1,4 @@
-"""
-ALPHA BIST — Feature Contract System
-=====================================
+"""ALPHA BIST — Feature Contract System.
 
 Her feature için metadata, validation ve PIT-safety garantisi.
 Feature pipeline'ın standardizasyonu için temel yapı.
@@ -33,41 +31,100 @@ Kullanım:
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Literal
 
 import structlog
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+
+# Feature kaynak tipleri
+FeatureSource = Literal[
+    "OHLCV",
+    "fundamental",
+    "KAP",
+    "macro",
+    "cross_sectional",
+    "market_session",
+    "circuit_breaker",
+    "multi",
+]
+
+# Feature frekans tipleri
+FeatureFrequency = Literal["tick", "intraday", "daily", "weekly"]
+
+# Feature kullanılabilirlik zamanı
+FeatureAvailability = Literal["close", "open", "realtime"]
+
+# Feature kategorileri
+FeatureCategory = Literal[
+    "technical",
+    "fundamental",
+    "sentiment",
+    "microstructure",
+    "session",
+    "risk",
+    "market",
+]
 
 
 @dataclass
 class FeatureContract:
-    """Feature metadata ve validation sözleşmesi."""
+    """Feature metadata ve validation sözleşmesi.
+
+    Her feature için tanımlayıcı bilgiler, validasyon kuralları
+    ve PIT-safety garantisi içerir.
+
+    Attributes:
+        name: Feature adı (benzersiz, snake_case).
+        source: Veri kaynağı.
+        formula: Hesaplama formülü/açıklaması.
+        lookback: Gerekli geçmiş veri penceresi (gün).
+        frequency: Hesaplama frekansı.
+        available_at: Ne zaman kullanılabilir.
+        pit_safe: Point-in-time güvenli mi?
+        version: Sözleşme versiyonu.
+        owner: Sorumlu modül.
+        description: Türkçe açıklama.
+        value_range: Geçerli değer aralığı (min, max).
+        validation_rules: Ek validasyon kuralları.
+        dependencies: Bağımlı feature'lar.
+        category: Feature kategorisi.
+        created_at: Oluşturulma tarihi (ISO format).
+    """
 
     name: str
-    source: str  # "OHLCV", "fundamental", "KAP", "macro", "cross_sectional"
-    formula: str  # Hesaplama formülü/açıklaması
-    lookback: int  # Gerekli geçmiş veri penceresi (gün)
-    frequency: str  # "tick", "intraday", "daily", "weekly"
-    available_at: str  # "close", "open", "realtime" — ne zaman kullanılabilir
-    pit_safe: bool  # Point-in-time güvenli mi?
+    source: FeatureSource
+    formula: str
+    lookback: int
+    frequency: FeatureFrequency
+    available_at: FeatureAvailability
+    pit_safe: bool
     version: int
-    owner: str  # "feature-engine", "seven-motors", "cross-sectional", "macro"
+    owner: str
     description: str = ""
-    value_range: tuple[float, float] | None = None  # (min, max)
+    value_range: tuple[float, float] | None = None
     validation_rules: dict[str, Any] = field(default_factory=dict)
-    dependencies: list[str] = field(default_factory=list)  # Bağımlı feature'lar
-    category: str = "technical"  # "technical", "fundamental", "sentiment", "microstructure", "session"
+    dependencies: list[str] = field(default_factory=list)
+    category: FeatureCategory = "technical"
     created_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
     def validate_value(self, value: float | None) -> bool:
-        """Feature değerini doğrula."""
+        """Feature değerini doğrula.
+
+        None değerler (eksik veri) geçerli kabul edilir.
+        NaN ve Inf değerler geçersizdir.
+
+        Args:
+            value: Doğrulanacak değer.
+
+        Returns:
+            True: değer geçerli. False: değer geçersiz.
+        """
         if value is None:
             return True  # None = eksik veri, geçerli
-
-        import math
 
         if math.isnan(value) or math.isinf(value):
             return False
@@ -87,7 +144,11 @@ class FeatureContract:
         return True
 
     def to_dict(self) -> dict[str, Any]:
-        """Dict'e çevir."""
+        """Contract'ı dict'e çevir.
+
+        Returns:
+            Tüm attribute'ları içeren dict.
+        """
         return {
             "name": self.name,
             "source": self.source,
@@ -110,7 +171,8 @@ class FeatureContract:
 class FeatureRegistry:
     """Feature kayıt ve yönetim merkezi.
 
-    Tüm feature contract'larını merkezi olarak yönetir, doğrular ve sorgular.
+    Tüm feature contract'larını merkezi olarak yönetir,
+    doğrular ve sorgular. Singleton olarak kullanılır.
     """
 
     def __init__(self) -> None:
@@ -122,56 +184,113 @@ class FeatureRegistry:
         self._register_defaults()
 
     def register(self, contract: FeatureContract) -> None:
-        """Feature contract'ı kaydet."""
+        """Feature contract'ı kaydet.
+
+        Aynı isimde ve daha düşük veya eşit version'da contract
+        varsa kayıt gerçekleşmez ve warning loglanır.
+
+        Args:
+            contract: Kaydedilecek FeatureContract.
+        """
         if contract.name in self._contracts:
             existing = self._contracts[contract.name]
             if existing.version >= contract.version:
                 logger.warning(
-                    "Feature contract version conflict",
+                    "feature_contract_version_çelişkisi",
                     name=contract.name,
-                    existing_version=existing.version,
-                    new_version=contract.version,
+                    mevcut_version=existing.version,
+                    yeni_version=contract.version,
                 )
                 return
         self._contracts[contract.name] = contract
-        logger.debug("Feature registered", name=contract.name, version=contract.version)
+        logger.debug(
+            "feature_kayıt_edildi",
+            name=contract.name,
+            version=contract.version,
+        )
 
     def get(self, name: str) -> FeatureContract | None:
-        """Feature contract'ı getir."""
+        """Feature contract'ı adına göre getir.
+
+        Args:
+            name: Feature adı.
+
+        Returns:
+            FeatureContract veya None (bulunamazsa).
+        """
         return self._contracts.get(name)
 
     def validate(self, name: str, value: float | None) -> bool:
-        """Feature değerini doğrula."""
+        """Feature değerini doğrula.
+
+        Args:
+            name: Feature adı.
+            value: Doğrulanacak değer.
+
+        Returns:
+            True: değer geçerli veya feature bulunamadı (warning).
+        """
         contract = self._contracts.get(name)
         if not contract:
-            logger.warning("Unknown feature", name=name)
+            logger.warning("bilinmeyen_feature", name=name)
             return False
         return contract.validate_value(value)
 
     def list_all(self) -> list[FeatureContract]:
-        """Tüm feature contract'larını listele."""
+        """Tüm feature contract'larını listele.
+
+        Returns:
+            Kayıtlı tüm FeatureContract'ların listesi.
+        """
         return list(self._contracts.values())
 
-    def list_by_category(self, category: str) -> list[FeatureContract]:
-        """Kategoriye göre feature listele."""
+    def list_by_category(self, category: FeatureCategory) -> list[FeatureContract]:
+        """Kategoriye göre feature listele.
+
+        Args:
+            category: Feature kategorisi.
+
+        Returns:
+            Bu kategorideki FeatureContract'ların listesi.
+        """
         return [c for c in self._contracts.values() if c.category == category]
 
     def list_by_owner(self, owner: str) -> list[FeatureContract]:
-        """Owner'a göre feature listele."""
+        """Owner'a göre feature listele.
+
+        Args:
+            owner: Sorumlu modül adı.
+
+        Returns:
+            Bu owner'a ait FeatureContract'ların listesi.
+        """
         return [c for c in self._contracts.values() if c.owner == owner]
 
     def list_pit_safe(self) -> list[FeatureContract]:
-        """PIT-safe feature'ları listele."""
+        """PIT-safe feature'ları listele.
+
+        Returns:
+            pit_safe=True olan FeatureContract'ların listesi.
+        """
         return [c for c in self._contracts.values() if c.pit_safe]
 
     def get_names(self) -> list[str]:
-        """Tüm feature isimlerini döndür."""
+        """Tüm feature isimlerini döndür.
+
+        Returns:
+            Kayıtlı feature isimlerinin listesi.
+        """
         return list(self._contracts.keys())
 
     def get_summary(self) -> dict[str, Any]:
-        """Özet istatistikler."""
-        categories = {}
-        owners = {}
+        """Özet istatistikler döndür.
+
+        Returns:
+            Toplam, PIT-safe/unsafe sayıları, kategori ve
+            owner dağılımlarını içeren dict.
+        """
+        categories: dict[str, int] = {}
+        owners: dict[str, int] = {}
         pit_count = 0
         for c in self._contracts.values():
             categories[c.category] = categories.get(c.category, 0) + 1
@@ -188,10 +307,13 @@ class FeatureRegistry:
         }
 
     def _register_defaults(self) -> None:
-        """Varsayılan feature contract'larını kaydet."""
+        """Varsayılan feature contract'larını kaydet.
 
-        # === PRICE CONTEXT (FeatureEngine) ===
+        BIST-100 piyasası için standart teknik, risk, sentiment,
+        cross-sectional ve BIST-specific feature'ları tanımlar.
+        """
         defaults = [
+            # === PRICE CONTEXT (FeatureEngine) ===
             FeatureContract(
                 name="return_1d",
                 source="OHLCV",
