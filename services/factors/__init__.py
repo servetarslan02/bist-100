@@ -41,9 +41,6 @@ from .fama_french import (
 from .performance import track_factor_performance, track_factor_performance_batch
 from .piotroski import calculate_f_score, calculate_f_score_simple
 from .ranking import DEFAULT_WEIGHTS, REGIME_WEIGHTS, get_bottom_n, get_top_n, rank_stocks
-from .performance import track_factor_performance, track_factor_performance_batch
-from .piotroski import calculate_f_score, calculate_f_score_simple
-from .ranking import DEFAULT_WEIGHTS, REGIME_WEIGHTS, get_bottom_n, get_top_n, rank_stocks
 
 __all__ = [
     # Piotroski

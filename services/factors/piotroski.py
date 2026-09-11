@@ -94,6 +94,7 @@ def calculate_f_score(
 
     Raises:
         TypeError: financials None veya dict değilse.
+        TypeError: financials_prev None veya dict değilse.
         ValueError: weights eksik kriter içeriyorsa.
     """
     if financials is None:
@@ -103,6 +104,8 @@ def calculate_f_score(
 
     # Ağırlıkları doğrula
     if weights is not None:
+        if not isinstance(weights, dict):
+            raise TypeError(f"weights dict olmalı, alınan tip: {type(weights).__name__}")
         missing = _REQUIRED_CRITERIA - set(weights.keys())
         if missing:
             raise ValueError(f"weights eksik kriterler: {sorted(missing)}")
@@ -110,6 +113,11 @@ def calculate_f_score(
     else:
         w = dict(DEFAULT_WEIGHTS)
 
+    # financials_prev doğrulama — falsy ama dict olmayan değerler için
+    if financials_prev is not None and not isinstance(financials_prev, dict):
+        raise TypeError(
+            f"financials_prev dict veya None olmalı, alınan tip: {type(financials_prev).__name__}"
+        )
     prev = financials_prev or {}
     score = 0.0
     max_score = sum(w.values())
@@ -273,7 +281,8 @@ def calculate_f_score(
     result: dict[str, Any] = {
         "f_score": normalized_score,
         "raw_score": round(score, 2),
-        "max_score": 9,
+        "max_score": round(max_score, 2),
+        "normalized_max": 9,
         "category": category,
         "signal": signal,
         "details": details,
