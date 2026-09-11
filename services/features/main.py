@@ -1,6 +1,13 @@
-from typing import Any
+"""ALPHA BIST — Feature Engine Service
 
-"""ALPHA BIST - Feature Engine Service (Main Entry Point)"""
+Gerçek zamanlı feature hesaplama servisi. Market tick event'lerini dinler,
+price cache'i günceller, feature pipeline'ını çalıştırır ve sonuçları
+Redis (hot state) + ClickHouse (historical) depolar.
+"""
+
+from __future__ import annotations
+
+from typing import Any
 
 import asyncio
 from datetime import UTC, datetime
@@ -27,57 +34,106 @@ from .pipeline import feature_pipeline
 
 logger = structlog.get_logger()
 
-# Varsayılan sabitler
-DEFAULT_MAX_TICK_CACHE: int = 200  # Her ticker için saklanacak maksimum tick sayısı
-DEFAULT_MIN_TICKS_FOR_FEATURE: int = 20  # Feature hesaplaması için minimum tick sayısı
-DEFAULT_HEALTH_PORT: int = 8080  # Health check HTTP sunucu portu
+# ---------------------------------------------------------------------------
+# Sabitler
+# ---------------------------------------------------------------------------
+
+DEFAULT_MAX_TICK_CACHE: int = 200
+DEFAULT_MIN_TICKS_FOR_FEATURE: int = 20
+DEFAULT_HEALTH_PORT: int = 8080
+DEFAULT_MAX_TICKERS: int = 1000
+
+
+# ---------------------------------------------------------------------------
+# Ana sınıf
+# ---------------------------------------------------------------------------
 
 
 class FeatureEngineService:
-    """Computes and stores features for all instruments."""
+    """Feature Engine Service — BIST-100 için gerçek zamanlı feature hesaplama.
+
+    Market tick event'lerini dinler, price cache'i günceller ve
+    feature pipeline'ını çalıştırır.
+
+    Özellikler:
+        - Gerçek zamanlı tick işleme
+        - Rolling price cache yönetimi
+        - Feature hesaplama (calculator + pipeline)
+        - Redis (hot state) + ClickHouse (historical) depolama
+        - Health check HTTP sunucusu
+    """
 
     def __init__(self) -> None:
         """Feature Engine Service başlatıcısı.
 
-        Price cache, pipeline ve çalışma durumunu初始化ler.
+        Price cache, pipeline ve çalışma durumunu başlatır.
+
+        Returns:
+            None.
+
+        Raises:
+            Yok.
         """
         self._running = False
         self._consumer: EventConsumer = None
-        self._price_cache: dict[str, list[dict]] = {}  # ticker -> recent prices
-        # Pipeline — drift detection, BIST features, store entegrasyonu
+        self._price_cache: dict[str, list[dict]] = {}
         self._pipeline = feature_pipeline
 
-    async def start(self) -> Any:
-        """Start the feature engine service."""
-        setup_logging()
-        logger.info("Starting Feature Engine Service")
+    def __repr__(self) -> str:
+        """FeatureEngineService kısa temsili.
 
+        Returns:
+            Çalışma durumu ve cache boyutu.
+        """
+        return f"FeatureEngineService(running={self._running}, tickers={len(self._price_cache)})"
+
+    async def start(self) -> None:
+        """Feature Engine Service'i başlatır.
+
+        Veritabanlarını başlatır, event consumer'ı kurar ve
+        tick dinleme döngüsünü başlatır.
+
+        Returns:
+            None.
+        """
+        setup_logging()
+        logger.info("feature_engine_starting")
         await init_databases()
         ensure_topics()
-
         self._running = True
-
-        # Set up event consumer
         self._consumer = EventConsumer(
             group_id="feature-engine",
             topics=["market.tick"],
             auto_offset_reset="latest",
         )
         self._consumer.on(EventType.MARKET_TICK, self._on_tick)
-
-        logger.info("Feature Engine Service started")
+        logger.info("feature_engine_started")
         await self._consumer.consume_loop()
 
-    async def stop(self) -> Any:
-        """Stop the feature engine service."""
+    async def stop(self) -> None:
+        """Feature Engine Service'i durdurur.
+
+        Returns:
+            None.
+        """
         self._running = False
         if self._consumer:
             self._consumer.stop()
         await close_databases()
-        logger.info("Feature Engine Service stopped")
+        logger.info("feature_engine_stopped")
 
-    async def _on_tick(self, event: CanonicalEvent) -> Any:
-        """Handle incoming tick events — her tick'te feature güncelle."""
+    async def _on_tick(self, event: CanonicalEvent) -> None:
+        """Gelen tick event'lerini işler — her tick'te price cache'i günceller ve feature hesaplar.
+
+        Args:
+            event: CanonicalEvent tick verisi.
+
+        Returns:
+            None.
+
+        Raises:
+            Yok — hatalar loglanır, service crash olmaz.
+        """
         try:
             ticker = event.data.get("ticker")
             instrument_id = event.data.get("instrument_id")
@@ -85,6 +141,11 @@ class FeatureEngineService:
             volume = event.data.get("volume", 0)
 
             if not ticker or not price:
+                return
+
+            # Ticker sayısı limiti
+            if ticker not in self._price_cache and len(self._price_cache) >= DEFAULT_MAX_TICKERS:
+                logger.warning("max_tickers_reached", count=len(self._price_cache))
                 return
 
             # Update price cache
@@ -99,15 +160,22 @@ class FeatureEngineService:
                 }
             )
 
-            # Keep last 200 ticks
+            # Keep last N ticks
             self._price_cache[ticker] = self._price_cache[ticker][-DEFAULT_MAX_TICK_CACHE:]
 
-            # Her tick'te feature güncelle (20+ tick varsa)
+            # Feature hesaplama (minimum tick sayısına ulaşınca)
             if len(self._price_cache[ticker]) >= DEFAULT_MIN_TICKS_FOR_FEATURE:
                 features = self._compute_features(ticker, self._price_cache[ticker])
 
                 if features:
-                    # Store in Redis (hot state) — anlık erişim için
+                    # Metadata — feature dict'ten ayrı tutulur (tip güvenliği)
+                    feature_metadata = {
+                        "ticker": ticker,
+                        "computed_at": datetime.now(UTC).isoformat(),
+                        "data_points": len(self._price_cache[ticker]),
+                    }
+
+                    # Store in Redis (hot state)
                     await redis_hset(
                         f"features:{ticker}", {k: str(v) for k, v in features.items() if isinstance(v, (int, float))}
                     )
@@ -115,7 +183,7 @@ class FeatureEngineService:
                     # Store in ClickHouse (historical)
                     self._store_features_ch(instrument_id or 0, ticker, features)
 
-                    # Publish feature update event — market state ve scanner'a gider
+                    # Publish feature update event
                     feat_event = CanonicalEvent(
                         event_type=EventType.FEATURE_UPDATED,
                         source="feature-engine",
@@ -129,26 +197,30 @@ class FeatureEngineService:
                     publish_event(feat_event, key=ticker)
 
         except Exception as e:
-            logger.error("Tick processing error", error=str(e))
-            raise
+            logger.error("tick_processing_error", error=str(e))
 
     def _compute_features(self, ticker: str, price_data: list[dict]) -> dict[str, float]:
-        """Compute features from price cache."""
+        """Price cache'ten feature hesaplar.
+
+        Tick verisini Polars DataFrame'e dönüştürür, OHLCV formatına çevirir
+        ve calculator ile tüm feature'ları hesaplar.
+
+        Args:
+            ticker: Hisse senedi kodu.
+            price_data: Tick verisi listesi (price, volume, timestamp).
+
+        Returns:
+            Feature adı → değer sözlüğü. Hata durumunda boş dict.
+        """
         try:
-            # Convert to DataFrame
             df = pl.DataFrame(price_data)
 
-            # Ensure columns exist
             required_cols = ["price", "volume", "timestamp"]
             for col in required_cols:
                 if col not in df.columns:
                     return {}
 
-            # Rename to OHLCV format (we only have close price from ticks)
-            # NOT: calculator.compute_all() buyuk harfli Close/Open/High/Low/Volume
-            # kolon adlari bekliyor - kucuk harfle KeyError('Close') ile sessizce {}
-            # donuyor ve feature hic hesaplanmiyor (bkz. try/except).
-            # DÜZELTME: Her iki formatı da destekle (büyük/küçük harf)
+            # OHLCV formatına çevir
             rename_map = {}
             if "price" in df.columns:
                 rename_map["price"] = "Close"
@@ -158,47 +230,40 @@ class FeatureEngineService:
                 rename_map["close"] = "Close"
             if rename_map:
                 df = df.rename(rename_map)
-            # Eksik OHLCV kolonlarını Close'dan türet
             for col in ["Open", "High", "Low"]:
                 if col not in df.columns:
                     df = df.with_columns(pl.col("Close").alias(col))
 
-            # Compute features
             features = feature_calculator.compute_all_features(df, ticker=ticker)
 
-            # Metadata — float dict'e string karıştırmayalım
-            feature_metadata = {
-                "ticker": ticker,
-                "computed_at": datetime.now(UTC).isoformat(),
-                "data_points": len(df),
-            }
-
-            # data_points sayısal — feature dict'e eklenebilir
-            features["data_points"] = len(df)
-
-            # === PIPELINE ENTEGRASYONU ===
-            # Feature store'a kaydet, drift detection çalıştır
+            # Pipeline entegrasyonu
             try:
                 import asyncio as _asyncio
-
                 try:
                     loop = _asyncio.get_running_loop()
-                    # Zaten bir loop içinde — background task olarak çalıştır
                     loop.create_task(self._run_pipeline_async(ticker, features, df))
                 except RuntimeError:
-                    # Loop yok — yeni oluştur
                     _asyncio.run(self._run_pipeline_async(ticker, features, df))
             except Exception as e:
-                logger.debug("Pipeline integration skipped", error=str(e))
+                logger.debug("pipeline_integration_skipped", error=str(e))
 
             return features
 
         except Exception as e:
-            logger.warning("Feature computation failed", ticker=ticker, error=str(e))
+            logger.warning("feature_computation_failed", ticker=ticker, error=str(e))
             return {}
 
-    async def _run_pipeline_async(self, ticker: str, features: dict[str, float], df) -> Any:
-        """Pipeline'ı async olarak çalıştır (store, drift detection)."""
+    async def _run_pipeline_async(self, ticker: str, features: dict[str, float], df: Any) -> None:
+        """Pipeline'ı async olarak çalıştırır (store, drift detection).
+
+        Args:
+            ticker: Hisse senedi kodu.
+            features: Hesaplanmış feature sözlüğü.
+            df: OHLCV Polars DataFrame.
+
+        Returns:
+            None.
+        """
         try:
             result = await self._pipeline.run(
                 ticker=ticker,
@@ -214,8 +279,17 @@ class FeatureEngineService:
         except Exception as e:
             logger.debug("Pipeline run failed", ticker=ticker, error=str(e))
 
-    def _store_features_ch(self, instrument_id: int, ticker: str, features: dict[str, float]) -> Any:
-        """Store features in ClickHouse."""
+    def _store_features_ch(self, instrument_id: int, ticker: str, features: dict[str, float]) -> None:
+        """Feature'ları ClickHouse'a depolar.
+
+        Args:
+            instrument_id: Enstrüman ID'si.
+            ticker: Hisse senedi kodu.
+            features: Feature adı → değer sözlüğü.
+
+        Returns:
+            None.
+        """
         try:
             now = datetime.now(UTC)
             rows = []
@@ -248,7 +322,7 @@ class FeatureEngineService:
                 )
 
         except Exception as e:
-            logger.warning("ClickHouse feature storage failed", ticker=ticker, error=str(e))
+            logger.warning("clickhouse_storage_failed", ticker=ticker, error=str(e))
 
 
 # =====================================================
