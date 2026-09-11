@@ -3,7 +3,7 @@
 **Tarih:** 2026-09-11
 **Kapsam:** 18 `.py` dosyası (4761 satır)
 **Denetim Sonucu:** 47 sorun tespit edildi, **47 düzeltildi** ✅
-**Kurumsal Seviye İnceleme:** 6/18 dosya tamamlandı (satır satır)
+**Kurumsal Seviye İnceleme:** 7/18 dosya tamamlandı (satır satır)
 
 ---
 
@@ -316,7 +316,7 @@ Her dosya satır satır incelenip ruff check + smoke test + syntax ile doğrulan
 | 4 | `calculator.py` | ✅ Tamamlandı | __name__ eksik, return tipi uyuşmazlığı, sessiz return, exception korumasız, Polars-first dönüşüm, yardımcı methodlar |
 | 5 | `contract.py` | ✅ Tamamlandı | __name__ eksik, import math konumu, Literal tipler, 12 docstring kısa, İngilizce log mesajları |
 | 6 | `pipeline.py` | ✅ Tamamlandı | Pandas-first dönüşüm → Polars-first + legacy warning |
-| 7 | `cross_sectional.py` | ⏳ Bekliyor | |
+| 7 | `cross_sectional.py` | ✅ Tamamlandı | Modül docstring eklendi, İngilizce→Türkçe docstring, magic number→sabit, NaN default→NaN filtreleme, tutarlı NaN handling |
 | 8 | `doc_generator.py` | ⏳ Bekliyor | |
 | 9 | `feature_store_feast.py` | ⏳ Bekliyor | |
 | 10 | `feature_tests.py` | ⏳ Bekliyor | |
