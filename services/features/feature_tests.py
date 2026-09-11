@@ -74,7 +74,7 @@ class TestResult:
         """TestResult kısa temsili.
 
         Returns:
-            Durum ikonu ve test adı.
+            Durum ikonu ve test adı içeren metin.
         """
         icon = "✅" if self.passed else "❌"
         return f"TestResult({icon} {self.test_name!r})"
@@ -108,7 +108,7 @@ class FeatureTestResult:
         """FeatureTestResult kısa temsili.
 
         Returns:
-            Feature adı ve geçti/başarısız oranı.
+            Feature adı ve geçti/başarısız oranı içeren metin.
         """
         icon = "✅" if self.overall_passed else "❌"
         return f"FeatureTestResult({icon} {self.feature_name!r}, {self.passed}/{self.total_tests})"
@@ -144,7 +144,7 @@ class TestSuiteSummary:
         """TestSuiteSummary kısa temsili.
 
         Returns:
-            Feature ve test geçme oranları.
+            Feature ve test geçme oranları içeren metin.
         """
         return (
             f"TestSuiteSummary(features={self.passed_features}/{self.total_features}, "
@@ -916,6 +916,8 @@ class FeatureTestSuite:
             }
         )
 
+
+__all__: list[str] = ["TestResult", "FeatureTestResult", "TestSuiteSummary", "FeatureTestSuite", "feature_test_suite"]
 
 # Singleton
 feature_test_suite = FeatureTestSuite()

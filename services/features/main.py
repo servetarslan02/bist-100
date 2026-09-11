@@ -97,7 +97,7 @@ class FeatureEngineService:
             None.
         """
         setup_logging()
-        logger.info("feature_engine_starting")
+        logger.info("feature_engine_starting", health_port=DEFAULT_HEALTH_PORT)
         await init_databases()
         ensure_topics()
         self._running = True
@@ -198,6 +198,7 @@ class FeatureEngineService:
 
         except Exception as e:
             logger.error("tick_processing_error", error=str(e))
+            raise
 
     def _compute_features(self, ticker: str, price_data: list[dict]) -> dict[str, float]:
         """Price cache'ten feature hesaplar.
@@ -271,12 +272,12 @@ class FeatureEngineService:
             )
             if result.drift_report and result.drift_report.get("drifted_features", 0) > 0:
                 logger.warning(
-                    "Feature drift detected via pipeline",
+                    "feature_drift_detected",
                     ticker=ticker,
                     drifted=result.drift_report.get("drifted_features"),
                 )
         except Exception as e:
-            logger.debug("Pipeline run failed", ticker=ticker, error=str(e))
+            logger.debug("pipeline_run_failed", ticker=ticker, error=str(e))
 
     def _store_features_ch(self, instrument_id: int, ticker: str, features: dict[str, float]) -> None:
         """Feature'ları ClickHouse'a depolar.
@@ -359,7 +360,7 @@ async def _health_server(port: int = DEFAULT_HEALTH_PORT) -> None:
     await runner.setup()
     site = web.TCPSite(runner, "0.0.0.0", port)
     await site.start()
-    logger.info("Health server started", port=port)
+    logger.info("health_server_started", port=port)
 
 
 # =====================================================
@@ -385,10 +386,12 @@ async def main() -> None:
     except KeyboardInterrupt:
         await service.stop()
     except Exception as e:
-        logger.error("Feature Engine crashed", error=str(e))
+        logger.error("feature_engine_crashed", error=str(e))
         await service.stop()
         raise
 
+
+__all__: list[str] = ["FeatureEngineService", "main"]
 
 if __name__ == "__main__":
     asyncio.run(main())

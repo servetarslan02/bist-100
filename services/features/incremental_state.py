@@ -82,7 +82,7 @@ class IncrementalStateManager:
         """IncrementalStateManager kısa temsili.
 
         Returns:
-            max_window ve toplam ticker sayısı.
+            max_window ve toplam ticker sayısı içeren metin.
         """
         with self._lock:
             ticker_count = len(self._buffers)
@@ -276,6 +276,8 @@ class IncrementalStateManager:
                 logger.info("state_cleared_all", removed=total)
                 return total
 
+
+__all__: list[str] = ["IncrementalStateManager", "incremental_state"]
 
 # Singleton
 incremental_state = IncrementalStateManager()

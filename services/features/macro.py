@@ -114,36 +114,43 @@ class MacroFeatureEngine:
         # USD/TRY features
         usdtry = macro_data.get("usdtry")
         features["macro_usdtry_level"] = self._safe_float(usdtry)
-        features["macro_usdtry_change"] = self._safe_float(macro_data.get("usdtry_change_pct", 0))
+        features["macro_usdtry_change"] = self._safe_float(macro_data.get("usdtry_change_pct"))
 
         # US 10Y yield
         us10y = macro_data.get("us10y")
         features["macro_us10y_level"] = self._safe_float(us10y)
-        features["macro_us10y_change"] = self._safe_float(macro_data.get("us10y_change_pct", 0))
+        features["macro_us10y_change"] = self._safe_float(macro_data.get("us10y_change_pct"))
 
         # VIX
         vix = macro_data.get("vix")
-        features["macro_vix_level"] = self._safe_float(vix)
-        features["macro_vix_regime"] = (
-            1.0 if (vix is not None and self._safe_float(vix) > DEFAULT_VIX_HIGH_THRESHOLD) else 0.0
-        )
+        vix_float = self._safe_float(vix)
+        features["macro_vix_level"] = vix_float
+        if np.isnan(vix_float):
+            features["macro_vix_regime"] = float("nan")
+        else:
+            features["macro_vix_regime"] = 1.0 if vix_float > DEFAULT_VIX_HIGH_THRESHOLD else 0.0
 
         # Brent crude
         brent = macro_data.get("brent_crude")
         features["macro_brent_level"] = self._safe_float(brent)
-        features["macro_brent_change"] = self._safe_float(macro_data.get("brent_change_pct", 0))
+        features["macro_brent_change"] = self._safe_float(macro_data.get("brent_change_pct"))
 
         # Gold
         gold = macro_data.get("gold")
         features["macro_gold_level"] = self._safe_float(gold)
 
         # Risk appetite composite
-        risk_factors = [
-            features.get("macro_vix_regime", 0),
-            1.0 if features.get("macro_usdtry_change", 0) > DEFAULT_USDTRY_CHANGE_THRESHOLD else 0.0,
-            1.0 if features.get("macro_brent_change", 0) > DEFAULT_BRENT_CHANGE_THRESHOLD else 0.0,
-        ]
-        features["macro_risk_score"] = float(np.mean(risk_factors))
+        risk_factors: list[float] = []
+        vix_regime = features.get("macro_vix_regime")
+        if vix_regime is not None and not np.isnan(vix_regime):
+            risk_factors.append(vix_regime)
+        usdtry_change = features.get("macro_usdtry_change")
+        if usdtry_change is not None and not np.isnan(usdtry_change):
+            risk_factors.append(1.0 if usdtry_change > DEFAULT_USDTRY_CHANGE_THRESHOLD else 0.0)
+        brent_change = features.get("macro_brent_change")
+        if brent_change is not None and not np.isnan(brent_change):
+            risk_factors.append(1.0 if brent_change > DEFAULT_BRENT_CHANGE_THRESHOLD else 0.0)
+        features["macro_risk_score"] = float(np.mean(risk_factors)) if risk_factors else float("nan")
 
         with self._lock:
             self._cache = features
@@ -234,6 +241,8 @@ class MacroFeatureEngine:
         except (TypeError, ValueError):
             return float("nan")
 
+
+__all__: list[str] = ["MacroFeatureEngine", "macro_feature_engine"]
 
 # Singleton
 macro_feature_engine = MacroFeatureEngine()

@@ -32,9 +32,28 @@ import structlog
 logger = structlog.get_logger()
 
 
+_SHAP_SUBSET_SIZE: int = 500
+_SHAP_BACKGROUND_SIZE: int = 100
+
+
 @dataclass
 class SelectionResult:
-    """Feature selection sonucu."""
+    """Feature selection sonucu.
+
+    Args:
+        selected_features: Seçilen feature isimleri.
+        removed_features: Çıkarılan feature isimleri.
+        removal_reasons: Feature → çıkarma nedeni sözlüğü.
+        n_original: Orijinal feature sayısı.
+        n_selected: Seçilen feature sayısı.
+        n_removed: Çıkarılan feature sayısı.
+        reduction_ratio: Azaltma oranı (0-1).
+        timestamp: İşlem zamanı (ISO 8601).
+    """
+
+    def __repr__(self) -> str:
+        """SelectionResult kısa temsili."""
+        return f"SelectionResult(selected={self.n_selected}, removed={self.n_removed}, ratio={self.reduction_ratio:.1%})"
 
     selected_features: list[str]
     removed_features: list[str]
@@ -48,7 +67,17 @@ class SelectionResult:
 
 @dataclass
 class FeatureImportance:
-    """Feature importance skoru."""
+    """Feature importance skoru.
+
+    Args:
+        feature_name: Feature adı.
+        importance: Importance skoru.
+        rank: Sıralama (1 = en önemli).
+    """
+
+    def __repr__(self) -> str:
+        """FeatureImportance kısa temsili."""
+        return f"FeatureImportance({self.feature_name!r}, imp={self.importance:.4f}, rank={self.rank})"
 
     feature_name: str
     importance: float
@@ -83,6 +112,10 @@ class FeatureSelector:
         self.variance_threshold = variance_threshold
         self.default_top_k = default_top_k
         self._selection_history: list[SelectionResult] = []
+
+    def __repr__(self) -> str:
+        """FeatureSelector kısa temsili."""
+        return f"FeatureSelector(corr={self.correlation_threshold}, var={self.variance_threshold}, history={len(self._selection_history)})"
 
     def select(
         self,
@@ -304,7 +337,7 @@ class FeatureSelector:
         return result
 
     def get_selection_history(self) -> list[SelectionResult]:
-        """Selection history."""
+        """Seçim geçmişini döndürür."""
         return self._selection_history
 
     # =====================================================
@@ -317,7 +350,16 @@ class FeatureSelector:
         feature_names: list[str],
         threshold: float | None = None,
     ) -> dict[str, Any]:
-        """Düşük varyanslı feature'ları ele."""
+        """Düşük varyanslı feature'ları ele.
+
+        Args:
+            X: Feature matrisi.
+            feature_names: Feature isimleri.
+            threshold: Varyans eşiği.
+
+        Returns:
+            kept, kept_indices, removed sözlüğü.
+        """
         if threshold is None:
             threshold = self.variance_threshold
 
@@ -353,6 +395,14 @@ class FeatureSelector:
         """Yüksek korelasyonlu feature çiftlerini ele.
 
         Her çiftten daha düşük varyanslı olanı çıkar.
+
+        Args:
+            X: Feature matrisi.
+            feature_names: Feature isimleri.
+            threshold: Korelasyon eşiği.
+
+        Returns:
+            kept, kept_indices, removed sözlüğü.
         """
         if threshold is None:
             threshold = self.correlation_threshold
@@ -371,7 +421,10 @@ class FeatureSelector:
                 return {"kept": feature_names, "kept_indices": list(range(n_features)), "removed": {}}
 
             corr_matrix = np.corrcoef(X_valid.T)
+            nan_count = int(np.sum(np.isnan(corr_matrix)))
             corr_matrix = np.nan_to_num(corr_matrix, nan=0.0)
+            if nan_count > 0:
+                logger.warning("correlation_matrix_nan_replaced", nan_count=nan_count)
         except Exception as e:
             logger.warning("correlation_filter_failed", error=str(e))
             return {"kept": feature_names, "kept_indices": list(range(n_features)), "removed": {}}
@@ -419,7 +472,18 @@ class FeatureSelector:
         model: Any,
         top_k: int,
     ) -> dict[str, Any]:
-        """SHAP importance'a göre en iyi K feature'ı seç."""
+        """SHAP importance'a göre en iyi K feature'ı seç.
+
+        Args:
+            X: Feature matrisi.
+            y: Target array.
+            feature_names: Feature isimleri.
+            model: sklearn-uyumlu model.
+            top_k: Seçilecek feature sayısı.
+
+        Returns:
+            kept, removed sözlüğü.
+        """
         importances = self._compute_shap_importance(X, y, feature_names, model)
 
         # Importance'a göre sırala
@@ -445,7 +509,17 @@ class FeatureSelector:
         feature_names: list[str],
         model: Any,
     ) -> dict[str, float]:
-        """SHAP importance hesapla."""
+        """SHAP importance skorlarını hesaplar.
+
+        Args:
+            X: Feature matrisi.
+            y: Target array.
+            feature_names: Feature isimleri.
+            model: sklearn-uyumlu model.
+
+        Returns:
+            Feature adı → importance skoru sözlüğü.
+        """
         importances: dict[str, float] = {}
 
         try:
@@ -461,9 +535,9 @@ class FeatureSelector:
             if hasattr(fitted_model, "predict_proba"):
                 explainer = shap.TreeExplainer(fitted_model)
             else:
-                explainer = shap.KernelExplainer(fitted_model.predict, X[:100])
+                explainer = shap.KernelExplainer(fitted_model.predict, X[:_SHAP_BACKGROUND_SIZE])
 
-            shap_values = explainer.shap_values(X[:500])  # Performans için subset
+            shap_values = explainer.shap_values(X[:_SHAP_SUBSET_SIZE])  # Performans için subset
 
             if isinstance(shap_values, list):
                 shap_values = shap_values[0]
@@ -545,6 +619,8 @@ class FeatureSelector:
             logger.warning("permutation_importance_failed", error=str(e))
             return {name: 1.0 for name in feature_names}
 
+
+__all__: list[str] = ["SelectionResult", "FeatureImportance", "FeatureSelector", "feature_selector"]
 
 # Singleton
 feature_selector = FeatureSelector()

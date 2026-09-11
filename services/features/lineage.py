@@ -656,7 +656,7 @@ class FeatureLineageTracker:
             edges: Kenar listesi.
 
         Returns:
-            Mermaid formatında graph字符串.
+            Mermaid formatında graph metni.
         """
         lines: list[str] = ["graph TD"]
 
@@ -681,6 +681,8 @@ class FeatureLineageTracker:
 
         return "\n".join(lines)
 
+
+__all__: list[str] = ["LineageNode", "LineageEdge", "FeatureLineageRecord", "LineageGraph", "FeatureLineageTracker", "feature_lineage"]
 
 # Singleton
 feature_lineage = FeatureLineageTracker()

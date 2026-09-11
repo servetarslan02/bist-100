@@ -82,7 +82,7 @@ class _CategoryStats:
         """Sınıfın kısa temsilini döndürür.
 
         Returns:
-            _CategoryStats alanlarını içeren okunabilir字符串.
+            _CategoryStats alanlarını içeren okunabilir metin.
         """
         return f"_CategoryStats(name={self.name!r}, count={self.count}, ratio={self.ratio:.1f}%)"
 
@@ -120,7 +120,7 @@ class _SummaryStats:
         """Özet istatistiklerin kısa temsilini döndürür.
 
         Returns:
-            _SummaryStats alanlarını içeren okunabilir字符串.
+            _SummaryStats alanlarını içeren okunabilir metin.
         """
         return (
             f"_SummaryStats(total={self.total}, pit_safe={self.pit_safe}, "
@@ -168,7 +168,7 @@ class FeatureDocGenerator:
         """Sınıfın kısa temsilini döndürür.
 
         Returns:
-            Sınıf adını ve boş parantez içeren字符串.
+            Sınıf adını ve boş parantez içeren metin.
         """
         return "FeatureDocGenerator()"
 
@@ -609,6 +609,8 @@ class FeatureDocGenerator:
             rows.append(f"| {item.name} | {item.count} | {item.ratio:.0f}% |")
         return rows
 
+
+__all__: list[str] = ["FeatureDocGenerator", "feature_doc_generator"]
 
 # Singleton
 feature_doc_generator = FeatureDocGenerator()

@@ -91,7 +91,7 @@ class Entity:
         """Entity'nin kısa temsilini döndürür.
 
         Returns:
-            Entity adı ve join key içeren字符串.
+            Entity adı ve join key içeren metin.
         """
         return f"Entity(name={self.name!r}, join_key={self.join_key!r})"
 
@@ -118,7 +118,7 @@ class FeatureSpec:
         """FeatureSpec'in kısa temsilini döndürür.
 
         Returns:
-            Feature adı ve dtype içeren字符串.
+            Feature adı ve dtype içeren metin.
         """
         return f"FeatureSpec(name={self.name!r}, dtype={self.dtype!r})"
 
@@ -178,7 +178,7 @@ class FeatureView:
         """FeatureView'in kısa temsilini döndürür.
 
         Returns:
-            View adı ve feature sayısı içeren字符串.
+            View adı ve feature sayısı içeren metin.
         """
         return f"FeatureView(name={self.name!r}, features={len(self.features)})"
 
@@ -229,7 +229,7 @@ class HistoricalFeatureResponse:
         """HistoricalFeatureResponse'un kısa temsilini döndürür.
 
         Returns:
-            Satır sayısı ve feature sayısı içeren字符串.
+            Satır sayısı ve feature sayısı içeren metin.
         """
         return (
             f"HistoricalFeatureResponse(rows={self.num_rows}, "
@@ -321,7 +321,7 @@ class BISTFeatureStore:
         """BISTFeatureStore'un kısa temsilini döndürür.
 
         Returns:
-            Entity ve feature view sayılarını içeren字符串.
+            Entity ve feature view sayılarını içeren metin.
         """
         return (
             f"BISTFeatureStore(entities={len(self._entities)}, "
@@ -909,6 +909,8 @@ class BISTFeatureStore:
         with self._lock:
             return self._metadata_registry.get(feature_ref)
 
+
+__all__: list[str] = ["Entity", "FeatureSpec", "FeatureView", "HistoricalFeatureResponse", "BISTFeatureStore", "feature_store"]
 
 # Singleton
 feature_store = BISTFeatureStore()

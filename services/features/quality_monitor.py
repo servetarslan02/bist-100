@@ -59,7 +59,7 @@ class FeatureQualityReport:
         """FeatureQualityReport kısa temsili.
 
         Returns:
-            Feature adı, severity ve null oranı.
+            Feature adı, severity ve null oranı içeren metin.
         """
         return f"FeatureQualityReport({self.feature_name!r}, severity={self.severity!r}, null={self.null_ratio:.1%})"
 @dataclass
@@ -81,7 +81,7 @@ class QualitySummary:
         """QualitySummary kısa temsili.
 
         Returns:
-            Feature sayıları ve completeness skoru.
+            Feature sayıları ve completeness skoru içeren metin.
         """
         return f"QualitySummary(total={self.total_features}, valid={self.valid_features}, completeness={self.completeness_score:.2f})"
 class FeatureQualityMonitor:
@@ -441,8 +441,10 @@ class FeatureQualityMonitor:
         """FeatureQualityMonitor kısa temsili.
 
         Returns:
-            Eşik değerleri ve history boyutu.
+            Eşik değerleri ve history boyutu içeren metin.
         """
         return f"FeatureQualityMonitor(null_warn={self.null_warning_threshold}, history={len(self._history)})"
+__all__: list[str] = ["FeatureQualityReport", "QualitySummary", "FeatureQualityMonitor", "feature_quality_monitor"]
+
 # Singleton
 feature_quality_monitor = FeatureQualityMonitor()

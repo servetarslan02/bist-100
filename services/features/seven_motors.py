@@ -238,6 +238,9 @@ class MicrostructureMotor:
 class WhyFallingMotor:
     """Düşen bıçağı tutma hatasını önle — çok faktörlü analiz."""
 
+    def __repr__(self) -> str:
+        return "WhyFallingMotor()"
+
     def compute(
         self,
         ticker: str,
@@ -339,25 +342,25 @@ class WhyFallingMotor:
         # Düşüş nedeni geçici mi kalıcı mı? (Çok faktörlü)
         temporary_score = 0.0
         if features.get("fall_market_selloff_5d", 0) == 1.0:
-            temporary_score += 30
+            temporary_score += SCORE_MARKET_SELL_5D
         if features.get("fall_sector_selloff_5d", 0) == 1.0:
-            temporary_score += 20
+            temporary_score += SCORE_SECTOR_SELL_5D
         if features.get("fall_temporary_panic", 0) == 1.0:
-            temporary_score += 25
+            temporary_score += SCORE_TEMPORARY_PANIC
         if features.get("fall_oversold_bounce", 0) == 1.0:
-            temporary_score += 15
-        if volume_zscore < DEFAULT_VOLUME_ZSCORE_LOW:  # Düşük hacim = panik değil
-            temporary_score += 10
+            temporary_score += SCORE_OVERSOLD_BOUNCE
+        if volume_zscore < DEFAULT_VOLUME_ZSCORE_LOW:
+            temporary_score += SCORE_LOW_VOLUME
 
         permanent_score = 0.0
         if features.get("fall_company_specific_5d", 0) == 1.0:
-            permanent_score += 40
+            permanent_score += SCORE_COMPANY_SPECIFIC
         if features.get("fall_liquidity_event", 0) == 1.0:
-            permanent_score += 20
+            permanent_score += SCORE_LIQUIDITY_EVENT
         if kap_sentiment < DEFAULT_NEG_SENTIMENT_STRONG:
-            permanent_score += 25
+            permanent_score += SCORE_KAP_NEGATIVE
         if news_sentiment < DEFAULT_NEG_SENTIMENT_STRONG:
-            permanent_score += 15
+            permanent_score += SCORE_NEWS_NEGATIVE
 
         total = temporary_score + permanent_score
         if total > 0:
@@ -370,14 +373,17 @@ class WhyFallingMotor:
         # Catch falling knife risk (0 = güvenli, 1 = tehlikeli)
         risk_score = 0.0
         if features.get("fall_company_specific_5d", 0) == 1.0:
-            risk_score += 40
+            risk_score += SCORE_PERMANENT_COMPANY
         if features.get("fall_liquidity_event", 0) == 1.0:
-            risk_score += 30
+            risk_score += SCORE_PERMANENT_LIQUIDITY
         if features.get("fall_high_vol_crash", 0) == 1.0:
-            risk_score += 20
+            risk_score += SCORE_HIGH_VOL_CRASH
         if stock_return_20d < DEFAULT_DEEP_DRAWDOWN:
-            risk_score += 10
+            risk_score += SCORE_DEEP_DRAWDOWN
 
         features["catch_falling_knife_risk"] = int(min(DEFAULT_RISK_CAP, risk_score))
 
         return features
+
+
+__all__: list[str] = ["RelativeStrengthMotor", "SeasonalityMotor", "MomentumMotor", "VolumeMotor", "VolatilityMotor", "MeanReversionMotor", "MicrostructureMotor", "WhyFallingMotor"]
