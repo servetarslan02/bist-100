@@ -238,12 +238,11 @@ class FeatureEngineService:
 
             # Pipeline entegrasyonu
             try:
-                import asyncio as _asyncio
                 try:
-                    loop = _asyncio.get_running_loop()
+                    loop = asyncio.get_running_loop()
                     loop.create_task(self._run_pipeline_async(ticker, features, df))
                 except RuntimeError:
-                    _asyncio.run(self._run_pipeline_async(ticker, features, df))
+                    asyncio.run(self._run_pipeline_async(ticker, features, df))
             except Exception as e:
                 logger.debug("pipeline_integration_skipped", error=str(e))
 
@@ -330,8 +329,15 @@ class FeatureEngineService:
 # =====================================================
 
 
-async def _health_server(port: int = DEFAULT_HEALTH_PORT) -> Any:
-    """Lightweight health check HTTP server for Docker healthcheck."""
+async def _health_server(port: int = DEFAULT_HEALTH_PORT) -> None:
+    """Docker healthcheck için hafif HTTP sunucu başlatır.
+
+    Args:
+        port: HTTP sunucu portu. Varsayılan DEFAULT_HEALTH_PORT.
+
+    Returns:
+        None.
+    """
     from aiohttp import web
 
     async def health_handler(request: Any) -> Any:
@@ -361,8 +367,17 @@ async def _health_server(port: int = DEFAULT_HEALTH_PORT) -> Any:
 # =====================================================
 
 
-async def main() -> Any:
-    """Main entry point for the feature engine service."""
+async def main() -> None:
+    """Feature Engine Service ana giriş noktası.
+
+    Health sunucusunu başlatır, service'i oluşturur ve çalıştırır.
+
+    Returns:
+        None.
+
+    Raises:
+        Exception: Service crash durumunda yeniden fırlatılır.
+    """
     await _health_server()
     service = FeatureEngineService()
     try:
