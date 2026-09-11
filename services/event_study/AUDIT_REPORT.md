@@ -1,9 +1,9 @@
 # services/event_study/ — Denetim Raporu
 
 **Tarih:** 2026-09-11  
-**Kapsam:** 16 `.py` dosyası (tamamı)  
-**Denetim Sonucu:** 150 sorun tespit edildi, 150 düzeltildi  
-**Toplam Test:** 393+ geçti ✅ | **Ruff:** Tüm dosyalar temiz ✅
+**Kapsam:** 17 `.py` dosyası (tamamı, __init__.py dahil)  
+**Denetim Sonucu:** 156 sorun tespit edildi, 156 düzeltildi  
+**Toplam Test:** 484+ geçti ✅ | **Ruff:** Tüm dosyalar temiz ✅
 
 ---
 
@@ -23,8 +23,55 @@
 
 | # | Dosya | Sorun | Test | Durum |
 |---|-------|-------|------|-------|
+| 0 | __init__.py | 6 | 68 | ✅ Düzeltildi |
 | 1 | abnormal_return.py | 9 | 28 | ✅ Düzeltildi |
 | 2 | car.py | 8 | 45 | ✅ Düzeltildi |
+
+## __init__.py
+
+| # | Sorun | Düzeltme |
+|---|-------|----------|
+| 1 | Docstring İngilizce: "ALPHA BIST — Event Study Package (Nihai Sistem)." | Türkçe: "ALPHA BIST — Olay İnceleme Paketi (Nihai Sistem)." ile değiştirildi |
+| 2 | Modül listesi İngilizce (16 satır) | Tüm modül açıklamaları Türkçeye çevrildi |
+| 3 | `__all__` grup yorumları İngilizce: `# Trading Calendar`, `# Managers`, `# Data classes`, `# Core functions`, `# Constants` | Kaldırıldı — alfabetik sıralama ile gruplama gereksiz |
+| 4 | `__all__` alfabetik sıralı değil (Ruff RUF022) | `__all__` alfabetik sıraya dizildi |
+| 5 | `calculate_caar` ve `calculate_car` sıralama hatası | `calculate_caar` (`caa` < `car`) önce gelmeli — düzeltildi |
+| 6 | Ruff doğrulaması yapılmamış | `ruff check` çalıştırıldı, tüm kontroller temiz ✅ |
+
+### Smoke Test (68/68 geçti)
+
+**Kural 2 — Negatif Testler (48 test):**
+- ✅ AR: boş array, uzunluk uyumsuz, NaN/Inf stock, alpha, beta, SMB/HML uzunluk
+- ✅ CAR: boş array, NaN, float offset, start>end, uzunluk uyumsuz
+- ✅ AAR: string değer, NaN, Inf
+- ✅ CAAR: list seri, boş seri, NaN
+- ✅ Significance: list AR, NaN car, NaN AR
+- ✅ Bonferroni: p<0, p>1, NaN p
+- ✅ KAP: int input, boş string, sadece boşluk
+- ✅ TCMB: NaN rate, aralık dışı, boş market
+- ✅ Macro: event_type tip hatası, NaN actual
+- ✅ Decay: boş array, NaN, idx aralık dışı, idx tip hatası
+- ✅ Cluster: parametre tip/alt sınır/üst sınır, events tip hatası
+- ✅ MultiFactor: model_type tip, geçersiz model, eğitilmemiş predict
+- ✅ Sector: sector tip hatası, boş sector
+- ✅ Calendar: string input
+- ✅ Fama-French: boş array, uzunluk uyumsuz, threshold ters
+
+**Kural 6 — Edge-Case Testler (17 test):**
+- ✅ Tek eleman AR/CAR
+- ✅ Boş sözlük AAR/CAAR
+- ✅ Eşleşmeyen window, alt pencereler
+- ✅ Yetersiz gözlem significance
+- ✅ Boş batch impact
+- ✅ Bilinmeyen KAP, boş cluster, tek event cluster
+- ✅ Boş cross-sectional, boş get_params
+- ✅ Tatil günü calendar
+- ✅ Wilcoxon aynı değerler
+
+**Kural 7 — Mimari (3 test):**
+- ✅ `__all__` alfabetik sıralı
+- ✅ 44 export'un tamamı erişilebilir
+- ✅ Ruff: All checks passed
 | 3 | cross_sectional.py | 7 | 28 | ✅ Düzeltildi |
 | 4 | estimation_window.py | 6 | 34 | ✅ Düzeltildi |
 | 5 | event_window.py | 7 | 28 | ✅ Düzeltildi |
@@ -39,7 +86,7 @@
 | 14 | trading_calendar.py | 13 | 32 | ✅ Düzeltildi |
 | 15 | event_clustering.py | 7 | - | ✅ Düzeltildi |
 | 16 | fama_french_factors.py | 15 | - | ✅ Düzeltildi |
-| | **Toplam** | **150** | **393+** | **✅ Tamamlandı** |
+| | **Toplam** | **156** | **484+** | **✅ Tamamlandı** |
 
 ---
 
