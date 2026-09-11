@@ -27,12 +27,20 @@ from .pipeline import feature_pipeline
 
 logger = structlog.get_logger()
 
+# Varsayılan sabitler
+DEFAULT_MAX_TICK_CACHE: int = 200  # Her ticker için saklanacak maksimum tick sayısı
+DEFAULT_MIN_TICKS_FOR_FEATURE: int = 20  # Feature hesaplaması için minimum tick sayısı
+DEFAULT_HEALTH_PORT: int = 8080  # Health check HTTP sunucu portu
+
 
 class FeatureEngineService:
     """Computes and stores features for all instruments."""
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """Feature Engine Service başlatıcısı.
+
+        Price cache, pipeline ve çalışma durumunu初始化ler.
+        """
         self._running = False
         self._consumer: EventConsumer = None
         self._price_cache: dict[str, list[dict]] = {}  # ticker -> recent prices
@@ -92,10 +100,10 @@ class FeatureEngineService:
             )
 
             # Keep last 200 ticks
-            self._price_cache[ticker] = self._price_cache[ticker][-200:]
+            self._price_cache[ticker] = self._price_cache[ticker][-DEFAULT_MAX_TICK_CACHE:]
 
             # Her tick'te feature güncelle (20+ tick varsa)
-            if len(self._price_cache[ticker]) >= 20:
+            if len(self._price_cache[ticker]) >= DEFAULT_MIN_TICKS_FOR_FEATURE:
                 features = self._compute_features(ticker, self._price_cache[ticker])
 
                 if features:
@@ -115,12 +123,14 @@ class FeatureEngineService:
                             "instrument_id": instrument_id,
                             "ticker": ticker,
                             "features": features,
+                            "metadata": feature_metadata,
                         },
                     )
                     publish_event(feat_event, key=ticker)
 
         except Exception as e:
             logger.error("Tick processing error", error=str(e))
+            raise
 
     def _compute_features(self, ticker: str, price_data: list[dict]) -> dict[str, float]:
         """Compute features from price cache."""
@@ -156,9 +166,14 @@ class FeatureEngineService:
             # Compute features
             features = feature_calculator.compute_all_features(df, ticker=ticker)
 
-            # Add metadata
-            features["ticker"] = ticker
-            features["computed_at"] = datetime.now(UTC).isoformat()
+            # Metadata — float dict'e string karıştırmayalım
+            feature_metadata = {
+                "ticker": ticker,
+                "computed_at": datetime.now(UTC).isoformat(),
+                "data_points": len(df),
+            }
+
+            # data_points sayısal — feature dict'e eklenebilir
             features["data_points"] = len(df)
 
             # === PIPELINE ENTEGRASYONU ===
@@ -241,12 +256,21 @@ class FeatureEngineService:
 # =====================================================
 
 
-async def _health_server(port: int = 8080) -> Any:
+async def _health_server(port: int = DEFAULT_HEALTH_PORT) -> Any:
     """Lightweight health check HTTP server for Docker healthcheck."""
     from aiohttp import web
 
-    async def health_handler(request) -> Any:
-        """Otomatik eklendi."""
+    async def health_handler(request: Any) -> Any:
+        """Docker healthcheck endpoint'i.
+
+        Servisin çalıştığını ve sağlıklı olduğunu doğrular.
+
+        Args:
+            request: HTTP isteği.
+
+        Returns:
+            JSON yanıt: {"status": "healthy", "service": "features"}
+        """
         return web.json_response({"status": "healthy", "service": "features"})
 
     app = web.Application()

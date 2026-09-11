@@ -108,10 +108,16 @@ class FeatureContract:
 
 
 class FeatureRegistry:
-    """Feature kayıt ve yönetim merkezi."""
+    """Feature kayıt ve yönetim merkezi.
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    Tüm feature contract'larını merkezi olarak yönetir, doğrular ve sorgular.
+    """
+
+    def __init__(self) -> None:
+        """Feature Registry başlatıcısı.
+
+        Varsayılan feature contract'larını kaydeder.
+        """
         self._contracts: dict[str, FeatureContract] = {}
         self._register_defaults()
 

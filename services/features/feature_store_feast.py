@@ -16,7 +16,6 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
-import numpy as np
 import structlog
 
 try:
@@ -186,7 +185,7 @@ class BISTFeatureStore:
             cached = self._online_cache.get(key, {})
             for ref in feature_refs:
                 feat_name = ref.split(":")[-1] if ":" in ref else ref
-                record[feat_name] = cached.get(feat_name, np.nan)
+                record[feat_name] = cached.get(feat_name, float("nan"))
             results.append(record)
         return results
 
@@ -195,16 +194,36 @@ class BISTFeatureStore:
         entity_df: dict[str, list[Any]],
         feature_refs: list[str],
     ) -> HistoricalFeatureResponse:
-        """
-        Point-in-Time (ASOF) Gelecek Verisi Sızdırmaz Tarihsel Feature Birleştirme.
+        """Point-in-Time (ASOF) gelecek verisi sızdırmaz tarihsel feature birleştirme.
+
+        Her entity-timestamp çifti için, o timestamp'te bilinen en son feature değerlerini döndürür.
+        Gelecekteki veri sızıntısı (leakage) kesinlikle önlenir.
 
         Args:
-            entity_df: {"ticker": ["GARAN", "THYAO"], "timestamp": [datetime(...), datetime(...)]}
-            feature_refs: İstenen feature listesi
+            entity_df: Entity ve timestamp çiftleri.
+                Örn: {"ticker": ["GARAN", "THYAO"], "timestamp": [datetime(...), datetime(...)]}
+            feature_refs: İstenen feature referans listesi.
+                Örn: ["bist_technical_fv:rsi_14", "bist_microstructure_fv:amihud_illiquidity"]
+
+        Returns:
+            HistoricalFeatureResponse: PIT-clean feature matrisi.
+
+        Raises:
+            ValueError: entity_df boş ise veya timestamp eksik ise.
         """
         tickers = entity_df.get("ticker", [])
         timestamps = entity_df.get("timestamp", [])
         n_rows = len(tickers)
+
+        if n_rows == 0:
+            logger.warning("get_historical_features_empty_entity", entity_df_keys=list(entity_df.keys()))
+            return HistoricalFeatureResponse(
+                feature_names=[],
+                entity_keys=[],
+                num_rows=0,
+                data={},
+                is_pit_clean=True,
+            )
 
         feat_names = [f.split(":")[-1] if ":" in f else f for f in feature_refs]
         data_out: dict[str, list[Any]] = {
@@ -212,10 +231,67 @@ class BISTFeatureStore:
             "timestamp": list(timestamps),
         }
 
-        rng = np.random.default_rng(42)
-        for feat in feat_names:
-            # Deterministik PIT değer üretimi
-            data_out[feat] = [float(rng.normal(0.5, 0.15)) for _ in range(n_rows)]
+        # Offline store'dan PIT-safe tarihsel veri çekimi.
+        # Her (ticker, timestamp) çifti için, o timestamp'te bilinen
+        # en son feature değeri ASOF join ile alınır.
+        # Offline store implementasyonu (DuckDB / TimescaleDB) burada entegre edilir.
+        # Offline store mevcut değilse NaN döndürülür — SAHTE VERİ ÜRETİLMEZ.
+        if self.offline_store_path is not None:
+            try:
+                import duckdb
+
+                con = duckdb.connect(self.offline_store_path, read_only=True)
+                for feat in feat_names:
+                    values: list[Any] = []
+                    for i in range(n_rows):
+                        ticker = tickers[i] if i < len(tickers) else None
+                        ts = timestamps[i] if i < len(timestamps) else None
+                        if ticker is None or ts is None:
+                            values.append(float("nan"))
+                            continue
+
+                        # ASOF join: timestamp'ten önceki en son kaydı bul
+                        try:
+                            result = con.execute(
+                                """
+                                SELECT feature_value
+                                FROM feature_historical
+                                WHERE ticker = ?
+                                  AND feature_name = ?
+                                  AND timestamp <= ?
+                                ORDER BY timestamp DESC
+                                LIMIT 1
+                                """,
+                                [ticker, feat, ts],
+                            ).fetchone()
+                            values.append(float(result[0]) if result is not None else float("nan"))
+                        except Exception as e:
+                            logger.debug(
+                                "pit_query_failed",
+                                ticker=ticker,
+                                feature=feat,
+                                error=str(e),
+                            )
+                            values.append(float("nan"))
+                    data_out[feat] = values
+                con.close()
+            except Exception as e:
+                logger.error(
+                    "offline_store_query_failed",
+                    path=self.offline_store_path,
+                    error=str(e),
+                )
+                for feat in feat_names:
+                    data_out[feat] = [float("nan")] * n_rows
+        else:
+            # Offline store tanımlı değil — NaN döndür.
+            # SAHTE VERİ ÜRETİLMEZ.
+            logger.warning(
+                "offline_store_not_configured",
+                message="Offline store path tanımlı değil. NaN değerler döndürülüyor.",
+            )
+            for feat in feat_names:
+                data_out[feat] = [float("nan")] * n_rows
 
         return HistoricalFeatureResponse(
             feature_names=feat_names,

@@ -79,8 +79,11 @@ class FeatureTestSuite:
     5. Determinism: Aynı input → aynı output
     """
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """Feature test suite başlatıcısı.
+
+        Test veri üreticilerini ve test fonksiyonlarını配置ler.
+        """
         self._test_data_generators: dict[str, Callable] = {
             "normal": self._generate_normal_data,
             "empty": self._generate_empty_data,
@@ -398,13 +401,19 @@ class FeatureTestSuite:
     # =====================================================
 
     def _generate_normal_data(self) -> pl.DataFrame:
-        """Normal test verisi üret (100 satır OHLCV)."""
-        np.random.seed(42)
+        """Normal test verisi üret (100 satır OHLCV).
+
+        Deterministik sonuçlar için sabit seed kullanır.
+
+        Returns:
+            OHLCV formatında Polars DataFrame.
+        """
+        rng = np.random.RandomState(42)
         n = 100
-        close = 100 + np.cumsum(np.random.randn(n) * 0.5)
-        high = close + np.abs(np.random.randn(n) * 0.3)
-        low = close - np.abs(np.random.randn(n) * 0.3)
-        volume = np.random.randint(1000, 100000, n).astype(float)
+        close = 100 + np.cumsum(rng.randn(n) * 0.5)
+        high = close + np.abs(rng.randn(n) * 0.3)
+        low = close - np.abs(rng.randn(n) * 0.3)
+        volume = rng.randint(1000, 100000, n).astype(float)
 
         return pl.DataFrame(
             {
@@ -416,7 +425,7 @@ class FeatureTestSuite:
                 "Close": close,
                 "High": high,
                 "Low": low,
-                "Open": close + np.random.randn(n) * 0.1,
+                "Open": close + rng.randn(n) * 0.1,
                 "Volume": volume,
             }
         )

@@ -40,9 +40,11 @@ class FeatureDocGenerator:
     - Summary statistics
     """
 
-    def __init__(self):
-        """Otomatik eklendi."""
-        pass
+    def __init__(self) -> None:
+        """Feature dokümantasyon üretici başlatıcısı.
+
+        Ek bir初始化 gerekmez, singleton olarak kullanılır.
+        """
 
     def generate_catalog(
         self,

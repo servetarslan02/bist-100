@@ -9,6 +9,7 @@
 """
 
 import time
+import threading
 from typing import Any
 
 import numpy as np
@@ -16,87 +17,151 @@ import structlog
 
 logger = structlog.get_logger(__name__)
 
+# Cache boyut sınırı
+DEFAULT_MAX_CACHE_TICKERS: int = 2000
+
 
 class FeatureCacheManager:
-    """70 Kanonik Özellik için ultra hızlı RAM & Matris önbellek yöneticisi."""
+    """70 Kanonik Özellik için ultra hızlı RAM & Matris önbellek yöneticisi.
+
+    Thread-safe: Paylaşılan singleton erişimi threading.Lock ile korunur.
+    """
 
     def __init__(self, ttl_seconds: float = 60.0) -> None:
+        """Cache manager başlatıcısı.
+
+        Args:
+            ttl_seconds: Önbelleğin geçerlilik süresi (saniye).
+        """
         self.ttl_seconds = ttl_seconds
         self._memory_cache: dict[str, dict[str, Any]] = {}
         self._matrix_cache: np.ndarray | None = None
         self._matrix_tickers: list[str] = []
         self._matrix_feature_names: list[str] = []
         self._cache_timestamp: float = 0.0
-        self._hits = 0
-        self._misses = 0
+        self._hits: int = 0
+        self._misses: int = 0
+        self._lock = threading.Lock()
 
     def is_valid(self) -> bool:
-        """Önbelleğin tazeliğini denetle."""
-        return bool(self._memory_cache) and (time.time() - self._cache_timestamp < self.ttl_seconds)
+        """Önbelleğin tazeliğini denetle.
+
+        Returns:
+            True: önbellek geçerli ve taze.
+        """
+        with self._lock:
+            return bool(self._memory_cache) and (time.time() - self._cache_timestamp < self.ttl_seconds)
 
     def get_features(self, ticker: str) -> dict[str, float] | None:
-        """Tek bir hissenin önbellekteki özelliklerini al."""
-        if not self.is_valid():
+        """Tek bir hissenin önbellekteki özelliklerini al.
+
+        Args:
+            ticker: Hisse senedi kodu.
+
+        Returns:
+            Feature dict'i veya None (cache miss).
+        """
+        with self._lock:
+            if not self._is_valid_unlocked():
+                self._misses += 1
+                return None
+            cached = self._memory_cache.get(ticker)
+            if cached:
+                self._hits += 1
+                return cached
             self._misses += 1
             return None
-        cached = self._memory_cache.get(ticker)
-        if cached:
-            self._hits += 1
-            return cached
-        self._misses += 1
-        return None
 
     def get_all_features(self) -> dict[str, Any] | None:
-        """Tüm evrenin önbellekteki özelliklerini al."""
-        if not self.is_valid():
-            self._misses += 1
-            return None
-        self._hits += 1
-        return self._memory_cache
+        """Tüm evrenin önbellekteki özelliklerini al.
+
+        Returns:
+            Ticker → feature dict'i veya None (cache miss).
+        """
+        with self._lock:
+            if not self._is_valid_unlocked():
+                self._misses += 1
+                return None
+            self._hits += 1
+            return self._memory_cache
 
     def set_all_features(self, feature_map: dict[str, Any]) -> None:
-        """Tüm evrenin özelliklerini önbelleğe yaz."""
+        """Tüm evrenin özelliklerini önbelleğe yaz.
+
+        Args:
+            feature_map: Ticker → feature dict'i.
+        """
         if not feature_map:
             return
-        self._memory_cache = dict(feature_map)
-        self._cache_timestamp = time.time()
-        logger.debug("feature_cache_updated", keys_count=len(feature_map), timestamp=self._cache_timestamp)
+        with self._lock:
+            # Boyut sınırı kontrolü
+            if len(feature_map) > DEFAULT_MAX_CACHE_TICKERS:
+                logger.warning(
+                    "cache_size_exceeded",
+                    requested=len(feature_map),
+                    limit=DEFAULT_MAX_CACHE_TICKERS,
+                )
+            self._memory_cache = dict(feature_map)
+            self._cache_timestamp = time.time()
+            logger.debug("feature_cache_updated", keys_count=len(feature_map), timestamp=self._cache_timestamp)
 
     def set_matrix_cache(self, matrix: np.ndarray, tickers: list[str], feature_names: list[str]) -> None:
-        """ML modelleri için önceden hesaplanmış matrisi sakla."""
-        self._matrix_cache = matrix
-        self._matrix_tickers = tickers
-        self._matrix_feature_names = feature_names
-        self._cache_timestamp = time.time()
+        """ML modelleri için önceden hesaplanmış matrisi sakla.
+
+        Args:
+            matrix: Feature matrisi (n_tickers × n_features).
+            tickers: Ticker listesi.
+            feature_names: Feature isimleri listesi.
+        """
+        with self._lock:
+            self._matrix_cache = matrix
+            self._matrix_tickers = tickers
+            self._matrix_feature_names = feature_names
+            self._cache_timestamp = time.time()
 
     def get_matrix_cache(self) -> tuple[np.ndarray, list[str], list[str]] | None:
-        """ML modelleri için önbellekteki matrisi döndür."""
-        if not self.is_valid() or self._matrix_cache is None:
-            return None
-        return self._matrix_cache, self._matrix_tickers, self._matrix_feature_names
+        """ML modelleri için önbellekteki matrisi döndür.
+
+        Returns:
+            (matrix, tickers, feature_names) tuple'ı veya None.
+        """
+        with self._lock:
+            if not self._is_valid_unlocked() or self._matrix_cache is None:
+                return None
+            return self._matrix_cache, self._matrix_tickers, self._matrix_feature_names
 
     def invalidate(self) -> None:
         """Önbelleği sıfırla."""
-        self._memory_cache.clear()
-        self._matrix_cache = None
-        self._matrix_tickers.clear()
-        self._matrix_feature_names.clear()
-        self._cache_timestamp = 0.0
-        logger.info("feature_cache_invalidated")
+        with self._lock:
+            self._memory_cache.clear()
+            self._matrix_cache = None
+            self._matrix_tickers.clear()
+            self._matrix_feature_names.clear()
+            self._cache_timestamp = 0.0
+            logger.info("feature_cache_invalidated")
 
     def get_stats(self) -> dict[str, Any]:
-        """Önbellek isabet ve performans metrikleri."""
-        total = self._hits + self._misses
-        hit_ratio = round(self._hits / max(total, 1), 4)
-        return {
-            "cached_tickers": len(self._memory_cache),
-            "matrix_cached": self._matrix_cache is not None,
-            "age_seconds": round(time.time() - self._cache_timestamp, 2) if self._cache_timestamp > 0 else 0.0,
-            "hits": self._hits,
-            "misses": self._misses,
-            "hit_ratio": hit_ratio,
-            "is_valid": self.is_valid(),
-        }
+        """Önbellek isabet ve performans metrikleri.
+
+        Returns:
+            Metrik dict'i: cached_tickers, matrix_cached, age_seconds, hits, misses, hit_ratio, is_valid.
+        """
+        with self._lock:
+            total = self._hits + self._misses
+            hit_ratio = round(self._hits / max(total, 1), 4)
+            return {
+                "cached_tickers": len(self._memory_cache),
+                "matrix_cached": self._matrix_cache is not None,
+                "age_seconds": round(time.time() - self._cache_timestamp, 2) if self._cache_timestamp > 0 else 0.0,
+                "hits": self._hits,
+                "misses": self._misses,
+                "hit_ratio": hit_ratio,
+                "is_valid": self._is_valid_unlocked(),
+            }
+
+    def _is_valid_unlocked(self) -> bool:
+        """Kilit altında çağrılan tazelik kontrolü (dahili yardımcı)."""
+        return bool(self._memory_cache) and (time.time() - self._cache_timestamp < self.ttl_seconds)
 
 
 # Singleton

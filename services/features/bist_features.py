@@ -1,13 +1,9 @@
-from typing import Any
-
-"""
-ALPHA BIST — BIST-Specific Feature Definitions
+"""ALPHA BIST — BIST-Specific Feature Definitions.
 
 BIST piyasasına özgü feature tanımları.
 ML pipeline'ında kullanılacak BIST-specific features.
 
 Kaynak: Borsa İstanbul kuralları, SPK mevzuatı
-# Features include: momentum_10d
 """
 
 from dataclasses import dataclass
@@ -308,6 +304,6 @@ def print_feature_summary() -> Any:
     total = len(BIST_FEATURE_DEFINITIONS)
     high = len(get_high_importance_features())
 
-    logger.info(f"BIST-Specific Features: {total} toplam, {high} yüksek önem")
+    logger.info("bist_features_summary", toplam=total, yuksek_onem=high)
     for cat, count in sorted(counts.items()):
-        logger.info(f"  {cat}: {count}")
+        logger.info("bist_feature_category", kategori=cat, sayi=count)

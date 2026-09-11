@@ -7,14 +7,31 @@ from typing import Any
 
 import polars as pl
 
+import structlog
+
 from services.ml.feature_engine import FeatureEngine
+
+logger = structlog.get_logger()
 
 
 class FeatureCalculator(FeatureEngine):
-    """Canonical FeatureEngine bridge for feature calculator."""
+    """Canonical FeatureEngine bridge for feature calculator.
+
+    services.ml.feature_engine.FeatureEngine motoruna bağlanır.
+    Polars-native hesaplama yapar.
+    """
 
     def compute_all_features(self, df: Any, ticker: str = "", mask: Any = None) -> dict[str, float]:
-        """Compute all features for given dataframe and ticker."""
+        """Verilen DataFrame ve ticker için tüm feature'ları hesapla.
+
+        Args:
+            df: Girdi DataFrame'i (Polars, Pandars veya dict).
+            ticker: Hisse senedi kodu.
+            mask: Boolean maske dizisi (opsiyonel).
+
+        Returns:
+            Feature adı → değer dict'i.
+        """
         if df is None:
             return {}
 
@@ -34,8 +51,8 @@ class FeatureCalculator(FeatureEngine):
 
                 mask_arr = np.asarray(mask, dtype=bool)
                 pdf = pdf.filter(pl.Series(mask_arr))
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("mask_uygulama_hatası", error=str(e), mask_uzunluk=len(mask))
 
         if len(pdf) < 5:
             return {}

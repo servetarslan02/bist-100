@@ -71,8 +71,14 @@ class FeatureSelector:
         correlation_threshold: float = 0.95,
         variance_threshold: float = 0.001,
         default_top_k: int = 50,
-    ):
-        """Otomatik eklendi."""
+    ) -> None:
+        """Feature selection motoru başlatıcısı.
+
+        Args:
+            correlation_threshold: Yüksek korelasyon eşiği (0-1).
+            variance_threshold: Düşük varyans eşiği.
+            default_top_k: Varsayılan seçilecek feature sayısı.
+        """
         self.correlation_threshold = correlation_threshold
         self.variance_threshold = variance_threshold
         self.default_top_k = default_top_k
@@ -485,8 +491,22 @@ class FeatureSelector:
         feature_names: list[str],
         model: Any,
     ) -> dict[str, float]:
-        """Permutation importance (SHAP fallback)."""
+        """Permutation importance (SHAP fallback).
+
+        Deterministik sonuçlar için sabit seed kullanır.
+
+        Args:
+            X: Feature matrisi.
+            y: Target array.
+            feature_names: Feature isimleri.
+            model: sklearn-uyumlu model.
+
+        Returns:
+            Feature importance dict'i.
+        """
         import copy
+
+        rng = np.random.RandomState(42)  # Deterministik seed
 
         try:
             fitted_model = copy.deepcopy(model)
@@ -506,7 +526,7 @@ class FeatureSelector:
 
             for i, name in enumerate(feature_names):
                 X_permuted = X.copy()
-                np.random.shuffle(X_permuted[:, i])
+                rng.shuffle(X_permuted[:, i])
 
                 if hasattr(fitted_model, "predict_proba"):
                     perm_preds = fitted_model.predict_proba(X_permuted)[:, 1]

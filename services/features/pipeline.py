@@ -17,6 +17,12 @@ from .store import feature_store
 
 logger = structlog.get_logger()
 
+# EBDKS tetikleme eşiği yüzdesi
+DEFAULT_EBDKS_THRESHOLD_PCT: float = 6.0
+
+# Referans istatistik maksimum ticker sayısı (memory leak önleme)
+DEFAULT_MAX_REFERENCE_STATS: int = 500
+
 
 @dataclass
 class PipelineConfig:
@@ -42,8 +48,12 @@ class PipelineResult:
 class FeaturePipeline:
     """End-to-end Feature Pipeline motoru."""
 
-    def __init__(self, config: PipelineConfig | None = None):
-        """Otomatik eklendi."""
+    def __init__(self, config: PipelineConfig | None = None) -> None:
+        """Feature Pipeline başlatıcısı.
+
+        Args:
+            config: Pipeline konfigürasyonu. None ise varsayılan kullanılır.
+        """
         self.config = config or PipelineConfig()
         self._reference_stats: dict[str, dict[str, float]] = {}
 
@@ -196,7 +206,7 @@ class FeaturePipeline:
 
             # EBDKS'ye mesafe
             bist100_change = cb_status.get("bist100_change_pct", 0)
-            bist["bist100_distance_to_ebdks"] = float(bist100_change + 6.0)  # %6 eşiğine mesafe
+            bist["bist100_distance_to_ebdks"] = float(bist100_change + DEFAULT_EBDKS_THRESHOLD_PCT)  # Eşiğe mesafe
 
             # Uptick rule
             bist["uptick_rule_active"] = 1.0 if short_selling_monitor._uptick_rule_active else 0.0
@@ -208,12 +218,30 @@ class FeaturePipeline:
             bist["short_sale_eligible"] = 1.0 if ticker in (short_selling_monitor._bist50_cache or []) else 0.0
 
         except Exception as e:
-            logger.debug("BIST feature computation failed", ticker=ticker, error=str(e))
+            logger.warning("BIST feature hesaplama hatası", ticker=ticker, error=str(e))
+            raise
 
         return bist
 
     def _check_drift(self, ticker: str, current_features: dict[str, float]) -> dict[str, Any]:
-        """Referans istatistikler ile mevcut özellikler arasındaki drift kontrolü."""
+        """Referans istatistikler ile mevcut özellikler arasındaki drift kontrolü.
+
+        Args:
+            ticker: Hisse senedi kodu.
+            current_features: Mevcut feature değerleri.
+
+        Returns:
+            Drift raporu: drifted_features, details, status.
+        """
+        # Memory leak önleme — maksimum ticker sayısı sınırı
+        if len(self._reference_stats) >= DEFAULT_MAX_REFERENCE_STATS and ticker not in self._reference_stats:
+            logger.warning(
+                "reference_stats_limit_reached",
+                limit=DEFAULT_MAX_REFERENCE_STATS,
+                ticker=ticker,
+            )
+            return {"drifted_features": 0, "status": "skipped_limit_reached"}
+
         if ticker not in self._reference_stats:
             self._reference_stats[ticker] = {k: float(v) for k, v in current_features.items()}
             return {"drifted_features": 0, "status": "baseline_established"}

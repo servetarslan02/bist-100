@@ -93,8 +93,11 @@ class FeatureVersionManager:
     - Version rollback
     """
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """Feature version manager başlatıcısı.
+
+        Version geçmişi ve mevcut version havuzlarını初始化ler.
+        """
         self._versions: dict[str, list[VersionSnapshot]] = {}  # feature_name → [versions]
         self._current: dict[str, VersionSnapshot] = {}  # feature_name → current version
         self._history: list[dict[str, Any]] = []

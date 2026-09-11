@@ -8,6 +8,26 @@ import structlog
 
 logger = structlog.get_logger(__name__)
 
+# === Düşüş Analizi Sabitleri ===
+DEFAULT_FALL_5D_THRESHOLD: float = -2.0          # 5 günlük düşüş eşiği (%)
+DEFAULT_FALL_20D_THRESHOLD: float = -5.0         # 20 günlük düşüş eşiği (%)
+DEFAULT_MARKET_SELL_5D_THRESHOLD: float = -3.0   # Piyasa 5 günlük satış eşiği (%)
+DEFAULT_MARKET_SELL_20D_THRESHOLD: float = -5.0  # Piyasa 20 günlük satış eşiği (%)
+DEFAULT_SECTOR_SELL_5D_THRESHOLD: float = -5.0   # Sektör 5 günlük satış eşiği (%)
+DEFAULT_SECTOR_SELL_20D_THRESHOLD: float = -8.0  # Sektör 20 günlük satış eşiği (%)
+DEFAULT_MARKET_FLAT_5D: float = -1.0             # Piyasa durgun eşiği (%)
+DEFAULT_SECTOR_FLAT_5D: float = -2.0             # Sektör durgun eşiği (%)
+DEFAULT_COMPANY_SPECIFIC_DROP: float = -5.0      # Şirkete özgü düşüş eşiği (%)
+DEFAULT_VOLUME_ZSCORE_HIGH: float = 2.0          # Hacim z-score yüksek eşik
+DEFAULT_VOLUME_ZSCORE_LOW: float = 1.0           # Hacim z-score düşük eşik
+DEFAULT_PANIC_DROP_5D: float = -10.0             # Panik satış eşiği (%)
+DEFAULT_PANIC_SENTIMENT: float = -0.3            # Panik sentiment eşiği
+DEFAULT_OVERSOLD_RSI: float = 30.0               # Aşırı satım RSI eşiği
+DEFAULT_HIGH_VOL_ATR: float = 5.0                # Yüksek volatilite ATR eşiği (%)
+DEFAULT_NEG_SENTIMENT_STRONG: float = -0.5       # Güçlü negatif sentiment eşiği
+DEFAULT_DEEP_DRAWDOWN: float = -15.0             # Derin düşüş eşiği (%)
+DEFAULT_RISK_CAP: float = 100.0                  # Risk skoru üst sınır
+
 
 class RelativeStrengthMotor:
     """Computes relative strength features vs benchmark."""
@@ -100,10 +120,19 @@ class SeasonalityMotor:
 
 
 class MomentumMotor:
-    """Computes momentum features."""
+    """Momentum feature hesaplama motoru."""
 
     def compute(self, ticker: str, close: np.ndarray, lookback: int = 20) -> dict[str, float]:
-        """Otomatik eklendi."""
+        """Momentum feature'larını hesapla.
+
+        Args:
+            ticker: Hisse senedi kodu.
+            close: Kapanış fiyatları dizisi.
+            lookback: Geriye bakış penceresi.
+
+        Returns:
+            Feature dict'i: momentum_mean, momentum_std.
+        """
         result: dict[str, float] = {}
         if len(close) < lookback:
             return result
@@ -114,10 +143,19 @@ class MomentumMotor:
 
 
 class VolumeMotor:
-    """Computes volume-based features."""
+    """Hacim feature hesaplama motoru."""
 
     def compute(self, ticker: str, volume: np.ndarray, lookback: int = 20) -> dict[str, float]:
-        """Otomatik eklendi."""
+        """Hacim feature'larını hesapla.
+
+        Args:
+            ticker: Hisse senedi kodu.
+            volume: Hacim dizisi.
+            lookback: Geriye bakış penceresi.
+
+        Returns:
+            Feature dict'i: volume_ratio.
+        """
         result: dict[str, float] = {}
         if len(volume) < lookback:
             return result
@@ -128,10 +166,19 @@ class VolumeMotor:
 
 
 class VolatilityMotor:
-    """Computes volatility features."""
+    """Volatilite feature hesaplama motoru."""
 
     def compute(self, ticker: str, close: np.ndarray, lookback: int = 20) -> dict[str, float]:
-        """Otomatik eklendi."""
+        """Volatilite feature'larını hesapla.
+
+        Args:
+            ticker: Hisse senedi kodu.
+            close: Kapanış fiyatları dizisi.
+            lookback: Geriye bakış penceresi.
+
+        Returns:
+            Feature dict'i: volatility.
+        """
         result: dict[str, float] = {}
         if len(close) < lookback:
             return result
@@ -141,10 +188,19 @@ class VolatilityMotor:
 
 
 class MeanReversionMotor:
-    """Computes mean reversion features."""
+    """Ortalama geri dönüş feature hesaplama motoru."""
 
     def compute(self, ticker: str, close: np.ndarray, lookback: int = 20) -> dict[str, float]:
-        """Otomatik eklendi."""
+        """Ortalama geri dönüş feature'larını hesapla.
+
+        Args:
+            ticker: Hisse senedi kodu.
+            close: Kapanış fiyatları dizisi.
+            lookback: Geriye bakış penceresi.
+
+        Returns:
+            Feature dict'i: mean_reversion.
+        """
         result: dict[str, float] = {}
         if len(close) < lookback:
             return result
@@ -154,12 +210,23 @@ class MeanReversionMotor:
 
 
 class MicrostructureMotor:
-    """Computes microstructure features."""
+    """Mikro yapı feature hesaplama motoru."""
 
     def compute(
         self, ticker: str, high: np.ndarray, low: np.ndarray, close: np.ndarray, lookback: int = 20
     ) -> dict[str, float]:
-        """Otomatik eklendi."""
+        """Mikro yapı feature'larını hesapla.
+
+        Args:
+            ticker: Hisse senedi kodu.
+            high: En yüksek fiyat dizisi.
+            low: En düşük fiyat dizisi.
+            close: Kapanış fiyatları dizisi.
+            lookback: Geriye bakış penceresi.
+
+        Returns:
+            Feature dict'i: spread.
+        """
         result: dict[str, float] = {}
         if len(close) < lookback:
             return result
@@ -187,12 +254,35 @@ class WhyFallingMotor:
         rsi: float = 50,
         atr_pct: float = 0,
     ) -> dict[str, float]:
-        """Düşüş nedeni sınıflandırması."""
+        """Düşüş nedeni sınıflandırması — çok faktörlü analiz.
+
+        Düşüşün geçici mi kalıcı mı olduğunu belirler.
+        Piyasa geneli satış, sektör satışı, şirket olayları,
+        likidite krizi ve aşırı satım koşullarını analiz eder.
+
+        Args:
+            ticker: Hisse senedi kodu.
+            stock_return_5d: Hisse 5 günlük getiri (%).
+            stock_return_20d: Hisse 20 günlük getiri (%).
+            market_return_5d: Piyasa 5 günlük getiri (%).
+            market_return_20d: Piyasa 20 günlük getiri (%).
+            sector_return_5d: Sektör 5 günlük getiri (%).
+            sector_return_20d: Sektör 20 günlük getiri (%).
+            volume_change: Hacim değişimi.
+            volume_zscore: Hacim z-score.
+            news_sentiment: Haber sentiment skoru (-1 ile +1).
+            kap_sentiment: KAP sentiment skoru (-1 ile +1).
+            rsi: RSI değeri (varsayılan 50).
+            atr_pct: ATR yüzdesi (varsayılan 0).
+
+        Returns:
+            Feature dict'i: is_falling, fall_severity, falling_is_temporary, catch_falling_knife_risk vb.
+        """
         features: dict[str, float] = {}
 
         # Düşüş var mı?
-        is_falling_5d = stock_return_5d < -2
-        is_falling_20d = stock_return_20d < -5
+        is_falling_5d = stock_return_5d < DEFAULT_FALL_5D_THRESHOLD
+        is_falling_20d = stock_return_20d < DEFAULT_FALL_20D_THRESHOLD
         features["is_falling_5d"] = 1.0 if is_falling_5d else 0.0
         features["is_falling_20d"] = 1.0 if is_falling_20d else 0.0
 
@@ -208,29 +298,43 @@ class WhyFallingMotor:
         features["fall_severity"] = round(abs(min(stock_return_5d, 0)), 4)
 
         # Market selloff tespiti (5d ve 20d)
-        features["fall_market_selloff_5d"] = 1.0 if market_return_5d < -3 else 0.0
-        features["fall_market_selloff_20d"] = 1.0 if market_return_20d < -5 else 0.0
+        features["fall_market_selloff_5d"] = 1.0 if market_return_5d < DEFAULT_MARKET_SELL_5D_THRESHOLD else 0.0
+        features["fall_market_selloff_20d"] = 1.0 if market_return_20d < DEFAULT_MARKET_SELL_20D_THRESHOLD else 0.0
 
         # Sector selloff tespiti
-        features["fall_sector_selloff_5d"] = 1.0 if sector_return_5d < -5 else 0.0
-        features["fall_sector_selloff_20d"] = 1.0 if sector_return_20d < -8 else 0.0
+        features["fall_sector_selloff_5d"] = 1.0 if sector_return_5d < DEFAULT_SECTOR_SELL_5D_THRESHOLD else 0.0
+        features["fall_sector_selloff_20d"] = 1.0 if sector_return_20d < DEFAULT_SECTOR_SELL_20D_THRESHOLD else 0.0
 
         # Company-specific (piyasa ve sektör düşmemişse)
         features["fall_company_specific_5d"] = (
-            1.0 if (market_return_5d > -1 and sector_return_5d > -2 and stock_return_5d < -5) else 0.0
+            1.0
+            if (
+                market_return_5d > DEFAULT_MARKET_FLAT_5D
+                and sector_return_5d > DEFAULT_SECTOR_FLAT_5D
+                and stock_return_5d < DEFAULT_COMPANY_SPECIFIC_DROP
+            )
+            else 0.0
         )
 
         # Liquidity event (hacim patlaması + fiyat düşüşü)
-        features["fall_liquidity_event"] = 1.0 if (volume_zscore > 2 and stock_return_5d < -5) else 0.0
+        features["fall_liquidity_event"] = (
+            1.0 if (volume_zscore > DEFAULT_VOLUME_ZSCORE_HIGH and stock_return_5d < DEFAULT_COMPANY_SPECIFIC_DROP) else 0.0
+        )
 
         # Temporary panic (hızlı düşüş + negatif sentiment düşük)
-        features["fall_temporary_panic"] = 1.0 if (stock_return_5d < -10 and news_sentiment > -0.3) else 0.0
+        features["fall_temporary_panic"] = (
+            1.0 if (stock_return_5d < DEFAULT_PANIC_DROP_5D and news_sentiment > DEFAULT_PANIC_SENTIMENT) else 0.0
+        )
 
         # Oversold bounce potential (RSI < 30 + düşüş şiddetli)
-        features["fall_oversold_bounce"] = 1.0 if (rsi < 30 and stock_return_5d < -5) else 0.0
+        features["fall_oversold_bounce"] = (
+            1.0 if (rsi < DEFAULT_OVERSOLD_RSI and stock_return_5d < DEFAULT_COMPANY_SPECIFIC_DROP) else 0.0
+        )
 
         # High volatility crash (ATR yüksek + düşüş)
-        features["fall_high_vol_crash"] = 1.0 if (atr_pct > 5 and stock_return_5d < -5) else 0.0
+        features["fall_high_vol_crash"] = (
+            1.0 if (atr_pct > DEFAULT_HIGH_VOL_ATR and stock_return_5d < DEFAULT_COMPANY_SPECIFIC_DROP) else 0.0
+        )
 
         # Düşüş nedeni geçici mi kalıcı mı? (Çok faktörlü)
         temporary_score = 0.0
@@ -242,7 +346,7 @@ class WhyFallingMotor:
             temporary_score += 25
         if features.get("fall_oversold_bounce", 0) == 1.0:
             temporary_score += 15
-        if volume_zscore < 1:  # Düşük hacim = panik değil
+        if volume_zscore < DEFAULT_VOLUME_ZSCORE_LOW:  # Düşük hacim = panik değil
             temporary_score += 10
 
         permanent_score = 0.0
@@ -250,9 +354,9 @@ class WhyFallingMotor:
             permanent_score += 40
         if features.get("fall_liquidity_event", 0) == 1.0:
             permanent_score += 20
-        if kap_sentiment < -0.5:
+        if kap_sentiment < DEFAULT_NEG_SENTIMENT_STRONG:
             permanent_score += 25
-        if news_sentiment < -0.5:
+        if news_sentiment < DEFAULT_NEG_SENTIMENT_STRONG:
             permanent_score += 15
 
         total = temporary_score + permanent_score
@@ -271,9 +375,9 @@ class WhyFallingMotor:
             risk_score += 30
         if features.get("fall_high_vol_crash", 0) == 1.0:
             risk_score += 20
-        if stock_return_20d < -15:
+        if stock_return_20d < DEFAULT_DEEP_DRAWDOWN:
             risk_score += 10
 
-        features["catch_falling_knife_risk"] = round(min(100, risk_score), 0)
+        features["catch_falling_knife_risk"] = int(min(DEFAULT_RISK_CAP, risk_score))
 
         return features

@@ -34,12 +34,18 @@ class CrossSectionalEngine:
             return result
 
         for fname in features:
-            values = [universe_features[t].get(fname, 0.0) for t in tickers if fname in universe_features[t]]
+            values = [universe_features[t].get(fname, float("nan")) for t in tickers if fname in universe_features[t]]
             if not values:
                 continue
 
-            arr = np.array(values)
+            arr = np.array(values, dtype=float)
+            arr = arr[np.isfinite(arr)]  # NaN/Inf filtrele
+            if len(arr) < 2:
+                continue
+
             val = features[fname]
+            if not np.isfinite(val):
+                continue
 
             # Percentile rank
             rank = float(np.sum(arr <= val)) / len(arr) if len(arr) > 1 else 0.5
@@ -48,7 +54,7 @@ class CrossSectionalEngine:
             # Z-score
             mean = np.mean(arr)
             std = np.std(arr)
-            result[f"cs_zscore_{fname}"] = float((val - mean) / std) if std > 1e-10 else 0.0
+            result[f"cs_zscore_{fname}"] = float((val - mean) / std) if std > np.finfo(float).eps else 0.0
 
         return result
 
@@ -104,17 +110,19 @@ class CrossSectionalEngine:
         result: dict[str, float] = {}
 
         # Advance/Decline ratio
-        momentum_values = [f.get("momentum", f.get("returns_1d", 0.0)) for f in all_day_features]
+        momentum_values = [f.get("momentum", f.get("returns_1d", float("nan"))) for f in all_day_features]
         if momentum_values:
             arr = np.array(momentum_values, dtype=float)
-            arr = arr[~np.isnan(arr)]
+            arr = arr[np.isfinite(arr)]  # NaN/Inf filtrele
             if len(arr) > 0:
                 advancing = int(np.sum(arr > 0))
                 declining = int(np.sum(arr < 0))
                 total = len(arr)
                 result["breadth_advance_ratio"] = advancing / total if total > 0 else 0.5
                 result["breadth_decline_ratio"] = declining / total if total > 0 else 0.5
-                result["breadth_ad_ratio"] = advancing / declining if declining > 0 else float(advancing)
+                result["breadth_ad_ratio"] = (
+                    advancing / declining if declining > 0 else float("nan")
+                )
 
         # Average RSI
         rsi_values = [f.get("rsi_14", 50.0) for f in all_day_features if "rsi_14" in f]

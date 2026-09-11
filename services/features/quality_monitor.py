@@ -85,8 +85,15 @@ class FeatureQualityMonitor:
         null_critical_threshold: float = 0.30,
         outlier_iqr_multiplier: float = 1.5,
         outlier_zscore_threshold: float = 3.0,
-    ):
-        """Otomatik eklendi."""
+    ) -> None:
+        """Feature kalite izleme motoru başlatıcısı.
+
+        Args:
+            null_warning_threshold: Null oranı uyarı eşiği.
+            null_critical_threshold: Null oranı kritik eşiği.
+            outlier_iqr_multiplier: IQR çarpanı (outlier tespiti).
+            outlier_zscore_threshold: Z-score eşiği (outlier tespiti).
+        """
         self.null_warning_threshold = null_warning_threshold
         self.null_critical_threshold = null_critical_threshold
         self.outlier_iqr_multiplier = outlier_iqr_multiplier
@@ -362,7 +369,11 @@ class FeatureQualityMonitor:
 
     @property
     def history(self) -> list[dict[str, Any]]:
-        """Otomatik eklendi."""
+        """Kalite kontrol geçmişini döndür.
+
+        Returns:
+            Kalite kontrol kayıtlarının listesi.
+        """
         return self._history
 
 

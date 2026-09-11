@@ -91,8 +91,11 @@ class FeatureLineageTracker:
     - Version-aware lineage tracking
     """
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """Feature lineage tracker başlatıcısı.
+
+        Boş kayıt havuzları ve raw kaynak kümesi oluşturur.
+        """
         self._records: dict[str, FeatureLineageRecord] = {}
         self._raw_sources: set[str] = set()
         self._history: list[dict[str, Any]] = []
