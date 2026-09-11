@@ -112,6 +112,7 @@ def calculate_bist_anomalies(
             dividend_yield, avg_volume, usdtry_beta, inflation_beta,
             rate_beta, sector_momentum, kap_sentiment, foreign_ownership
         market_data: Piyasa verileri (opsiyonel, gelecekte kullanım için).
+            Şu an kullanılmıyor, ileriye dönük rezerved.
 
     Returns:
         8 anomaly skoru sözlüğü (çoğu 0-1, sector_momentum ve kap_sentiment -1 ile 1 arası).
@@ -123,6 +124,8 @@ def calculate_bist_anomalies(
         raise TypeError("stock parametresi None olamaz")
     if not isinstance(stock, dict):
         raise TypeError(f"stock dict olmalı, alınan tip: {type(stock).__name__}")
+    if market_data is not None:
+        logger.info("bist_anomalies_market_data_ignored", reason="reserved for future use")
 
     anomalies: dict[str, float] = {}
 
@@ -163,6 +166,10 @@ def calculate_bist_anomalies(
     return anomalies
 
 
+# Bilinmeyen anomaly'ler için varsayılan (tek instance)
+_DEFAULT_ANOMALY: MappingProxyType[str, Any] = MappingProxyType({"direction": 1})
+
+
 def calculate_anomaly_score(
     anomalies: dict[str, float] | None,
     weights: dict[str, float] | None = None,
@@ -184,14 +191,14 @@ def calculate_anomaly_score(
     if not isinstance(anomalies, dict):
         raise TypeError(f"anomalies dict olmalı, alınan tip: {type(anomalies).__name__}")
 
-    w = weights or {k: v["weight"] for k, v in ANOMALY_DEFINITIONS.items()}
+    w = weights if weights is not None else {k: v["weight"] for k, v in ANOMALY_DEFINITIONS.items()}
     total_weight = sum(w.values())
 
     score = 0.0
     for name, value in anomalies.items():
         safe_value = _safe_float(value, default=0.0, name=f"anomaly.{name}")
         weight = w.get(name, 0)
-        direction = ANOMALY_DEFINITIONS.get(name, MappingProxyType({"direction": 1}))["direction"]
+        direction = ANOMALY_DEFINITIONS.get(name, _DEFAULT_ANOMALY)["direction"]
 
         # Yön düzeltmesi
         adjusted_value = safe_value if direction > 0 else (1 - safe_value)

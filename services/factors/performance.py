@@ -166,6 +166,8 @@ def track_factor_performance(
     }
 
     # Benchmark karşılaştırma
+    if benchmark_returns is not None and not isinstance(benchmark_returns, list):
+        raise TypeError(f"benchmark_returns list veya None olmalı, alınan tip: {type(benchmark_returns).__name__}")
     if benchmark_returns and len(benchmark_returns) >= n:
         b_raw = np.array(benchmark_returns[:n], dtype=float)
         b = _clean_array(b_raw)
@@ -231,5 +233,8 @@ def track_factor_performance_batch(
 
     results: dict[str, dict[str, Any]] = {}
     for name, returns in factors_data.items():
+        if not isinstance(returns, list):
+            logger.warning("performance_batch_invalid_type", factor=name, type=type(returns).__name__, action="skipped")
+            continue
         results[name] = track_factor_performance(returns, benchmark_returns, name)
     return results

@@ -525,7 +525,17 @@
 | `factor_rotation.py` | MappingProxyType (2 katman immutable) | ✅ Güvenli |
 | `factor_time_series.py` | Stateless | ✅ Güvenli |
 
-**Sonuç:** Tüm modüller stateless/pure pattern izliyor. Paylaşılan mutable state yok. Concurrent kullanım güvenli. Risk seviyesi: **DÜŞÜK**.
+**Tüm modüller için uygulanan düzeltmeler:**
+
+| # | Dosya | Düzeltme |
+|---|---|---|
+| 1 | `altman.py` | `_safe_float` default validation + whitespace sector guard |
+| 2 | `beneish.py` | `previous` type check + risk_score sabitleri |
+| 3 | `fama_french.py` | Regime warning + exception fix + non-mutating batch |
+| 4 | `bist_anomalies.py` | `market_data` logging + `_DEFAULT_ANOMALY` singleton |
+| 5 | `ranking.py` | Invalid regime warning |
+| 6 | `performance.py` | `_safe_float` logging + benchmark type check + batch type check |
+| 7 | `api/v1/factors.py` | `structlog` migration + 20 magic number sabiti |
 
 ---
 

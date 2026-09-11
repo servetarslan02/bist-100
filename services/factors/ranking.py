@@ -105,6 +105,8 @@ def rank_stocks(
     # Rejime göre ağırlık ayarla
     if regime in REGIME_WEIGHTS:
         weights.update(REGIME_WEIGHTS[regime])
+    elif regime != "NORMAL":
+        logger.warning("ranking_unknown_regime", regime=regime, action="using_default_weights")
 
     # Ağırlıkları normalize et
     total_w = sum(weights.values())

@@ -38,6 +38,10 @@ THRESHOLDS: MappingProxyType[str, float] = MappingProxyType({
 # Bölünme hatası koruması için minimum değer
 _MIN_DENOMINATOR: float = 1e-3
 
+# Risk skoru sabitleri (formül: (m_score + _RISK_OFFSET) / _RISK_DIVISOR * 100)
+_RISK_OFFSET: float = 3.0
+_RISK_DIVISOR: float = 2.0
+
 
 def _safe_float(value: Any, default: float = 0.0, name: str = "unknown") -> float:
     """Değeri güvenli float'a çevirir; None, NaN veya Inf için varsayılan döndürür.
@@ -103,12 +107,15 @@ def calculate_m_score(
 
     Raises:
         TypeError: current None veya dict değilse.
+        TypeError: previous dict veya None değilse.
     """
     if current is None:
         raise TypeError("current parametresi None olamaz")
     if not isinstance(current, dict):
         raise TypeError(f"current dict olmalı, alınan tip: {type(current).__name__}")
 
+    if not isinstance(previous, (dict, type(None))):
+        raise TypeError(f"previous dict veya None olmalı, alınan tip: {type(previous).__name__}")
     prev = previous or {}
 
     # Eğer previous verisi varsa → gerçek hesaplama
@@ -143,7 +150,7 @@ def calculate_m_score(
         signal = "BUY"
 
     # Risk skoru (0-100, yüksek = riskli)
-    risk_score = min(max((m_score + 3) / 2 * 100, 0), 100)
+    risk_score = min(max((m_score + _RISK_OFFSET) / _RISK_DIVISOR * 100, 0), 100)
 
     result: dict[str, Any] = {
         "m_score": round(m_score, 4),

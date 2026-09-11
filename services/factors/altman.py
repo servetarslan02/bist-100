@@ -54,7 +54,7 @@ def _safe_float(value: Any, default: float = 0.0, name: str = "unknown") -> floa
 
     Args:
         value: Dönüştürülecek değer.
-        default: Hata durumunda dönecek varsayılan değer.
+        default: Hata durumunda dönecek varsayılan değer (float olmalı).
         name: Loglama için alan adı.
 
     Returns:
@@ -63,6 +63,14 @@ def _safe_float(value: Any, default: float = 0.0, name: str = "unknown") -> floa
     Raises:
         Hiçbir zaman — her durumda varsayılan döner.
     """
+    # Default'un güvenli olduğundan emin ol
+    try:
+        default = float(default)
+        if math.isnan(default) or math.isinf(default):
+            default = 0.0
+    except (ValueError, TypeError):
+        default = 0.0
+
     if value is None:
         logger.warning("altman_none_value", field=name, default=default)
         return default
@@ -125,7 +133,7 @@ def calculate_z_score(
         raise TypeError("financials parametresi None olamaz")
     if not isinstance(financials, dict):
         raise TypeError(f"financials dict olmalı, alınan tip: {type(financials).__name__}")
-    if not sector or not isinstance(sector, str):
+    if not sector or not isinstance(sector, str) or not sector.strip():
         raise ValueError(f"sector geçerli bir string olmalı, alınan: {sector!r}")
 
     # Toplam varlıklar — bölünme hatası koruması

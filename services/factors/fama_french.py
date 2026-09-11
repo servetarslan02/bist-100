@@ -105,7 +105,7 @@ def _percentile_from_z(z: float) -> float:
         from scipy.stats import norm
 
         return float(norm.cdf(z))
-    except (ImportError, Exception):
+    except ImportError:
         return 0.5 * (1.0 + math.erf(z / math.sqrt(2.0)))
 
 
@@ -182,7 +182,7 @@ def calculate_factor_scores_batch(
 
     Returns:
         Her hisse için 'factor_scores' anahtarı eklenmiş liste.
-        Girdi listesi doğrudan değiştirilir (in-place).
+        Orijinal liste değiştirilmez (kopya üzerinde çalışır).
 
     Raises:
         TypeError: universe None veya list değilse.
@@ -193,6 +193,9 @@ def calculate_factor_scores_batch(
         raise TypeError(f"universe list olmalı, alınan tip: {type(universe).__name__}")
     if not universe:
         return []
+
+    # Kopya üzerinde çalış (input'u mutate etme)
+    universe = [dict(s) for s in universe]
 
     # Tüm metrikler için evren istatistikleri hesapla
     all_metrics: set[str] = set()
@@ -241,6 +244,8 @@ def get_factor_weights(regime: str = "NORMAL") -> dict[str, float]:
 
     if regime in regime_adjustments:
         base.update(regime_adjustments[regime])
+    else:
+        logger.warning("fama_french_unknown_regime", regime=regime, action="using_default_weights")
 
     # Ağırlıkları normalize et (toplam = 1.0)
     total = sum(base.values())

@@ -2,17 +2,50 @@
 
 from __future__ import annotations
 
-import logging
 from typing import Any
 
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ...core.redis_helper import get_cached
 from ..dependencies import check_rate_limit, get_current_user
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 router = APIRouter()
+
+# --- Faktör skor sabitleri ---
+_MOMENTUM_BASE: float = 50.0
+_MOMENTUM_MULTIPLIER: float = 8.0
+_MOMENTUM_MIN: float = 20.0
+_MOMENTUM_MAX: float = 99.0
+
+_VOLATILITY_BASE: float = 25.0
+_VOLATILITY_MULTIPLIER: float = 12.0
+_VOLATILITY_MIN: float = 15.0
+_VOLATILITY_MAX: float = 95.0
+
+_LIQUIDITY_FACTOR: float = 0.95
+_LIQUIDITY_MIN: float = 40.0
+_LIQUIDITY_MAX: float = 99.0
+
+_QUALITY_BASE: float = 70.0
+_QUALITY_MODULO: float = 20.0
+_QUALITY_MIN: float = 45.0
+_QUALITY_MAX: float = 95.0
+
+_VALUE_BASE: float = 65.0
+_VALUE_MULTIPLIER: float = 3.0
+_VALUE_MIN: float = 30.0
+_VALUE_MAX: float = 90.0
+
+_SIZE_HIGH_SCORE: float = 70.0
+_SIZE_HIGH_VALUE: float = 80.0
+_SIZE_LOW_VALUE: float = 55.0
+_SIZE_MIN: float = 35.0
+_SIZE_MAX: float = 95.0
+
+_NEUTRAL_SCORE: float = 50.0
 
 
 def _hesapla_faktor_skorlari(score: float, change: float) -> dict[str, float]:
@@ -25,12 +58,12 @@ def _hesapla_faktor_skorlari(score: float, change: float) -> dict[str, float]:
     Returns:
         dict: Momentum, value, quality, volatility, liquidity, size skorları.
     """
-    momentum = min(99.0, max(20.0, 50.0 + change * 8.0))
-    volatility = min(95.0, max(15.0, abs(change) * 12.0 + 25.0))
-    liquidity = min(99.0, max(40.0, score * 0.95))
-    quality = min(95.0, max(45.0, 70.0 + (score % 20)))
-    value = min(90.0, max(30.0, 65.0 - (change * 3.0)))
-    size = min(95.0, max(35.0, 80.0 if score > 70 else 55.0))
+    momentum = min(_MOMENTUM_MAX, max(_MOMENTUM_MIN, _MOMENTUM_BASE + change * _MOMENTUM_MULTIPLIER))
+    volatility = min(_VOLATILITY_MAX, max(_VOLATILITY_MIN, abs(change) * _VOLATILITY_MULTIPLIER + _VOLATILITY_BASE))
+    liquidity = min(_LIQUIDITY_MAX, max(_LIQUIDITY_MIN, score * _LIQUIDITY_FACTOR))
+    quality = min(_QUALITY_MAX, max(_QUALITY_MIN, _QUALITY_BASE + (score % _QUALITY_MODULO)))
+    value = min(_VALUE_MAX, max(_VALUE_MIN, _VALUE_BASE - (change * _VALUE_MULTIPLIER)))
+    size = min(_SIZE_MAX, max(_SIZE_MIN, _SIZE_HIGH_VALUE if score > _SIZE_HIGH_SCORE else _SIZE_LOW_VALUE))
     return {
         "momentum": round(momentum, 1),
         "value": round(value, 1),
@@ -39,6 +72,21 @@ def _hesapla_faktor_skorlari(score: float, change: float) -> dict[str, float]:
         "liquidity": round(liquidity, 1),
         "size": round(size, 1),
     }
+
+
+# --- Fama-French sabitleri ---
+_FF_NORMALIZE: float = 50.0
+_FF_SCALE: float = 50.0
+_FF_FACTOR_STD_DIVISOR: float = 150.0
+_FF_R2_BASE: float = 0.7
+
+_FF_MKTRF_BASE: float = 0.8
+_FF_MKTRF_SCALE: float = 0.5
+_FF_R2_MIN: float = 0.5
+_FF_R2_MAX: float = 0.95
+_FF_R2_FACTOR_SCALE: float = 0.2
+_FF_ALPHA_MOMENTUM_SCALE: float = 0.15
+_FF_ALPHA_QUALITY_SCALE: float = 0.1
 
 
 def _hesapla_fama_french(factors: dict[str, float]) -> dict[str, Any]:
@@ -50,21 +98,21 @@ def _hesapla_fama_french(factors: dict[str, float]) -> dict[str, Any]:
     Returns:
         dict: Fama-French betaları, R-kare ve alfa değeri.
     """
-    momentum = factors.get("momentum", 50.0)
-    value = factors.get("value", 50.0)
-    quality = factors.get("quality", 50.0)
-    volatility = factors.get("volatility", 50.0)
-    size = factors.get("size", 50.0)
+    momentum = factors.get("momentum", _NEUTRAL_SCORE)
+    value = factors.get("value", _NEUTRAL_SCORE)
+    quality = factors.get("quality", _NEUTRAL_SCORE)
+    volatility = factors.get("volatility", _NEUTRAL_SCORE)
+    size = factors.get("size", _NEUTRAL_SCORE)
 
-    smb = round((size - 50) / 50, 2)
-    hml = round((value - 50) / 50, 2)
-    rmw = round((quality - 50) / 50, 2)
-    cma = round((momentum - 50) / 50, 2)
-    mkt_rf = round(0.8 + (volatility / 100) * 0.5, 2)
+    smb = round((size - _FF_NORMALIZE) / _FF_SCALE, 2)
+    hml = round((value - _FF_NORMALIZE) / _FF_SCALE, 2)
+    rmw = round((quality - _FF_NORMALIZE) / _FF_SCALE, 2)
+    cma = round((momentum - _FF_NORMALIZE) / _FF_SCALE, 2)
+    mkt_rf = round(_FF_MKTRF_BASE + (volatility / 100) * _FF_MKTRF_SCALE, 2)
 
-    factor_std = max(0.01, abs(momentum - 50) + abs(value - 50) + abs(quality - 50)) / 150
-    r_squared = round(min(0.95, max(0.5, 0.7 + factor_std * 0.2)), 2)
-    alpha_annual = round((momentum - 50) * 0.15 + (quality - 50) * 0.1, 1)
+    factor_std = max(0.01, abs(momentum - _FF_NORMALIZE) + abs(value - _FF_NORMALIZE) + abs(quality - _FF_NORMALIZE)) / _FF_FACTOR_STD_DIVISOR
+    r_squared = round(min(_FF_R2_MAX, max(_FF_R2_MIN, _FF_R2_BASE + factor_std * _FF_R2_FACTOR_SCALE)), 2)
+    alpha_annual = round((momentum - _FF_NORMALIZE) * _FF_ALPHA_MOMENTUM_SCALE + (quality - _FF_NORMALIZE) * _FF_ALPHA_QUALITY_SCALE, 1)
 
     return {
         "fama_french_betas": {
@@ -101,7 +149,7 @@ async def _get_factor_scores(ticker: str) -> dict[str, Any]:
             detail=f"{ticker} için faktör verisi bulunamadı.",
         )
 
-    score = item.get("score", 50.0)
+    score = item.get("score", _NEUTRAL_SCORE)
     change = item.get("change", 0.0)
     factors = _hesapla_faktor_skorlari(score, change)
 
@@ -237,12 +285,12 @@ async def portfolio_exposure(
                 t_scores = await _get_factor_scores(pos_ticker)
                 f = t_scores.get("factors", {})
                 for key in weighted:
-                    weighted[key] += f.get(key, 50.0) * w
+                    weighted[key] += f.get(key, _NEUTRAL_SCORE) * w
             except Exception as exc:
-                logger.warning("pozisyon_faktor_hatasi: ticker=%s, hata=%s", pos_ticker, exc)
+                logger.warning("pozisyon_faktor_hatasi", ticker=pos_ticker, hata=str(exc))
                 basarisiz_pozisyonlar.append(pos_ticker)
                 for key in weighted:
-                    weighted[key] += 50.0 * w
+                    weighted[key] += _NEUTRAL_SCORE * w
 
         ff = _hesapla_fama_french(weighted)
 
