@@ -168,6 +168,21 @@ class FeatureContract:
         }
 
 
+
+    def __repr__(self) -> str:
+        """FeatureContract kısa temsili.
+    
+        Returns:
+            Sınıf bilgisi.
+        """
+        return f"FeatureContract()"
+def __repr__(self) -> str:
+        """FeatureContract kısa temsili.
+
+        Returns:
+            Feature adı, versiyon ve PIT-safe durumu.
+        """
+        return f"FeatureContract({self.name!r}, v{self.version}, pit_safe={self.pit_safe})"
 class FeatureRegistry:
     """Feature kayıt ve yönetim merkezi.
 
@@ -518,5 +533,20 @@ class FeatureRegistry:
             self.register(contract)
 
 
+
+    def __repr__(self) -> str:
+        """FeatureRegistry kısa temsili.
+    
+        Returns:
+            Sınıf bilgisi.
+        """
+        return f"FeatureRegistry()"
+def __repr__(self) -> str:
+        """FeatureRegistry kısa temsili.
+
+        Returns:
+            Kayıtlı feature sayısı.
+        """
+        return f"FeatureRegistry(features={len(self._contracts)})"
 # Singleton
 feature_registry = FeatureRegistry()

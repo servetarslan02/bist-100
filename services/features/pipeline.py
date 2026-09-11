@@ -34,6 +34,21 @@ class PipelineConfig:
     target_horizons: list[int] = field(default_factory=lambda: [1, 5, 10, 20])
 
 
+
+    def __repr__(self) -> str:
+        """PipelineConfig kısa temsili.
+    
+        Returns:
+            Sınıf bilgisi.
+        """
+        return f"PipelineConfig()"
+def __repr__(self) -> str:
+        """PipelineConfig kısa temsili.
+
+        Returns:
+            Pipeline adı ve enabled durumu.
+        """
+        return f"PipelineConfig({self.name!r}, enabled={self.enabled})"
 @dataclass
 class PipelineResult:
     """Pipeline çalıştırma sonucu."""
@@ -45,6 +60,21 @@ class PipelineResult:
     timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
 
+
+    def __repr__(self) -> str:
+        """PipelineResult kısa temsili.
+    
+        Returns:
+            Sınıf bilgisi.
+        """
+        return f"PipelineResult()"
+def __repr__(self) -> str:
+        """PipelineResult kısa temsili.
+
+        Returns:
+            Feature sayısı ve success durumu.
+        """
+        return f"PipelineResult(features={len(self.features)}, success={self.success})"
 class FeaturePipeline:
     """End-to-end Feature Pipeline motoru."""
 
@@ -274,4 +304,19 @@ class FeaturePipeline:
         }
 
 
+
+    def __repr__(self) -> str:
+        """FeaturePipeline kısa temsili.
+    
+        Returns:
+            Sınıf bilgisi.
+        """
+        return f"FeaturePipeline()"
+def __repr__(self) -> str:
+        """FeaturePipeline kısa temsili.
+
+        Returns:
+            Pipeline adı.
+        """
+        return f"FeaturePipeline({self.config.name!r})"
 feature_pipeline = FeaturePipeline()

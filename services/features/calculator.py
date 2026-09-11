@@ -150,4 +150,19 @@ class FeatureCalculator(FeatureEngine):
             return pdf
 
 
+
+    def __repr__(self) -> str:
+        """FeatureCalculator kısa temsili.
+    
+        Returns:
+            Sınıf bilgisi.
+        """
+        return f"FeatureCalculator()"
+def __repr__(self) -> str:
+        """FeatureCalculator kısa temsili.
+
+        Returns:
+            Sınıf adı.
+        """
+        return "FeatureCalculator()"
 feature_calculator = FeatureCalculator()

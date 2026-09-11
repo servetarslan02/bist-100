@@ -57,6 +57,21 @@ class BISTFeatureDef:
     importance: FeatureImportance = "high"
 
 
+
+    def __repr__(self) -> str:
+        """BISTFeatureDef kısa temsili.
+    
+        Returns:
+            Sınıf bilgisi.
+        """
+        return f"BISTFeatureDef()"
+def __repr__(self) -> str:
+        """BISTFeatureDef kısa temsili.
+
+        Returns:
+            Feature adı ve kategori.
+        """
+        return f"BISTFeatureDef({self.name!r}, category={self.category!r})"
 # BIST-specific feature tanımları
 BIST_FEATURE_DEFINITIONS: list[BISTFeatureDef] = [
     # === SEANS FAZI FEATURES ===

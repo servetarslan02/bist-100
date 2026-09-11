@@ -206,5 +206,20 @@ class CrossSectionalEngine:
         return result
 
 
+
+    def __repr__(self) -> str:
+        """CrossSectionalEngine kısa temsili.
+    
+        Returns:
+            Sınıf bilgisi.
+        """
+        return f"CrossSectionalEngine()"
+def __repr__(self) -> str:
+        """CrossSectionalEngine kısa temsili.
+
+        Returns:
+            Sınıf adı.
+        """
+        return "CrossSectionalEngine()"
 # Singleton
 cross_sectional_engine = CrossSectionalEngine()
