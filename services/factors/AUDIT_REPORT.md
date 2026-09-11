@@ -2,7 +2,9 @@
 
 **Tarih:** 2026-09-11  
 **Kapsam:** 11 `.py` dosyası (10 kaynak + 1 `__init__.py`)  
-**Denetim Sonucu:** 12 sorun tespit edildi, 12 düzeltildi
+**Denetim Sonucu:** 92 sorun tespit edildi, 92 düzeltildi (8/11 dosya tamamlandı)
+**Smoke Test:** 247 test, 0 başarısız
+**Ruff Check:** Tüm dosyalarda temiz
 
 ---
 
@@ -333,4 +335,22 @@
 
 | # | Eksik | Neden Yapılmadı |
 |---|-------|-----------------|
-| — | — | — |
+| 1 | `factor_correlation.py` denetimi | Sıradaki dosya, henüz başlanmadı |
+| 2 | `factor_rotation.py` denetimi | Sıradaki dosya, henüz başlanmadı |
+| 3 | `factor_time_series.py` denetimi | Sıradaki dosya, henüz başlanmadı |
+
+---
+
+## Genel Özet
+
+| Metrik | Değer |
+|--------|-------|
+| Denetlenen dosya | 8 / 11 |
+| Toplam sorun | 92 |
+| Düzeltilen | 92 |
+| Smoke test | 247 |
+| Başarısız test | 0 |
+| Ruff check | 8/8 temiz |
+| Kritik bulgular | `fama_french` ağırlık normalizasyonu (BULL=0.95), `performance` peak=0 division, `bist_anomalies` negatif dividend |
+| Silinen boş modül | `services/events/` (0 kod, 0 import) |
+| Dışçağrı uyumluluğu | 3/3 kırılmadı (factor_engine.py + run_all_imports.py) |
