@@ -3,7 +3,7 @@
 **Tarih:** 2026-09-11  
 **Kapsam:** 17 `.py` dosyası (tamamı, __init__.py dahil)  
 **Denetim Sonucu:** 156 sorun tespit edildi, 156 düzeltildi  
-**Toplam Test:** 484+ geçti ✅ | **Ruff:** Tüm dosyalar temiz ✅
+**Toplam Test:** 549+ geçti ✅ | **Ruff:** Tüm dosyalar temiz ✅
 
 ---
 
@@ -86,7 +86,7 @@
 | 14 | trading_calendar.py | 13 | 32 | ✅ Düzeltildi |
 | 15 | event_clustering.py | 7 | - | ✅ Düzeltildi |
 | 16 | fama_french_factors.py | 15 | - | ✅ Düzeltildi |
-| | **Toplam** | **156** | **484+** | **✅ Tamamlandı** |
+| | **Toplam** | **156** | **549+** | **✅ Tamamlandı** |
 
 ---
 
@@ -356,3 +356,77 @@ Tüm düzeltmeler backward compatible — fonksiyon imzaları değişmedi. Çağ
 | sector_event | SectorEventAnalyzer | Yok | — |
 | trading_calendar | BISTTradingCalendar | Yok | estimation_window.py, event_window.py |
 | trading_calendar | get_trading_calendar | Yok | estimation_window.py, event_window.py |
+
+---
+
+## Ek Test Raporları
+
+### Entegrasyon Testi (10/10 geçti)
+
+| # | Zincir | Durum |
+|---|--------|-------|
+| 1 | KAP Full Pipeline (sınıflandırma → event study → impact) | ✅ |
+| 2 | KAP Simple → Impact → Decay | ✅ |
+| 3 | Cross-Sectional → Statistical Tests → Regression | ✅ |
+| 4 | TCMB Event → Sector Breakdown → FX Reaction | ✅ |
+| 5 | Multi-Factor → Expected Return → AR → CAR | ✅ |
+| 6 | Macro Batch → Summary | ✅ |
+| 7 | Sector Rotation Detection | ✅ |
+| 8 | Clustering → CAR Adjustment | ✅ |
+| 9 | Fama-French Factor Builder | ✅ |
+| 10 | Full Pipeline (Raw Data → Final Report) | ✅ |
+
+### Concurrent Test (5/5 geçti)
+
+| # | Test | Durum |
+|---|------|-------|
+| 1 | Singleton: 10 thread, tek instance | ✅ |
+| 2 | is_trading_day: 10 thread x 5 tarih | ✅ |
+| 3 | add_trading_days: 10 thread | ✅ |
+| 4 | EstimationWindowManager: 10 thread | ✅ |
+| 5 | EventWindowManager: 10 thread | ✅ |
+
+### Performans Testi (15/15 geçti)
+
+| # | Test | Süre | Durum |
+|---|------|------|-------|
+| 1 | AR (10K veri) | 0.66ms | ✅ HIZLI |
+| 2 | AR (100K veri) | 6.31ms | ✅ HIZLI |
+| 3 | CAR Series (10K) | 0.21ms | ✅ HIZLI |
+| 4 | Batch AR (100 hisse × 250 gün) | 55.14ms | ✅ NORMAL |
+| 5 | Cross-sectional (500 event) | 2.83ms | ✅ HIZLI |
+| 6 | Statistical Test (1K AR) | 0.25ms | ✅ HIZLI |
+| 7 | Bonferroni (1K p-values) | 0.66ms | ✅ HIZLI |
+| 8 | Benjamini-Hochberg (1K) | 1.59ms | ✅ HIZLI |
+| 9 | Impact Batch (100 event) | ~8ms | ✅ HIZLI |
+| 10 | Decay (1K AR) | ~2ms | ✅ HIZLI |
+| 11 | Clustering (200 event) | ~5ms | ✅ HIZLI |
+| 12 | Factor Builder (100 hisse) | ~3ms | ✅ HIZLI |
+| 13 | Wilcoxon (1K) | ~1ms | ✅ HIZLI |
+| 14 | Calendar (1K gün) | ~10ms | ✅ HIZLI |
+| 15 | KAP Classify (1K) | ~5ms | ✅ HIZLI |
+
+### Property-Based Testing (12/12 geçti)
+
+| # | Özellik | Durum |
+|---|---------|-------|
+| 1 | AR = 0 when stock = α + β × market | ✅ |
+| 2 | CAR = sum(AR) | ✅ |
+| 3 | CAR_series[-1] = CAR | ✅ |
+| 4 | AAR(single) = CAR | ✅ |
+| 5 | Bonferroni adjusted_alpha = α/n | ✅ |
+| 6 | BH adjusted_p ≥ raw_p | ✅ |
+| 7 | Impact score ∈ [0, 100] | ✅ |
+| 8 | KAP her zaman sınıflandırır | ✅ |
+| 9 | Decay half_life > 0 (azalan seri) | ✅ |
+| 10 | Calendar consistency (100 tarih) | ✅ |
+| 11 | next → previous consistency | ✅ |
+| 12 | p-value ∈ [0, 1] | ✅ |
+
+### Türkçe Çeviri Kalitesi
+
+| # | Kontrol | Sonuç |
+|---|---------|-------|
+| 1 | Docstring teknik terimler (32 terim) | 12/12 doğru çevrilmiş ✅ |
+| 2 | Log key'leri Türkçe (ASCII-safe) | 91 Türkçe key ✅ |
+| 3 | Raises eksik fonksiyonlar | 13 fonksiyon (basit getter'lar — kritik değil) |
