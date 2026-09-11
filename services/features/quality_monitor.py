@@ -54,6 +54,14 @@ class FeatureQualityReport:
     severity: str = "OK"  # OK, WARNING, CRITICAL
 
 
+
+    def __repr__(self) -> str:
+        """FeatureQualityReport kısa temsili.
+
+        Returns:
+            Feature adı, severity ve null oranı.
+        """
+        return f"FeatureQualityReport({self.feature_name!r}, severity={self.severity!r}, null={self.null_ratio:.1%})"
 @dataclass
 class QualitySummary:
     """Genel kalite özeti."""
@@ -68,6 +76,14 @@ class QualitySummary:
     timestamp: str
 
 
+
+    def __repr__(self) -> str:
+        """QualitySummary kısa temsili.
+
+        Returns:
+            Feature sayıları ve completeness skoru.
+        """
+        return f"QualitySummary(total={self.total_features}, valid={self.valid_features}, completeness={self.completeness_score:.2f})"
 class FeatureQualityMonitor:
     """Feature kalite izleme motoru.
 
@@ -93,6 +109,12 @@ class FeatureQualityMonitor:
             null_critical_threshold: Null oranı kritik eşiği.
             outlier_iqr_multiplier: IQR çarpanı (outlier tespiti).
             outlier_zscore_threshold: Z-score eşiği (outlier tespiti).
+
+        Returns:
+            None.
+
+        Raises:
+            Yok.
         """
         self.null_warning_threshold = null_warning_threshold
         self.null_critical_threshold = null_critical_threshold
@@ -108,13 +130,19 @@ class FeatureQualityMonitor:
     ) -> FeatureQualityReport:
         """Tek feature için kalite kontrolü.
 
+        Null oranı, outlier tespiti (IQR + z-score), range validation
+        ve constant feature kontrolü yapar.
+
         Args:
-            feature_name: Feature adı
-            values: Feature değerleri
-            expected_range: Beklenen değer aralığı (min, max)
+            feature_name: Feature adı.
+            values: Feature değerleri (numpy array).
+            expected_range: Beklenen değer aralığı (min, max). None ise range kontrolü yapılmaz.
 
         Returns:
-            FeatureQualityReport
+            FeatureQualityReport: Kalite raporu.
+
+        Raises:
+            Yok — boş değer array'i için CRITICAL rapor döner.
         """
         if len(values) == 0:
             return FeatureQualityReport(
@@ -181,11 +209,33 @@ class FeatureQualityMonitor:
         q50 = float(np.percentile(valid_values, 50))
         q75 = float(np.percentile(valid_values, 75))
 
-        # Outlier tespiti (IQR yöntemi)
+        # Outlier tespiti (IQR + z-score paralel)
         iqr = q75 - q25
         lower_fence = q25 - self.outlier_iqr_multiplier * iqr
         upper_fence = q75 + self.outlier_iqr_multiplier * iqr
-        outlier_mask = (valid_values < lower_fence) | (valid_values > upper_fence)
+        iqr_outlier_mask = (valid_values < lower_fence) | (valid_values > upper_fence)
+        iqr_outlier_count = int(np.sum(iqr_outlier_mask))
+
+        # Z-score outlier tespiti
+        if std > 1e-10:
+            z_scores = np.abs((valid_values - mean) / std)
+            zscore_outlier_mask = z_scores > self.outlier_zscore_threshold
+            zscore_outlier_count = int(np.sum(zscore_outlier_mask))
+        else:
+            zscore_outlier_mask = np.zeros(len(valid_values), dtype=bool)
+            zscore_outlier_count = 0
+
+        # Çelişki kontrolü — IQR ve z-score farklı sayıda bulursa logla
+        if abs(iqr_outlier_count - zscore_outlier_count) > max(1, len(valid_values) * 0.05):
+            logger.warning(
+                "outlier_method_disagreement",
+                feature=feature_name,
+                iqr_count=iqr_outlier_count,
+                zscore_count=zscore_outlier_count,
+            )
+
+        # Union of both methods
+        outlier_mask = iqr_outlier_mask | zscore_outlier_mask
         outlier_count = int(np.sum(outlier_mask))
         outlier_ratio = outlier_count / len(valid_values)
 
@@ -248,15 +298,15 @@ class FeatureQualityMonitor:
         """Tüm feature'lar için kalite kontrolü.
 
         Args:
-            feature_data: {feature_name: values_array}
-            expected_ranges: {feature_name: (min, max)}
+            feature_data: {feature_name: values_array} sözlüğü.
+            expected_ranges: {feature_name: (min, max)} sözlüğü. None ise range kontrolü yapılmaz.
 
         Returns:
-            FeatureQualityReport listesi
+            FeatureQualityReport listesi.
         """
         reports = []
         for name, values in feature_data.items():
-            range_val = expected_ranges.get(name) if expected_ranges else None
+            range_val = expected_ranges.get(name) if expected_ranges is not None else None
             report = self.check_feature(name, values, range_val)
             reports.append(report)
 
@@ -323,43 +373,52 @@ class FeatureQualityMonitor:
         current: np.ndarray,
         feature_name: str = "",
     ) -> dict[str, Any]:
-        """Distribution shift kontrolü (basitleştirilmiş KS test).
+        """Distribution shift kontrolü.
+
+        scipy yüklüyse `ks_2samp` kullanır, değilse manuel CDF farkı hesabı yapar.
 
         Args:
-            baseline: Referans dağılım
-            current: Mevcut dağılım
-            feature_name: Feature adı (log için)
+            baseline: Referans dağılım.
+            current: Mevcut dağılım.
+            feature_name: Feature adı (log için).
 
         Returns:
-            Shift raporu dict
+            Shift raporu: feature, ks_statistic, shifted, baseline/current mean/std.
         """
         if len(baseline) < 10 or len(current) < 10:
             return {"shifted": False, "reason": "Insufficient data"}
 
-        # Basitleştirilmiş KS statistic
-        baseline_sorted = np.sort(baseline)
-        current_sorted = np.sort(current)
+        # scipy varsa kullan (Q-1)
+        try:
+            from scipy.stats import ks_2samp
 
-        # CDF farkı
-        all_values = np.sort(np.concatenate([baseline_sorted, current_sorted]))
-        cdf_baseline = np.searchsorted(baseline_sorted, all_values, side="right") / len(baseline_sorted)
-        cdf_current = np.searchsorted(current_sorted, all_values, side="right") / len(current_sorted)
-
-        ks_statistic = float(np.max(np.abs(cdf_baseline - cdf_current)))
-
-        # Eşik: 0.05 → %95 güvenle farklı
-        shifted = ks_statistic > 0.05
+            result = ks_2samp(baseline, current)
+            ks_statistic = float(result.statistic)
+            p_value = float(result.pvalue)
+            shifted = p_value < 0.05
+        except ImportError:
+            # Fallback: manuel KS statistic
+            baseline_sorted = np.sort(baseline)
+            current_sorted = np.sort(current)
+            all_values = np.sort(np.concatenate([baseline_sorted, current_sorted]))
+            cdf_baseline = np.searchsorted(baseline_sorted, all_values, side="right") / len(baseline_sorted)
+            cdf_current = np.searchsorted(current_sorted, all_values, side="right") / len(current_sorted)
+            ks_statistic = float(np.max(np.abs(cdf_baseline - cdf_current)))
+            p_value = None
+            shifted = ks_statistic > 0.05
 
         if shifted:
             logger.warning(
                 "feature_distribution_shifted",
                 feature=feature_name,
                 ks_statistic=round(ks_statistic, 4),
+                p_value=round(p_value, 4) if p_value is not None else None,
             )
 
         return {
             "feature": feature_name,
             "ks_statistic": round(ks_statistic, 4),
+            "p_value": round(p_value, 4) if p_value is not None else None,
             "shifted": shifted,
             "baseline_mean": round(float(np.mean(baseline)), 4),
             "current_mean": round(float(np.mean(current)), 4),
@@ -369,7 +428,7 @@ class FeatureQualityMonitor:
 
     @property
     def history(self) -> list[dict[str, Any]]:
-        """Kalite kontrol geçmişini döndür.
+        """Kalite kontrol geçmişini döndürür.
 
         Returns:
             Kalite kontrol kayıtlarının listesi.
@@ -377,5 +436,13 @@ class FeatureQualityMonitor:
         return self._history
 
 
+
+    def __repr__(self) -> str:
+        """FeatureQualityMonitor kısa temsili.
+
+        Returns:
+            Eşik değerleri ve history boyutu.
+        """
+        return f"FeatureQualityMonitor(null_warn={self.null_warning_threshold}, history={len(self._history)})"
 # Singleton
 feature_quality_monitor = FeatureQualityMonitor()
