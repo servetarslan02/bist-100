@@ -37,13 +37,16 @@ def _safe_float(value: Any, default: float = 0.0, name: str = "unknown") -> floa
         Güvenli float değeri.
     """
     if value is None:
+        logger.warning("performance_none_value", field=name, default=default)
         return default
     try:
         result = float(value)
         if math.isnan(result) or math.isinf(result):
+            logger.warning("performance_nan_or_inf", field=name, value=value, default=default)
             return default
         return result
-    except (ValueError, TypeError):
+    except (ValueError, TypeError) as exc:
+        logger.warning("performance_type_conversion_failed", field=name, value=value, error=str(exc), default=default)
         return default
 
 

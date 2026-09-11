@@ -553,17 +553,17 @@ Her dosya için audit raporundaki iddialar tek tek doğrulandı:
 
 | Dosya | Audit İddiası | Doğrulanan | Yeni Bulgu |
 |---|---|---|---|
-| `altman.py` | 15 | 15/15 ✅ | 0 |
-| `beneish.py` | 14 | 14/14 ✅ | 0 |
+| `altman.py` | 15 | 15/15 ✅ | 2 (LOW) |
+| `beneish.py` | 14 | 14/14 ✅ | 2 (LOW) |
 | `piotroski.py` | 11 | 11/11 ✅ | 5 (önceki denetimde) |
-| `fama_french.py` | 14 | 14/14 ✅ | 0 |
-| `bist_anomalies.py` | 13 | 13/13 ✅ | 0 |
-| `ranking.py` | 11 | 11/11 ✅ | 0 |
-| `performance.py` | 12 | 12/12 ✅ | 0 |
+| `fama_french.py` | 14 | 14/14 ✅ | 3 (LOW) |
+| `bist_anomalies.py` | 13 | 13/13 ✅ | 2 (LOW) |
+| `ranking.py` | 11 | 11/11 ✅ | 1 (LOW) |
+| `performance.py` | 12 | 12/12 ✅ | 3 (1 MEDIUM düzeltildi, 2 LOW) |
 | `factor_correlation.py` | 13 | 13/13 ✅ | 0 |
 | `factor_rotation.py` | 16 | 16/16 ✅ | 0 |
 | `factor_time_series.py` | 17 | 17/17 ✅ | 0 |
-| **TOPLAM** | **136** | **136/136** | **5** |
+| **TOPLAM** | **136** | **136/136** | **18 (1 düzeltildi)** |
 
 ---
 
