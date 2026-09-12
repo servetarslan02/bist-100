@@ -1,4 +1,4 @@
-"""ALPHA BIST - Real-Time Data Provider v1.3
+"""ALPHA BIST — Real-Time Data Provider v1.3
 
 Polling değil, EVENT-DRIVEN veri akışı.
 Yeni veri çıktığı anda yakalanır ve işlenir.
@@ -30,10 +30,31 @@ import yfinance as yf
 
 logger = structlog.get_logger()
 
+# Varsayılan sabitler
+DEFAULT_KAP_POLL_SECONDS: int = 30
+DEFAULT_NEWS_POLL_SECONDS: int = 15
+DEFAULT_MARKET_POLL_SECONDS: int = 900
+DEFAULT_MACRO_POLL_SECONDS: int = 300
+DEFAULT_HASH_SET_MAX: int = 50000
+DEFAULT_HASH_SET_KEEP: int = 25000
+DEFAULT_SEEN_URLS_MAX: int = 10000
+DEFAULT_SEEN_URLS_KEEP: int = 5000
+DEFAULT_HTTP_TIMEOUT: float = 15.0
+DEFAULT_RSS_TIMEOUT: float = 10.0
+DEFAULT_CHUNK_SIZE: int = 50
+
 
 @dataclass
 class DataEvent:
-    """Yakalanan veri olayı."""
+    """Yakalanan veri olayı.
+
+    Attributes:
+        source: Veri kaynağı adı.
+        event_type: Olay tipi.
+        data: Olay verisi.
+        timestamp: Olay zaman damgası.
+        content_hash: İçerik hash'i (duplicate detection).
+    """
 
     source: str
     event_type: str
@@ -41,16 +62,26 @@ class DataEvent:
     timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     content_hash: str = ""
 
-    def __post_init__(self):
-        """Otomatik eklendi."""
+    def __post_init__(self) -> None:
+        """Content hash otomatik hesaplar."""
         if not self.content_hash:
             raw = orjson.dumps(self.data, option=orjson.OPT_SORT_KEYS, default=str).decode()
             self.content_hash = hashlib.sha256(raw.encode()).hexdigest()
 
+    def __repr__(self) -> str:
+        """DataEvent string temsili.
+
+        Returns:
+            İnsan tarafından okunabilir temsil.
+        """
+        return (
+            f"DataEvent(source={self.source!r}, "
+            f"type={self.event_type!r}, hash={self.content_hash[:8]})"
+        )
+
 
 class RealTimeDataEngine:
-    """
-    Push-based veri motoru.
+    """Push-based veri motoru.
 
     Dış kaynaklar:
     - RSS/WebSub → push (yeni içerik otomatik gelir)
@@ -61,29 +92,43 @@ class RealTimeDataEngine:
     Polling SON ÇAREDİR — sadece push desteklemeyen kaynaklar için.
     """
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """RealTimeDataEngine örneği oluşturur."""
         self._running = False
         self._handlers: dict[str, list[Callable]] = {}
-        self._seen_hashes: set[str] = set()  # Duplicate detection
+        self._seen_hashes: set[str] = set()
         self._session: aiohttp.ClientSession | None = None
 
-    def on(self, source: str, handler: Callable) -> Any:
-        """Veri kaynağına handler ata."""
+    def __repr__(self) -> str:
+        """RealTimeDataEngine string temsili.
+
+        Returns:
+            İnsan tarafından okunabilir temsil.
+        """
+        return (
+            f"RealTimeDataEngine(running={self._running}, "
+            f"sources={len(self._handlers)}, seen={len(self._seen_hashes)})"
+        )
+
+    def on(self, source: str, handler: Callable) -> None:
+        """Veri kaynağına handler atar.
+
+        Args:
+            source: Veri kaynağı adı.
+            handler: DataEvent alan fonksiyon.
+        """
         if source not in self._handlers:
             self._handlers[source] = []
         self._handlers[source].append(handler)
-        return self
 
-    async def start(self) -> Any:
-        """Tüm veri kaynaklarını başlat."""
+    async def start(self) -> None:
+        """Tüm veri kaynaklarını başlatır."""
         self._running = True
         if aiohttp:
             self._session = aiohttp.ClientSession()
 
         logger.info("RealTime Data Engine started")
 
-        # Paralel olarak tüm kaynakları dinle
         await asyncio.gather(
             self._listen_kap_realtime(),
             self._listen_news_rss(),
@@ -92,25 +137,35 @@ class RealTimeDataEngine:
             return_exceptions=True,
         )
 
-    async def stop(self) -> Any:
-        """Durdur."""
+    async def stop(self) -> None:
+        """Tüm veri kaynaklarını durdurur."""
         self._running = False
         if self._session:
             await self._session.close()
+        logger.info("RealTime Data Engine stopped")
 
     def _is_new(self, event: DataEvent) -> bool:
-        """Duplicate detection — aynı veri iki kez işlenmez."""
+        """Duplicate detection — aynı veri iki kez işlenmez.
+
+        Args:
+            event: Kontrol edilecek olay.
+
+        Returns:
+            True: Yeni, False: Duplicate.
+        """
         if event.content_hash in self._seen_hashes:
             return False
         self._seen_hashes.add(event.content_hash)
-        # Time-based cleanup instead of size-based truncation
-        if len(self._seen_hashes) > 50000:
-            # Keep recent 25000 by recreating set
-            self._seen_hashes = set(list(self._seen_hashes)[-25000:])
+        if len(self._seen_hashes) > DEFAULT_HASH_SET_MAX:
+            self._seen_hashes = set(list(self._seen_hashes)[-DEFAULT_HASH_SET_KEEP:])
         return True
 
-    async def _dispatch(self, event: DataEvent) -> Any:
-        """Event'i ilgili handler'lara dağıt."""
+    async def _dispatch(self, event: DataEvent) -> None:
+        """Event'i ilgili handler'lara dağıtır.
+
+        Args:
+            event: Dağıtılacak olay.
+        """
         if not self._is_new(event):
             return
 
@@ -124,13 +179,9 @@ class RealTimeDataEngine:
             except Exception as e:
                 logger.error("Handler error", source=event.source, error=str(e))
 
-    # =====================================================
-    # KAP Real-Time (RSS polling — çok sık)
-    # =====================================================
+    async def _listen_kap_realtime(self) -> None:
+        """KAP bildirimlerini dinler.
 
-    async def _listen_kap_realtime(self) -> Any:
-        """
-        KAP bildirimlerini dinle.
         KAP WebSocket/SSE yok ama RSS/API çok sık poll edilebilir.
         Her 30 saniyede bir yeni bildirim kontrolü.
         """
@@ -138,14 +189,13 @@ class RealTimeDataEngine:
 
         while self._running:
             try:
-                # KAP API'den son bildirimleri çek
                 url = "https://www.kap.org.tr/tr/api/disclosures"
                 params = {
                     "fromDate": last_check.strftime("%Y-%m-%d"),
                     "toDate": datetime.now(UTC).strftime("%Y-%m-%d"),
                 }
 
-                async with self._session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+                async with self._session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=DEFAULT_HTTP_TIMEOUT)) as resp:
                     if resp.status == 200:
                         data = await resp.json()
                         for item in data.get("data", []):
@@ -171,20 +221,14 @@ class RealTimeDataEngine:
             except Exception as e:
                 logger.warning("KAP realtime error", error=str(e))
 
-            # 30 saniye bekle — KAP'ta yeni bildirim anında düşer
-            await asyncio.sleep(30)
+            await asyncio.sleep(DEFAULT_KAP_POLL_SECONDS)
 
-    # =====================================================
-    # News RSS Real-Time (SSE/RSS — sürekli)
-    # =====================================================
+    async def _listen_news_rss(self) -> None:
+        """Haber RSS feed'lerini sürekli dinler.
 
-    async def _listen_news_rss(self) -> Any:
-        """
-        Haber RSS feed'lerini sürekli dinle.
         RSS feed'leri pubsub mantığıyla çalışır — yeni haber eklenir eklenmez görünür.
         Her 15 saniyede bir kontrol.
         """
-
         feeds = [
             ("https://www.dunya.com/rss/ekonomi.xml", "Dünya"),
             ("https://www.paraanaliz.com/feed/", "ParaAnaliz"),
@@ -196,7 +240,7 @@ class RealTimeDataEngine:
         while self._running:
             for feed_url, source_name in feeds:
                 try:
-                    async with self._session.get(feed_url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                    async with self._session.get(feed_url, timeout=aiohttp.ClientTimeout(total=DEFAULT_RSS_TIMEOUT)) as resp:
                         if resp.status == 200:
                             text = await resp.text()
                             root = ET.fromstring(text)
@@ -226,36 +270,30 @@ class RealTimeDataEngine:
                                 await self._dispatch(event)
 
                 except Exception as e:
-                    logger.debug("RSS fetch error", source=source_name, error=str(e))
+                    logger.warning("RSS fetch error", source=source_name, error=str(e))
 
-                # Memory limit
-                if len(seen_urls) > 10000:
-                    seen_urls = set(list(seen_urls)[-5000:])
+                if len(seen_urls) > DEFAULT_SEEN_URLS_MAX:
+                    seen_urls = set(list(seen_urls)[-DEFAULT_SEEN_URLS_KEEP:])
 
-            # 15 saniye bekle
-            await asyncio.sleep(15)
+            await asyncio.sleep(DEFAULT_NEWS_POLL_SECONDS)
 
-    # =====================================================
-    # Market Data Stream (aggressive polling)
-    # =====================================================
+    async def _listen_market_stream(self) -> None:
+        """Piyasa verisini dinler.
 
-    async def _listen_market_stream(self) -> Any:
-        """
-        Piyasa verisini dinle.
         Ücretsiz kaynaklarla aggressive polling (her 60 saniye).
         Lisanslı feed ile gerçek streaming olur.
         """
         from ..bist_universe import BIST_STOCKS
 
-        watchlist = BIST_STOCKS  # FULL UNIVERSE
+        watchlist = BIST_STOCKS
 
         while self._running:
             try:
-                # Batch download in chunks of 50
-                for i in range(0, len(watchlist), 50):
-                    chunk = watchlist[i : i + 50]
+                for i in range(0, len(watchlist), DEFAULT_CHUNK_SIZE):
+                    chunk = watchlist[i : i + DEFAULT_CHUNK_SIZE]
                     tickers_str = " ".join([f"{t}.IS" for t in chunk])
-                    data = yf.download(
+                    data = await asyncio.to_thread(
+                        yf.download,
                         tickers_str,
                         period="1d",
                         interval="1m",
@@ -280,42 +318,37 @@ class RealTimeDataEngine:
                                             "price": float(latest["Close"]),
                                             "volume": int(latest.get("Volume", 0)),
                                             "vwap": float(latest["Close"]),
-                                            "timestamp": datetime.now(UTC).isoformat(),  # yf is 15-min delayed
+                                            "timestamp": datetime.now(UTC).isoformat(),
                                         },
                                     )
                                     await self._dispatch(event)
                             except KeyError:
-                                logger.warning("Data error in _listen_market_stream: KeyError", exc_info=True)
-                    await asyncio.sleep(1)  # rate limit protection
+                                logger.warning("Market stream veri hatası", ticker=ticker, exc_info=True)
+                    await asyncio.sleep(1)
 
             except Exception as e:
                 logger.warning("yfinance realtime error", error=str(e))
 
-            # Poll interval (15 dakika - yfinance 15dk gecikmeli)
-            await asyncio.sleep(900)
+            await asyncio.sleep(DEFAULT_MARKET_POLL_SECONDS)
 
-    # =====================================================
-    # Macro Events (düşük frekans — zaten nadir değişir)
-    # =====================================================
+    async def _listen_macro_events(self) -> None:
+        """Makro verileri dinler.
 
-    async def _listen_macro_events(self) -> Any:
-        """
-        Makro verileri dinle.
         TCMB/TÜİK verileri zaten nadir değişir (günlük/aylık).
         Ama sürpriz veri geldiğinde anında yakalanmalı.
         """
         while self._running:
             try:
-                # TCMB EVDS'den son verileri kontrol et
-                # (Gerçek implementasyonda webhook/SSE kullanılabilir)
                 logger.debug("Macro check completed")
 
             except Exception as e:
                 logger.warning("Macro listener error", error=str(e))
 
-            # 5 dakika — makro veri zaten nadir değişir
-            await asyncio.sleep(300)
+            await asyncio.sleep(DEFAULT_MACRO_POLL_SECONDS)
 
 
 # Singleton
 realtime_engine = RealTimeDataEngine()
+
+
+__all__ = ["DataEvent", "RealTimeDataEngine", "realtime_engine"]
