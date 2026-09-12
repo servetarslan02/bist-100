@@ -71,6 +71,11 @@ class DataGap:
     estimated_bars: int = 0
 
     def __repr__(self) -> str:
+        """DataGap string temsili.
+
+        Returns:
+            İnsan tarafından okunabilir temsil.
+        """
         return (
             f"DataGap(ticker={self.ticker!r}, "
             f"gap_start={self.gap_start.isoformat()!r}, "
@@ -80,7 +85,14 @@ class DataGap:
 
     @property
     def gap_days(self) -> float:
-        """Boşluğun gün cinsinden süresi."""
+        """Boşluğun gün cinsinden süresi.
+
+        Args:
+            Yok.
+
+        Returns:
+            Gün cinsinden süre.
+        """
         return (self.gap_end - self.gap_start).total_seconds() / SECONDS_PER_DAY
 
 
@@ -107,6 +119,11 @@ class BackfillResult:
     duration_seconds: float = 0.0
 
     def __repr__(self) -> str:
+        """BackfillResult string temsili.
+
+        Returns:
+            İnsan tarafından okunabilir temsil.
+        """
         return (
             f"BackfillResult(ticker={self.ticker!r}, "
             f"success={self.success}, bars_filled={self.bars_filled}, "
@@ -135,6 +152,11 @@ class BackfillStats:
     last_backfill_time: float | None = None
 
     def __repr__(self) -> str:
+        """BackfillStats string temsili.
+
+        Returns:
+            İnsan tarafından okunabilir temsil.
+        """
         return (
             f"BackfillStats(total_gaps={self.total_gaps}, "
             f"filled={self.gaps_filled}, failed={self.gaps_failed}, "
@@ -174,6 +196,9 @@ class BackfillManager:
             chunk_size: Aynı anda işlenecek boşluk sayısı.
             delay_between_chunks: Chunk'lar arası bekleme süresi (saniye).
             delay_between_tickers: Ticker'lar arası bekleme süresi (saniye).
+
+        Returns:
+            Yok.
         """
         self._max_lookback_days = max_lookback_days
         self._chunk_size = chunk_size
@@ -568,11 +593,21 @@ class BackfillManager:
         return count
 
     def stop(self) -> None:
-        """Backfill işlemini durdurur."""
+        """Backfill işlemini durdurur.
+
+        Args:
+            Yok.
+
+        Returns:
+            Yok.
+        """
         self._running = False
 
     def get_stats(self) -> dict[str, Any]:
         """Backfill istatistiklerini döndürür.
+
+        Args:
+            Yok.
 
         Returns:
             İstatistik sözlüğü.
@@ -591,6 +626,9 @@ class BackfillManager:
 
     def get_progress(self) -> dict[str, Any]:
         """İlerleme durumunu döndürür.
+
+        Args:
+            Yok.
 
         Returns:
             İlerleme sözlüğü.

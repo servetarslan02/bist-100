@@ -40,6 +40,11 @@ class DedupStats:
     window_cleanups: int = 0
 
     def __repr__(self) -> str:
+        """DedupStats string temsili.
+
+        Returns:
+            İnsan tarafından okunabilir temsil.
+        """
         return (
             f"DedupStats(checked={self.total_checked}, "
             f"duplicates={self.total_duplicates}, "
@@ -62,6 +67,9 @@ class EventDeduplicator:
 
         Args:
             window_hours: Deduplikasyon penceresi (saat cinsinden).
+
+        Returns:
+            Yok.
         """
         self._seen: dict[str, float] = {}
         self._window_seconds = window_hours * 3600
@@ -120,6 +128,9 @@ class EventDeduplicator:
 
         Args:
             event_data: Event verisi.
+
+        Returns:
+            Yok.
         """
         event_hash = self._compute_hash(event_data)
         self._seen[event_hash] = time.time()
@@ -156,7 +167,14 @@ class EventDeduplicator:
             logger.debug("Dedup cleanup", cleaned=cleaned, remaining=len(self._seen))
 
     def cleanup(self) -> None:
-        """Manuel temizleme — pencere dışındaki kayıtları siler."""
+        """Manuel temizleme — pencere dışındaki kayıtları siler.
+
+        Args:
+            Yok.
+
+        Returns:
+            Yok.
+        """
         cutoff = time.time() - self._window_seconds
         old_count = len(self._seen)
         self._seen = {h: ts for h, ts in self._seen.items() if ts > cutoff}
@@ -165,6 +183,9 @@ class EventDeduplicator:
 
     def get_stats(self) -> dict[str, Any]:
         """İstatistikleri döndürür.
+
+        Args:
+            Yok.
 
         Returns:
             Deduplikasyon istatistik sözlüğü.
@@ -180,7 +201,14 @@ class EventDeduplicator:
         }
 
     def reset(self) -> None:
-        """Tüm durumu sıfırlar."""
+        """Tüm durumu sıfırlar.
+
+        Args:
+            Yok.
+
+        Returns:
+            Yok.
+        """
         self._seen.clear()
         self._stats = DedupStats()
 

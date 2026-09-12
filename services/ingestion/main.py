@@ -64,6 +64,9 @@ BIST_STOCKS: list[str] = _load_bist_stocks()
 def is_bist_session_active() -> bool:
     """BIST seans saatlerini kontrol eder (Hafta içi 09:55 - 18:10 TSİ / UTC+3).
 
+    Args:
+        Yok.
+
     Returns:
         True: Seans açık, False: Seans kapalı.
     """
@@ -84,7 +87,14 @@ class IngestionService:
     """
 
     def __init__(self) -> None:
-        """IngestionService örneği oluşturur."""
+        """IngestionService örneği oluşturur.
+
+        Args:
+            Yok.
+
+        Returns:
+            Yok.
+        """
         self._running = False
         self._instrument_map: dict[str, int] = {}
         self._tasks: list[asyncio.Task[None]] = []
@@ -94,6 +104,12 @@ class IngestionService:
 
         Tüm döngüleri (market, KAP, makro, haber, sosyal) paralel başlatır.
         Servis durdurulana kadar çalışır.
+
+        Args:
+            Yok.
+
+        Returns:
+            Yok.
 
         Raises:
             Exception: Veritabanı veya event bus başlatma hatası.
@@ -144,6 +160,12 @@ class IngestionService:
         """Ingestion servisini durdurur.
 
         Tüm döngüleri, event bus ve veritabanı bağlantılarını kapatır.
+
+        Args:
+            Yok.
+
+        Returns:
+            Yok.
         """
         self._running = False
         for task in self._tasks:
@@ -646,6 +668,12 @@ async def main() -> None:
     """Ingestion servisinin ana giriş noktası.
 
     Health check sunucusunu başlatır, ardından IngestionService'i çalıştırır.
+
+    Args:
+        Yok.
+
+    Returns:
+        Yok.
 
     Raises:
         Exception: Servis çökerse yeniden yükseltilir.

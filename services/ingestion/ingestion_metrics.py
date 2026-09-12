@@ -145,6 +145,12 @@ class IngestionMetrics:
         """IngestionMetrics örneği oluşturur.
 
         Prometheus mevcut değilse warning loglanır ve no-op moda geçilir.
+
+        Args:
+            Yok.
+
+        Returns:
+            Yok.
         """
         self._enabled = PROMETHEUS_AVAILABLE
         if not self._enabled:
@@ -159,6 +165,10 @@ class IngestionMetrics:
             data_type: Veri türü (örn. "daily", "tick").
             status: Durum ("success" veya "failure").
             latency_s: İstek süresi (saniye).
+
+
+        Returns:
+            Yok.
         """
         if not self._enabled:
             return
@@ -178,6 +188,8 @@ class IngestionMetrics:
 
         Raises:
             Exception: Scope içinde hata oluşursa (metrik kaydedildikten sonra yeniden yükseltilir).
+        Returns:
+            Yok.
         """
         start = time.time()
         status = "success"
@@ -197,6 +209,9 @@ class IngestionMetrics:
         Args:
             provider: Provider adı.
             state: Durum string'i ("CLOSED", "OPEN", "HALF_OPEN").
+
+        Returns:
+            Yok.
         """
         if not self._enabled:
             return
@@ -208,6 +223,10 @@ class IngestionMetrics:
 
         Args:
             provider: Provider adı.
+
+
+        Returns:
+            Yok.
         """
         if not self._enabled:
             return
@@ -220,6 +239,10 @@ class IngestionMetrics:
         Args:
             provider: Provider adı.
             wait_seconds: Bekleme süresi (saniye).
+
+
+        Returns:
+            Yok.
         """
         if not self._enabled:
             return
@@ -230,6 +253,10 @@ class IngestionMetrics:
 
         Args:
             provider: Provider adı.
+
+
+        Returns:
+            Yok.
         """
         if not self._enabled:
             return
@@ -243,6 +270,10 @@ class IngestionMetrics:
             ticker: Hisse sembolü.
             source: Veri kaynağı.
             score: Kalite puanı (0-100).
+
+
+        Returns:
+            Yok.
         """
         if not self._enabled:
             return
@@ -253,6 +284,10 @@ class IngestionMetrics:
 
         Args:
             ticker: Hisse sembolü.
+
+
+        Returns:
+            Yok.
         """
         if not self._enabled:
             return
@@ -264,6 +299,10 @@ class IngestionMetrics:
 
         Args:
             event_type: Event türü.
+
+
+        Returns:
+            Yok.
         """
         if not self._enabled:
             return
@@ -279,6 +318,9 @@ class IngestionMetrics:
 
         Yields:
             None — context manager scope.
+
+        Returns:
+            Yok.
         """
         start = time.time()
         try:
@@ -294,6 +336,10 @@ class IngestionMetrics:
         Args:
             event_type: Event türü.
             source: Veri kaynağı.
+
+
+        Returns:
+            Yok.
         """
         if not self._enabled:
             return
@@ -305,6 +351,10 @@ class IngestionMetrics:
 
         Args:
             data_type: Veri türü.
+
+
+        Returns:
+            Yok.
         """
         if not self._enabled:
             return
@@ -316,6 +366,10 @@ class IngestionMetrics:
 
         Args:
             ticker: Hisse sembolü.
+
+
+        Returns:
+            Yok.
         """
         if not self._enabled:
             return
@@ -326,6 +380,10 @@ class IngestionMetrics:
 
         Args:
             ticker: Hisse sembolü.
+
+
+        Returns:
+            Yok.
         """
         if not self._enabled:
             return

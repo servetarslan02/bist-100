@@ -79,6 +79,11 @@ class CircuitStats:
     state_changes: int = 0
 
     def __repr__(self) -> str:
+        """CircuitStats string temsili.
+
+        Returns:
+            İnsan tarafından okunabilir temsil.
+        """
         return (
             f"CircuitStats(requests={self.total_requests}, "
             f"successes={self.total_successes}, "
@@ -124,6 +129,9 @@ class CircuitBreaker:
             recovery_timeout_s: OPEN → HALF_OPEN geçiş süresi (saniye).
             half_open_max_calls: HALF_OPEN'da izin verilen test istek sayısı.
             success_threshold: HALF_OPEN → CLOSED için ardışık başarı sayısı.
+
+        Returns:
+            Yok.
         """
         self.name = name
         self.failure_threshold = failure_threshold
@@ -140,6 +148,9 @@ class CircuitBreaker:
     def state(self) -> CircuitState:
         """Mevcut durumu döndürür (OPEN timeout kontrolü ile).
 
+        Args:
+            Yok.
+
         Returns:
             Mevcut CircuitState değeri.
         """
@@ -154,6 +165,9 @@ class CircuitBreaker:
 
         Args:
             new_state: Geçilecek yeni durum.
+
+        Returns:
+            Yok.
         """
         old_state = self._state
         self._state = new_state
@@ -175,6 +189,12 @@ class CircuitBreaker:
         """Başarılı istek kaydı yapar.
 
         HALF_OPEN durumunda eşik aşıldığında CLOSED geçişi tetikler.
+
+        Args:
+            Yok.
+
+        Returns:
+            Yok.
         """
         current = self.state
 
@@ -192,6 +212,12 @@ class CircuitBreaker:
 
         CLOSED durumunda eşik aşıldığında OPEN geçişi tetikler.
         HALF_OPEN durumunda hemen OPEN'a döner.
+
+        Args:
+            Yok.
+
+        Returns:
+            Yok.
         """
         current = self.state
 
@@ -208,11 +234,21 @@ class CircuitBreaker:
             self._transition(CircuitState.OPEN)
 
     def record_rejected(self) -> None:
-        """OPEN iken reddedilen istek kaydı yapar."""
+        """OPEN iken reddedilen istek kaydı yapar.
+
+        Args:
+            Yok.
+
+        Returns:
+            Yok.
+        """
         self._stats.total_rejected += 1
 
     def can_execute(self) -> bool:
         """İstek yapılabilir mi kontrol eder.
+
+        Args:
+            Yok.
 
         Returns:
             İstek yapılabilirse True, engellenmişse False.
@@ -324,6 +360,9 @@ class CircuitBreaker:
     def context(self) -> "CircuitBreaker._ContextManager":
         """async with cb.context(): ... kullanımı için bağlam yöneticisi döndürür.
 
+        Args:
+            Yok.
+
         Returns:
             _ContextManager örneği.
         """
@@ -331,6 +370,9 @@ class CircuitBreaker:
 
     def get_state(self) -> dict[str, Any]:
         """Durum bilgisini döndürür (monitoring için).
+
+        Args:
+            Yok.
 
         Returns:
             Durum ve istatistik sözlüğü.
@@ -356,7 +398,14 @@ class CircuitBreaker:
         }
 
     def reset(self) -> None:
-        """Circuit breaker'ı sıfırlar (test veya manuel recovery için)."""
+        """Circuit breaker'ı sıfırlar (test veya manuel recovery için).
+
+        Args:
+            Yok.
+
+        Returns:
+            Yok.
+        """
         self._state = CircuitState.CLOSED
         self._stats = CircuitStats()
         self._half_open_calls = 0
@@ -371,7 +420,14 @@ class CircuitBreakerManager:
     """
 
     def __init__(self) -> None:
-        """CircuitBreakerManager örneği oluşturur."""
+        """CircuitBreakerManager örneği oluşturur.
+
+        Args:
+            Yok.
+
+        Returns:
+            Yok.
+        """
         self._breakers: dict[str, CircuitBreaker] = {}
 
     def get_or_create(
@@ -401,13 +457,23 @@ class CircuitBreakerManager:
     def get_all_states(self) -> dict[str, dict[str, Any]]:
         """Tüm circuit breaker durumlarını döndürür.
 
+        Args:
+            Yok.
+
         Returns:
             {provider_adı: durum_sözlüğü} yapısı.
         """
         return {name: cb.get_state() for name, cb in self._breakers.items()}
 
     def reset_all(self) -> None:
-        """Tüm circuit breaker'ları sıfırlar."""
+        """Tüm circuit breaker'ları sıfırlar.
+
+        Args:
+            Yok.
+
+        Returns:
+            Yok.
+        """
         for cb in self._breakers.values():
             cb.reset()
 
