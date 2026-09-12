@@ -20,7 +20,7 @@ logger = structlog.get_logger()
 
 
 # Türkçe sentiment sözlüğü
-TURKISH_POSITIVE = [
+DEFAULT_TURKISH_POSITIVE: list[str] = [
     "yükseliş",
     "artış",
     "kazanç",
@@ -62,7 +62,7 @@ TURKISH_POSITIVE = [
     "boom",
 ]
 
-TURKISH_NEGATIVE = [
+DEFAULT_TURKISH_NEGATIVE: list[str] = [
     "düşüş",
     "kayıp",
     "zarar",
@@ -101,16 +101,31 @@ TURKISH_NEGATIVE = [
 ]
 
 
+DEFAULT_SENTIMENT_THRESHOLD: float = 0.1
+
+
 class SocialProvider:
     """Sosyal medya veri sağlayıcısı (async)."""
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """SocialProvider örneği oluşturur."""
         self._client = get_client("social", timeout=15.0, max_retries=2)
         self._x_api_key: str | None = None
 
-    def set_x_api_key(self, key: str) -> Any:
-        """X API key ayarla."""
+    def __repr__(self) -> str:
+        """SocialProvider string temsili.
+
+        Returns:
+            İnsan tarafından okunabilir temsil.
+        """
+        return f"SocialProvider(x_configured={self._x_api_key is not None})"
+
+    def set_x_api_key(self, key: str) -> None:
+        """X API key ayarlar.
+
+        Args:
+            key: X API anahtarı.
+        """
         self._x_api_key = key
 
     # =====================================================
@@ -455,7 +470,7 @@ class SocialProvider:
             if word in pre_negations:
                 negate_next = True
                 continue
-            if word in TURKISH_POSITIVE:
+            if word in DEFAULT_TURKISH_POSITIVE:
                 if negate_next:
                     neg_count += 1
                     last_sentiment = "neg"
@@ -463,7 +478,7 @@ class SocialProvider:
                     pos_count += 1
                     last_sentiment = "pos"
                 negate_next = False
-            elif word in TURKISH_NEGATIVE:
+            elif word in DEFAULT_TURKISH_NEGATIVE:
                 if negate_next:
                     pos_count += 1
                     last_sentiment = "pos"
@@ -495,8 +510,8 @@ class SocialProvider:
             return {"avg_sentiment": 0.0, "positive_ratio": 0.0, "count": 0}
 
         sentiments = [self._analyze_sentiment(t) for t in texts]
-        positive = sum(1 for s in sentiments if s > 0.1)
-        negative = sum(1 for s in sentiments if s < -0.1)
+        positive = sum(1 for s in sentiments if s > DEFAULT_SENTIMENT_THRESHOLD)
+        negative = sum(1 for s in sentiments if s < -DEFAULT_SENTIMENT_THRESHOLD)
         neutral = len(sentiments) - positive - negative
 
         return {
@@ -553,3 +568,6 @@ class SocialProvider:
 
 # Singleton
 social_provider = SocialProvider()
+
+
+__all__ = ["SocialProvider", "social_provider"]
