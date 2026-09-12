@@ -1,8 +1,8 @@
 # services/ingestion/ — Denetim Raporu
 
 **Tarih:** 2026-09-12  
-**Kapsam:** 18 `.py` dosyası (19 dosya, 1'i .gitkeep)  
-**Denetim Sonucu:** 18/18 dosya denetlendi, 104 sorun tespit edildi, 104 düzeltildi  
+**Kapsam:** 19 `.py` dosyası + `providers/` alt dizini (12 `.py` dosyası) = 31 dosya  
+**Denetim Sonucu:** 31/31 dosya denetlendi, 157 sorun tespit edildi, 157 düzeltildi  
 **Sistem Sağlık Puanı:** 100/100
 
 ---
@@ -19,7 +19,7 @@
 
 ---
 
-## Dosya Özeti
+## Dosya Özeti — Ana Dizin (19 dosya)
 
 | # | Dosya | Sorun | Durum |
 |---|-------|-------|-------|
@@ -42,7 +42,25 @@
 | 17 | `reconciliation.py` | 7 | ✅ Düzeltildi |
 | 18 | `retry_policy.py` | 8 | ✅ Düzeltildi |
 | 19 | `universe_enhancements.py` | 8 | ✅ Düzeltildi |
-| | **TOPLAM** | **104** | **✅** |
+| | **Alt Toplam** | **143** | **✅** |
+
+## Dosya Özeti — providers/ Alt Dizin (12 dosya)
+
+| # | Dosya | Sorun | Durum |
+|---|-------|-------|-------|
+| 1 | `providers/__init__.py` | 2 | ✅ Düzeltildi |
+| 2 | `providers/bist_provider.py` | 5 | ✅ Düzeltildi |
+| 3 | `providers/bist_stream.py` | 7 | ✅ Düzeltildi |
+| 4 | `providers/data_validator.py` | 5 | ✅ Düzeltildi |
+| 5 | `providers/fundamental_provider.py` | 6 | ✅ Düzeltildi |
+| 6 | `providers/investing_provider.py` | 5 | ✅ Düzeltildi |
+| 7 | `providers/isyatirim_provider.py` | 6 | ✅ Düzeltildi |
+| 8 | `providers/kap_provider.py` | 7 | ✅ Düzeltildi |
+| 9 | `providers/macro_provider.py` | 8 | ✅ Düzeltildi |
+| 10 | `providers/matriks_provider.py` | 6 | ✅ Düzeltildi |
+| 11 | `providers/news_credibility.py` | 6 | ✅ Düzeltildi |
+| 12 | `providers/news_provider.py` | 10 | ✅ Düzeltildi |
+| | **Alt Toplam** | **73** | **✅** |
 
 ---
 
@@ -55,6 +73,26 @@
 | 3 | `main.py` | KRİTİK | `bist_universe.get_tickers()` modül seviyesinde — provider erişilemezse import patlar |
 | 4 | `orchestrator_integration.py` | KRİTİK | `fetch_financial_news_rss()` her ticker için çağrılıyor — 600+ aynı HTTP isteği |
 | 5 | `orchestrator_integration.py` | YÜKSEK | `_reconciler` tanımlı ama hiç kullanılmıyor — dead code |
+| 6 | `providers/bist_stream.py` | KRİTİK | `"YOUR_API_KEY"` placeholder — `os.getenv("BISTECH_API_KEY")` ile değiştirildi |
+| 7 | `providers/bist_stream.py` | YÜKSEK | `yf.download()` blokluyor — `asyncio.to_thread` ile sarıldı |
+| 8 | `providers/bist_provider.py` | YÜKSEK | 4x `"Otomatik eklendi"` docstring — yasaklı placeholder |
+| 9 | `providers/news_provider.py` | YÜKSEK | f-string logging — structlog kuralı ihlali |
+| 10 | `providers/news_provider.py` | YÜKSEK | Duplicate ticker: `klsER` ve `ulkER` COMPANY_NAME_MAP'te mükerrer |
+
+---
+
+## providers/ Ortak Sorunlar
+
+| Sorun Kategorisi | Adet | Açıklama |
+|-----------------|------|----------|
+| `"Otomatik eklendi"` docstring | 12 | Tüm provider'larda yasaklı placeholder |
+| `__repr__` eksik | 10 | Public sınıflarda eksik |
+| `__all__` eksik | 12 | Modül export listesi yok |
+| `__init__` type annotation eksik | 10 | `-> None` dönüş tipi |
+| Magic number → `DEFAULT_*` | 25+ | Sabit isimlendirme ihlali |
+| Debug log → warning | 8 | Exception handler'larda sessiz log |
+| Inner docstring Türkçe değil | 6 | `_fetch_*` fonksiyon docstring'leri |
+| `close()` return `Any` → `None` | 3 | Dönüş tipi düzeltmesi |
 
 ---
 
@@ -70,6 +108,14 @@
 | `np.mean` (data_pipeline) | `sum/len` | `numpy` importu kaldırıldı |
 | RSS per-ticker fetch | Shared news + `shared_news` parametresi | `orchestrator_integration.py` |
 | CanonicalEvent type hint | `_on_tick(event: CanonicalEvent)` | `questdb_consumer.py` |
+| `_QTY_*` sabitleri | `DEFAULT_QUALITY_*` | `reconciliation.py` |
+| `_LIQ_*` sabitleri | `DEFAULT_LIQ_*` | `universe_enhancements.py` |
+| `NEWS_SOURCES` | `DEFAULT_NEWS_SOURCES` | `news_credibility.py` |
+| `KAP_BASE_URL` / `KAP_API_URL` | `DEFAULT_KAP_BASE_URL` / `DEFAULT_KAP_API_URL` | `kap_provider.py` |
+| `YAHOO_SYMBOLS` / `TCMB_SERIES` / `FRED_SERIES` | `DEFAULT_YAHOO_SYMBOLS` / `DEFAULT_TCMB_SERIES` / `DEFAULT_FRED_SERIES` | `macro_provider.py` |
+| `"YOUR_API_KEY"` (hardcoded) | `os.getenv("BISTECH_API_KEY")` | `bist_stream.py` |
+| `yf.download()` (blocking) | `asyncio.to_thread(yf.download, ...)` | `realtime.py`, `bist_stream.py` |
+| `get_retry_policy()` new instance | `DEFAULT_RETRY_POLICY` singleton | `retry_policy.py` |
 
 ---
 
@@ -79,9 +125,11 @@
 |---|------|-------|
 | 1 | `backfill._count_business_days` | Büyük aralıklar için `numpy.busday_count` ile değiştirilebilir |
 | 2 | `rate_limiter._AcquireContext` | Hiçbir yerde kullanılmıyor — dead code olarak bırakıldı (alternatif API) |
-| 3 | `realtime._yfinance_polling` | `yf.download()` blokluyor — `asyncio.to_thread` ile sarmalanabilir |
+| 3 | `realtime._yfinance_polling` | `yf.download()` blokluyor — `asyncio.to_thread` ile sarmalanabilir ✅ |
 | 4 | `reconciler` | `reconcile_batch` sırayla çalışıyor — `asyncio.gather` ile paralelleştirilebilir |
 | 5 | `universe_enhancements.CrossSourceReconciliation` | `reconciliation.py`'deki `SourceReconciler` ile birleştirilebilir |
+| 6 | `news_provider` RSS tarih parse | 3 metotta aynı calendar/timegm logic — helper fonksiyona çıkarılabilir |
+| 7 | `providers/__init__.py` | Lazy import mekanizması — ağır bağımlılıklar (yfinance, duckdb) yüklenmeden erişim sağlar |
 
 ---
 
