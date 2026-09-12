@@ -20,6 +20,13 @@ import yfinance as yf
 
 logger = structlog.get_logger()
 
+# Varsayılan sabitler
+DEFAULT_POLL_INTERVAL_SECONDS: int = 300
+DEFAULT_MAX_HANDLERS: int = 100
+DEFAULT_CHUNK_SIZE: int = 50
+DEFAULT_ERROR_BACKOFF_SECONDS: int = 60
+DEFAULT_CHUNK_DELAY_SECONDS: float = 1.0
+
 
 class RealtimeDataProvider:
     """Gerçek zamanlı veri sağlayıcı.
@@ -40,8 +47,20 @@ class RealtimeDataProvider:
         self._handlers: list[Callable[..., Any]] = []
         self._last_prices: dict[str, float] = {}
         self._last_update: dict[str, datetime] = {}
-        self._poll_interval: int = 300
+        self._poll_interval: int = DEFAULT_POLL_INTERVAL_SECONDS
         self._provider: str = "yfinance"
+        self._consecutive_errors: int = 0
+
+    def __repr__(self) -> str:
+        """RealtimeDataProvider string temsili.
+
+        Returns:
+            İnsan tarafından okunabilir temsil.
+        """
+        return (
+            f"RealtimeDataProvider(provider={self._provider}, "
+            f"tickers={len(self._last_prices)}, running={self._running})"
+        )
 
     def on_tick(self, handler: Callable[..., Any]) -> None:
         """Tick handler kaydeder.
@@ -52,8 +71,8 @@ class RealtimeDataProvider:
             handler: (ticker, price, volume, change_pct) alan fonksiyon.
         """
         self._handlers.append(handler)
-        if len(self._handlers) > 100:
-            self._handlers = self._handlers[-100:]
+        if len(self._handlers) > DEFAULT_MAX_HANDLERS:
+            self._handlers = self._handlers[-DEFAULT_MAX_HANDLERS:]
 
     async def start(self, tickers: list[str], provider: str = "yfinance") -> None:
         """Veri akışını başlatır.
@@ -86,10 +105,17 @@ class RealtimeDataProvider:
             try:
                 start = time.time()
 
-                for i in range(0, len(tickers), 50):
-                    chunk = tickers[i : i + 50]
+                for i in range(0, len(tickers), DEFAULT_CHUNK_SIZE):
+                    chunk = tickers[i : i + DEFAULT_CHUNK_SIZE]
                     tickers_yf = [f"{t}.IS" for t in chunk]
-                    data = yf.download(tickers_yf, period="1d", group_by="ticker", threads=True, progress=False)
+                    data = await asyncio.to_thread(
+                        yf.download,
+                        tickers_yf,
+                        period="1d",
+                        group_by="ticker",
+                        threads=True,
+                        progress=False,
+                    )
 
                     for ticker in chunk:
                         try:
@@ -117,16 +143,24 @@ class RealtimeDataProvider:
                         except Exception as exc:
                             logger.debug("Ticker processing skipped", error=str(exc), ticker=ticker)
 
-                    await asyncio.sleep(1)
+                    await asyncio.sleep(DEFAULT_CHUNK_DELAY_SECONDS)
 
                 elapsed = time.time() - start
                 logger.info("yfinance poll completed", tickers=len(tickers), elapsed=f"{elapsed:.1f}s")
+                self._consecutive_errors = 0
 
                 await asyncio.sleep(self._poll_interval)
 
             except Exception as exc:
-                logger.error("yfinance polling error", error=str(exc))
-                await asyncio.sleep(60)
+                self._consecutive_errors += 1
+                backoff = min(DEFAULT_ERROR_BACKOFF_SECONDS * self._consecutive_errors, 600)
+                logger.error(
+                    "yfinance polling error",
+                    error=str(exc),
+                    consecutive_errors=self._consecutive_errors,
+                    backoff_seconds=backoff,
+                )
+                await asyncio.sleep(backoff)
 
     async def _matriks_streaming(self, tickers: list[str]) -> None:
         """Matriks streaming (WebSocket) ile veri akışı.

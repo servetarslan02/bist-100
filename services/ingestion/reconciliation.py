@@ -25,12 +25,12 @@ import structlog
 logger = structlog.get_logger()
 
 # Kalite skoru çarpanları
-_QTY_SINGLE_SOURCE: float = 0.6
-_QTY_TWO_SOURCES: float = 0.8
-_QTY_DEV_HIGH: float = 0.5
-_QTY_DEV_MED: float = 0.7
-_QTY_DEV_LOW: float = 0.9
-_QTY_CONFLICT_PENALTY: float = 0.6
+DEFAULT_QUALITY_SINGLE_SOURCE: float = 0.6
+DEFAULT_QUALITY_TWO_SOURCES: float = 0.8
+DEFAULT_QUALITY_DEV_HIGH: float = 0.5
+DEFAULT_QUALITY_DEV_MED: float = 0.7
+DEFAULT_QUALITY_DEV_LOW: float = 0.9
+DEFAULT_QUALITY_CONFLICT_PENALTY: float = 0.6
 
 
 @dataclass
@@ -136,7 +136,7 @@ class SourceReconciler:
                 canonical_price=round(price, 2),
                 source=source,
                 conflict=False,
-                quality_score=_QTY_SINGLE_SOURCE,
+                quality_score=DEFAULT_QUALITY_SINGLE_SOURCE,
                 max_deviation_pct=0.0,
                 sources=prices,
                 warnings=["Tek kaynak — çapraz doğrulama yok"],
@@ -235,22 +235,22 @@ class SourceReconciler:
         # Kaynak sayısına göre
         source_count = len(prices)
         if source_count == 1:
-            score *= _QTY_SINGLE_SOURCE
+            score *= DEFAULT_QUALITY_SINGLE_SOURCE
         elif source_count == 2:
-            score *= _QTY_TWO_SOURCES
+            score *= DEFAULT_QUALITY_TWO_SOURCES
 
         # Sapmaya göre
         max_dev = max(deviations.values()) if deviations else 0
         if max_dev > 1.0:
-            score *= _QTY_DEV_HIGH
+            score *= DEFAULT_QUALITY_DEV_HIGH
         elif max_dev > 0.5:
-            score *= _QTY_DEV_MED
+            score *= DEFAULT_QUALITY_DEV_MED
         elif max_dev > 0.1:
-            score *= _QTY_DEV_LOW
+            score *= DEFAULT_QUALITY_DEV_LOW
 
         # Çakışma varsa
         if conflict:
-            score *= _QTY_CONFLICT_PENALTY
+            score *= DEFAULT_QUALITY_CONFLICT_PENALTY
 
         return score
 

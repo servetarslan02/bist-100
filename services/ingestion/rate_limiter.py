@@ -118,6 +118,9 @@ class RateLimiter:
     def _cleanup_window(self, provider: str) -> None:
         """Eski istekleri pencereden çıkarır.
 
+        Pencere süresi dışına çıkan zaman damgalarını listeden kaldırır.
+        İlk eleman en eski olduğu için while döngüsü ile O(1) amorti edilir.
+
         Args:
             provider: Provider adı.
         """
@@ -127,7 +130,9 @@ class RateLimiter:
 
         cutoff = time.time() - config.window_seconds
         timestamps = self._timestamps.get(provider, [])
-        self._timestamps[provider] = [t for t in timestamps if t > cutoff]
+        while timestamps and timestamps[0] <= cutoff:
+            timestamps.pop(0)
+        self._timestamps[provider] = timestamps
 
     def _get_wait_time(self, provider: str) -> float:
         """Bekleme süresini hesaplar.
@@ -155,17 +160,29 @@ class RateLimiter:
     async def acquire(self, provider: str) -> float:
         """Rate limit kontrolü yapar ve gerekirse bekler.
 
+        Provider için önceden tanımlanmış limit ve kilit kullanır.
+        Limit tanımlı değilse bekleme yapmadan 0.0 döndürür.
+
         Args:
             provider: Provider adı.
 
         Returns:
             Bekleme süresi (saniye). 0 = beklemedi.
+
+        Raises:
+            KeyError: Provider için limit tanımlanmamış ve lock bulunamıyorsa.
         """
         config = self._limits.get(provider)
         if not config:
             return 0.0
 
-        async with self._locks.get(provider, asyncio.Lock()):
+        lock = self._locks.get(provider)
+        if lock is None:
+            logger.warning("Provider lock bulunamadı, yeniden oluşturuluyor", provider=provider)
+            self._locks[provider] = asyncio.Lock()
+            lock = self._locks[provider]
+
+        async with lock:
             stats = self._stats[provider]
             stats.total_requests += 1
             stats.last_request_time = time.time()
@@ -250,6 +267,10 @@ class RateLimiter:
         stats = self._stats.get(provider, RateLimitStats())
         config = self._limits.get(provider)
 
+        avg_wait_ms: float | None = None
+        if stats.total_waits > 0:
+            avg_wait_ms = round((stats.total_wait_seconds / stats.total_waits) * 1000, 1)
+
         return {
             "provider": provider,
             "limit": config.max_requests if config else None,
@@ -258,7 +279,7 @@ class RateLimiter:
             "total_requests": stats.total_requests,
             "total_waits": stats.total_waits,
             "total_wait_seconds": round(stats.total_wait_seconds, 2),
-            "avg_wait_ms": round((stats.total_wait_seconds / max(stats.total_waits, 1)) * 1000, 1),
+            "avg_wait_ms": avg_wait_ms,
         }
 
     def get_all_stats(self) -> dict[str, dict[str, Any]]:
@@ -282,7 +303,7 @@ class RateLimiter:
 
 
 # BIST'e özgü varsayılan limitler
-BIST_RATE_LIMITS: dict[str, dict[str, int | float]] = {
+BIST_RATE_LIMITS: dict[str, dict[str, int | float]] = {  # noqa: RUF012
     "yfinance": {"max_requests": 60, "window_seconds": 60},
     "kap": {"max_requests": 30, "window_seconds": 60},
     "tcmb": {"max_requests": 20, "window_seconds": 60},

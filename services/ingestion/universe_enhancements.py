@@ -19,16 +19,16 @@ import structlog
 logger = structlog.get_logger()
 
 # Likidite skoru eşikleri
-_LIQ_VOLUME_HIGH: float = 1_000_000
-_LIQ_VOLUME_MED: float = 500_000
-_LIQ_VOLUME_LOW: float = 100_000
-_LIQ_VOLUME_VERY_LOW: float = 10_000
-_LIQ_SPREAD_TIGHT: float = 0.1
-_LIQ_SPREAD_MED: float = 0.3
-_LIQ_SPREAD_WIDE: float = 1.0
-_LIQ_CAP_LARGE: float = 10e9
-_LIQ_CAP_MED: float = 1e9
-_LIQ_CAP_SMALL: float = 100e6
+DEFAULT_LIQ_VOLUME_HIGH: float = 1_000_000
+DEFAULT_LIQ_VOLUME_MED: float = 500_000
+DEFAULT_LIQ_VOLUME_LOW: float = 100_000
+DEFAULT_LIQ_VOLUME_VERY_LOW: float = 10_000
+DEFAULT_LIQ_SPREAD_TIGHT: float = 0.1
+DEFAULT_LIQ_SPREAD_MED: float = 0.3
+DEFAULT_LIQ_SPREAD_WIDE: float = 1.0
+DEFAULT_LIQ_CAP_LARGE: float = 10e9
+DEFAULT_LIQ_CAP_MED: float = 1e9
+DEFAULT_LIQ_CAP_SMALL: float = 100e6
 
 
 @dataclass
@@ -72,6 +72,14 @@ class UniverseEnhancements:
     fonksiyonları sağlar.
     """
 
+    def __repr__(self) -> str:
+        """UniverseEnhancements string temsili.
+
+        Returns:
+            İnsan tarafından okunabilir temsil.
+        """
+        return "UniverseEnhancements()"
+
     def compute_liquidity_score(self, avg_volume: float, avg_spread_pct: float, market_cap: float) -> float:
         """Likidite skoru hesaplar (0-100).
 
@@ -86,29 +94,29 @@ class UniverseEnhancements:
         score = 50.0
 
         # Volume component
-        if avg_volume > _LIQ_VOLUME_HIGH:
+        if avg_volume > DEFAULT_LIQ_VOLUME_HIGH:
             score += 25
-        elif avg_volume > _LIQ_VOLUME_MED:
+        elif avg_volume > DEFAULT_LIQ_VOLUME_MED:
             score += 15
-        elif avg_volume > _LIQ_VOLUME_LOW:
+        elif avg_volume > DEFAULT_LIQ_VOLUME_LOW:
             score += 5
-        elif avg_volume < _LIQ_VOLUME_VERY_LOW:
+        elif avg_volume < DEFAULT_LIQ_VOLUME_VERY_LOW:
             score -= 25
 
         # Spread component
-        if avg_spread_pct < _LIQ_SPREAD_TIGHT:
+        if avg_spread_pct < DEFAULT_LIQ_SPREAD_TIGHT:
             score += 15
-        elif avg_spread_pct < _LIQ_SPREAD_MED:
+        elif avg_spread_pct < DEFAULT_LIQ_SPREAD_MED:
             score += 5
-        elif avg_spread_pct > _LIQ_SPREAD_WIDE:
+        elif avg_spread_pct > DEFAULT_LIQ_SPREAD_WIDE:
             score -= 15
 
         # Market cap component
-        if market_cap > _LIQ_CAP_LARGE:
+        if market_cap > DEFAULT_LIQ_CAP_LARGE:
             score += 10
-        elif market_cap > _LIQ_CAP_MED:
+        elif market_cap > DEFAULT_LIQ_CAP_MED:
             score += 5
-        elif market_cap < _LIQ_CAP_SMALL:
+        elif market_cap < DEFAULT_LIQ_CAP_SMALL:
             score -= 10
 
         return max(0, min(100, score))
@@ -141,7 +149,7 @@ class UniverseEnhancements:
                 elif days_since > 5:
                     return "SUSPENDED"
             except Exception as exc:
-                logger.debug("Listing status tarih parse hatası", error=str(exc))
+                logger.warning("Listing status tarih parse hatası", ticker=ticker, error=str(exc))
 
         return "ACTIVE"
 
@@ -154,6 +162,14 @@ class CrossSourceReconciliation:
     - `SourceReconciler`: ingestion pipeline içinde (ağırlıklı ortalama)
     - `CrossSourceReconciliation`: bağımsız doğrulama (z-score outlier)
     """
+
+    def __repr__(self) -> str:
+        """CrossSourceReconciliation string temsili.
+
+        Returns:
+            İnsan tarafından okunabilir temsil.
+        """
+        return "CrossSourceReconciliation()"
 
     def reconcile_price(self, sources: dict[str, float], tolerance_pct: float = 2.0) -> dict[str, Any]:
         """Fiyat kaynaklarını doğrular.
@@ -202,6 +218,14 @@ class OutlierDetector:
 
     Z-score ve IQR yöntemleriyle outlier tespiti sağlar.
     """
+
+    def __repr__(self) -> str:
+        """OutlierDetector string temsili.
+
+        Returns:
+            İnsan tarafından okunabilir temsil.
+        """
+        return "OutlierDetector()"
 
     def detect_zscore_outliers(self, values: list[float], threshold: float = 4.0) -> list[int]:
         """Z-score ile outlier tespit eder.
@@ -258,6 +282,14 @@ class SurvivorshipBiasProtection:
     def __init__(self) -> None:
         """SurvivorshipBiasProtection örneği oluşturur."""
         self._delisted: dict[str, dict[str, str]] = {}
+
+    def __repr__(self) -> str:
+        """SurvivorshipBiasProtection string temsili.
+
+        Returns:
+            İnsan tarafından okunabilir temsil.
+        """
+        return f"SurvivorshipBiasProtection(delisted={len(self._delisted)})"
 
     def mark_delisted(self, ticker: str, delist_date: str, reason: str = "") -> None:
         """Şirketi delisted olarak işaretler.

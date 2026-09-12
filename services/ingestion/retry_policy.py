@@ -14,6 +14,7 @@ Kullanım:
 
 import asyncio
 import random
+import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -175,6 +176,8 @@ class RetryPolicy:
             jitter_range=jitter_range,
         )
         self.stats = RetryStats()
+        self._lock = asyncio.Lock()
+        self._sync_lock = threading.Lock()
 
         self.retryable_exceptions = retryable_exceptions or {
             ConnectionError,
@@ -246,13 +249,15 @@ class RetryPolicy:
             RetryExhaustedError: Tüm denemeler tükendiğinde.
             Exception: Non-retryable hata.
         """
-        self.stats.total_calls += 1
+        async with self._lock:
+            self.stats.total_calls += 1
         last_error: Exception | None = None
 
         for attempt in range(1, self.config.max_attempts + 1):
             try:
                 result = await func(*args, **kwargs)
-                self.stats.total_successes += 1
+                async with self._lock:
+                    self.stats.total_successes += 1
                 if attempt > 1:
                     logger.info("Retry succeeded", attempt=attempt, total_attempts=self.config.max_attempts)
                 return result
@@ -262,17 +267,19 @@ class RetryPolicy:
 
                 if not self._is_retryable(exc):
                     logger.warning("Non-retryable error", error=str(exc), error_type=type(exc).__name__)
-                    self.stats.total_failures += 1
+                    async with self._lock:
+                        self.stats.total_failures += 1
                     raise
 
                 if attempt >= self.config.max_attempts:
                     break
 
                 delay = self._calculate_delay(attempt)
-                self.stats.total_retries += 1
-                self.stats.total_wait_seconds += delay
-                self.stats.last_retry_time = time.time()
-                self.stats.max_attempts_used = max(self.stats.max_attempts_used, attempt)
+                async with self._lock:
+                    self.stats.total_retries += 1
+                    self.stats.total_wait_seconds += delay
+                    self.stats.last_retry_time = time.time()
+                    self.stats.max_attempts_used = max(self.stats.max_attempts_used, attempt)
 
                 logger.warning(
                     "Retry attempt",
@@ -285,7 +292,8 @@ class RetryPolicy:
 
                 await asyncio.sleep(delay)
 
-        self.stats.total_failures += 1
+        async with self._lock:
+            self.stats.total_failures += 1
         raise RetryExhaustedError(
             attempts=self.config.max_attempts,
             last_error=last_error,  # type: ignore[arg-type]
@@ -311,34 +319,39 @@ class RetryPolicy:
             RetryExhaustedError: Tüm denemeler tükendiğinde.
             Exception: Non-retryable hata.
         """
-        self.stats.total_calls += 1
+        with self._sync_lock:
+            self.stats.total_calls += 1
         last_error: Exception | None = None
 
         for attempt in range(1, self.config.max_attempts + 1):
             try:
                 result = func(*args, **kwargs)
-                self.stats.total_successes += 1
+                with self._sync_lock:
+                    self.stats.total_successes += 1
                 return result
 
             except Exception as exc:
                 last_error = exc
 
                 if not self._is_retryable(exc):
-                    self.stats.total_failures += 1
+                    with self._sync_lock:
+                        self.stats.total_failures += 1
                     raise
 
                 if attempt >= self.config.max_attempts:
                     break
 
                 delay = self._calculate_delay(attempt)
-                self.stats.total_retries += 1
-                self.stats.total_wait_seconds += delay
+                with self._sync_lock:
+                    self.stats.total_retries += 1
+                    self.stats.total_wait_seconds += delay
 
                 logger.warning("Retry attempt (sync)", attempt=attempt, delay_seconds=round(delay, 2), error=str(exc))
 
                 time.sleep(delay)
 
-        self.stats.total_failures += 1
+        with self._sync_lock:
+            self.stats.total_failures += 1
         raise RetryExhaustedError(
             attempts=self.config.max_attempts,
             last_error=last_error,  # type: ignore[arg-type]
@@ -374,6 +387,10 @@ BIST_RETRY_POLICIES: dict[str, RetryPolicy] = {
 }
 
 
+# Bilinmeyen provider için varsayılan retry policy
+DEFAULT_RETRY_POLICY: RetryPolicy = RetryPolicy(max_attempts=3, base_delay_s=1.0, max_delay_s=30.0)
+
+
 def get_retry_policy(provider: str) -> RetryPolicy:
     """Provider için retry policy döndürür.
 
@@ -383,10 +400,7 @@ def get_retry_policy(provider: str) -> RetryPolicy:
     Returns:
         RetryPolicy örneği (bilinmeyen provider için varsayılan).
     """
-    return BIST_RETRY_POLICIES.get(
-        provider,
-        RetryPolicy(max_attempts=3, base_delay_s=1.0, max_delay_s=30.0),
-    )
+    return BIST_RETRY_POLICIES.get(provider, DEFAULT_RETRY_POLICY)
 
 
 __all__ = [
@@ -399,4 +413,5 @@ __all__ = [
     "NON_RETRYABLE_STATUS_CODES",
     "BIST_RETRY_POLICIES",
     "get_retry_policy",
+    "DEFAULT_RETRY_POLICY",
 ]
