@@ -42,15 +42,32 @@ from opentelemetry import trace
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.grpc_client")
 
+# Sinyal yönü sabitleri (protobuf int → string)
+_DIRECTION_REVERSE_MAP: dict[int, str] = {0: "BUY", 1: "SELL", 2: "HOLD"}
+
+# Stream bekleme süreleri (saniye) — SSD yazma azaltma
+_DEFAULT_STREAM_INTERVAL_SEC: float = 30.0
+_DEFAULT_PORTFOLIO_STREAM_INTERVAL_SEC: float = 10.0
+
+# Varsayılan gRPC deadline (saniye)
+_DEFAULT_GRPC_DEADLINE_SEC: float = 10.0
+
 
 def otel_trace(span_name: str) -> Any:
-    """Decorator to wrap a method in an OTel span."""
+    """OpenTelemetry span ile saran dekoratör.
 
-    def decorator(func) -> Any:
-        """Otomatik eklendi."""
+    Args:
+        span_name: Oluşturulacak span'ın adı.
+
+    Returns:
+        Dekore edilmiş fonksiyon.
+    """
+
+    def decorator(func: Any) -> Any:
+        """Asıl dekoratör fonksiyonu."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs) -> Any:
-            """Otomatik eklendi."""
+        def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
+            """Span içinde fonksiyon çalıştırır."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
 
@@ -60,7 +77,11 @@ def otel_trace(span_name: str) -> Any:
 
 
 def _get_correlation_metadata() -> list[tuple[str, str]]:
-    """Correlation ID'yi gRPC metadata'ya ekle."""
+    """Correlation ID'yi gRPC metadata'ya ekler.
+
+    Returns:
+        gRPC metadata tuple listesi. Correlation ID yoksa boş liste.
+    """
     try:
         from ..core.distributed_tracing import correlation_id_var
 
@@ -68,7 +89,9 @@ def _get_correlation_metadata() -> list[tuple[str, str]]:
         if cid:
             return [("x-correlation-id", cid)]
     except ImportError:
-        logger.error("Exception caught", exc_info=True)
+        logger.debug("distributed_tracing modülü bulunamadı")
+    except Exception as e:
+        logger.error("correlation_id metadata hatası", error=str(e))
     return []
 
 
@@ -79,11 +102,15 @@ class BaseGRPCClient:
     otomatik yük dağılımı. Tek instance varsa bile çalışır (noop).
     """
 
-    def __init__(self, hosts: list[str] = None, port: int = 50051):
-        """
+    def __init__(self, hosts: list[str] | None = None, port: int = 50051) -> None:
+        """gRPC istemci taban sınıfı başlatıcısı.
+
         Args:
-            hosts: gRPC sunucu adresleri. None ise ortam değişkeninden okunur.
+            hosts: gRPC sunucu adresleri. None ise GRPC_HOSTS ortam değişkeninden okunur.
             port: gRPC portu.
+
+        Returns:
+            None.
         """
         if hosts is None:
             import os
@@ -94,11 +121,26 @@ class BaseGRPCClient:
         self.port = port
         self._channel = None
         self._stub = None
-        self._default_deadline = 10.0  # saniye — gRPC çağrıları için varsayılan deadline
+        self._default_deadline = _DEFAULT_GRPC_DEADLINE_SEC
+
+    def __repr__(self) -> str:
+        """BaseGRPCClient kısa temsili.
+
+        Returns:
+            Host sayısı ve port bilgisi.
+        """
+        return f"BaseGRPCClient(hosts={len(self.hosts)}, port={self.port})"
 
     @otel_trace("grpc.connect")
-    async def connect(self) -> Any:
-        """Otomatik eklendi."""
+    async def connect(self) -> bool:
+        """gRPC sunucusuna bağlanır.
+
+        mTLS credentials varsa güvenli bağlantı, yoksa insecure bağlantı kurar.
+        Birden fazla host varsa round_robin load balancing uygulanır.
+
+        Returns:
+            True ise bağlantı başarılı, False ise başarısız.
+        """
         if not HAS_GRPC:
             logger.warning("gRPC not available (grpcio not installed)")
             return False
@@ -152,8 +194,12 @@ class BaseGRPCClient:
             return False
 
     @otel_trace("grpc.close")
-    async def close(self) -> Any:
-        """Otomatik eklendi."""
+    async def close(self) -> None:
+        """gRPC bağlantısını kapatır.
+
+        Returns:
+            None.
+        """
         if self._channel:
             try:
                 await self._channel.close()
@@ -162,30 +208,60 @@ class BaseGRPCClient:
             self._channel = None
             self._stub = None
 
-    async def __aenter__(self) -> Any:
-        """Otomatik eklendi."""
+    async def __aenter__(self) -> "BaseGRPCClient":
+        """Async context manager girişi — bağlanır.
+
+        Returns:
+            self.
+        """
         await self.connect()
         return self
 
-    async def __aexit__(self, *args) -> Any:
-        """Otomatik eklendi."""
+    async def __aexit__(self, *args: Any) -> None:
+        """Async context manager çıkışı — bağlantıyı kapatır.
+
+        Returns:
+            None.
+        """
         await self.close()
 
 
 class MarketClient(BaseGRPCClient):
-    """Piyasa verisi gRPC istemcisi — Protobuf native."""
+    """Piyasa verisi gRPC istemcisi — Protobuf native.
 
-    async def connect(self) -> Any:
-        """Otomatik eklendi."""
+    Anlık fiyat stream'i ve tek seferlik fiyat sorgusu sağlar.
+    """
+
+    def __repr__(self) -> str:
+        """MarketClient kısa temsili.
+
+        Returns:
+            Host sayısı ve stub durumu.
+        """
+        return f"MarketClient(hosts={len(self.hosts)}, connected={self._stub is not None})"
+
+    async def connect(self) -> bool:
+        """Market servis stub'ını oluşturur ve bağlanır.
+
+        Returns:
+            True ise bağlantı başarılı, False ise başarısız.
+        """
         if await super().connect():
             self._stub = market_pb2_grpc.MarketServiceStub(self._channel)
             return True
         return False
 
     async def stream_ticks(self, tickers: list[str]) -> AsyncIterator[dict[str, Any]]:
-        """Anlık fiyat stream'i (Protobuf binary)."""
+        """Anlık fiyat stream'i (Protobuf binary).
+
+        Args:
+            tickers: Ticker listesi.
+
+        Returns:
+            Fiyat dict'leri AsyncIterator'ı.
+        """
         if not self._stub:
-            logger.warning("MarketClient not connected, falling back to Redis")
+            logger.warning("MarketClient bağlı değil, Redis fallback")
             from ..core.redis_helper import get_cached
 
             while True:
@@ -198,7 +274,7 @@ class MarketClient(BaseGRPCClient):
                             "change": data.get("change", 0),
                             "timestamp": int(time.time() * 1000),
                         }
-                await asyncio.sleep(30)  # SSD write reduction: 5s → 30s  # SSD write reduction: 1s → 5s  # SSD write reduction: 0.1s → 1s
+                await asyncio.sleep(_DEFAULT_STREAM_INTERVAL_SEC)
             return
 
         request = market_pb2.TickRequest(tickers=tickers)
@@ -220,7 +296,14 @@ class MarketClient(BaseGRPCClient):
 
     @otel_trace("grpc.market.get_tick")
     async def get_tick(self, ticker: str) -> dict[str, Any]:
-        """Tek seferlik fiyat (Protobuf)."""
+        """Tek seferlik fiyat sorgusu (Protobuf).
+
+        Args:
+            ticker: Hisse senedi kodu.
+
+        Returns:
+            Fiyat dict'i. Hata durumunda error anahtarı içerir.
+        """
         if not self._stub:
             from ..core.redis_helper import get_cached
 
@@ -245,17 +328,39 @@ class MarketClient(BaseGRPCClient):
 
 
 class SignalClient(BaseGRPCClient):
-    """Sinyal gRPC istemcisi — Protobuf native."""
+    """Sinyal gRPC istemcisi — Protobuf native.
 
-    async def connect(self) -> Any:
-        """Otomatik eklendi."""
+    Sinyal stream'i ve son sinyalleri sorgulama sağlar.
+    """
+
+    def __repr__(self) -> str:
+        """SignalClient kısa temsili.
+
+        Returns:
+            Host sayısı ve stub durumu.
+        """
+        return f"SignalClient(hosts={len(self.hosts)}, connected={self._stub is not None})"
+
+    async def connect(self) -> bool:
+        """Signal servis stub'ını oluşturur ve bağlanır.
+
+        Returns:
+            True ise bağlantı başarılı, False ise başarısız.
+        """
         if await super().connect():
             self._stub = market_pb2_grpc.SignalServiceStub(self._channel)
             return True
         return False
 
     async def stream_signals(self, min_confidence: float = 0.5) -> AsyncIterator[dict[str, Any]]:
-        """Sinyal stream'i (Protobuf binary)."""
+        """Sinyal stream'i (Protobuf binary).
+
+        Args:
+            min_confidence: Minimum güven skoru filtresi.
+
+        Returns:
+            Sinyal dict'leri AsyncIterator'ı.
+        """
         if not self._stub:
             from ..core.redis_helper import get_cached
 
@@ -264,17 +369,16 @@ class SignalClient(BaseGRPCClient):
                 for signal in signals:
                     if signal.get("confidence", 0) >= min_confidence:
                         yield signal
-                await asyncio.sleep(30)  # SSD write reduction: 5s → 30s  # SSD write reduction: 1s → 5s
+                await asyncio.sleep(_DEFAULT_STREAM_INTERVAL_SEC)
             return
 
         request = market_pb2.SignalRequest(min_confidence=min_confidence)
         metadata = _get_correlation_metadata()
         try:
-            direction_map = {0: "BUY", 1: "SELL", 2: "HOLD"}
             async for signal in self._stub.StreamSignals(request, metadata=metadata):
                 yield {
                     "ticker": signal.ticker,
-                    "direction": direction_map.get(signal.direction, "HOLD"),
+                    "direction": _DIRECTION_REVERSE_MAP.get(signal.direction, "HOLD"),
                     "confidence": signal.confidence,
                     "target_price": signal.target_price,
                     "stop_loss": signal.stop_loss,
@@ -282,11 +386,18 @@ class SignalClient(BaseGRPCClient):
                     "timestamp": signal.timestamp,
                 }
         except grpc.RpcError as e:
-            logger.error("gRPC StreamSignals error", code=e.code(), details=e.details())
+            logger.error("gRPC StreamSignals hatası", code=e.code(), details=e.details())
 
     @otel_trace("grpc.signal.get_recent_signals")
     async def get_recent_signals(self, min_confidence: float = 0.5) -> list[dict[str, Any]]:
-        """Son sinyalleri al (Protobuf)."""
+        """Son sinyalleri sorgula (Protobuf).
+
+        Args:
+            min_confidence: Minimum güven skoru filtresi.
+
+        Returns:
+            Sinyal dict'leri listesi.
+        """
         if not self._stub:
             from ..core.redis_helper import get_cached
 
@@ -297,11 +408,10 @@ class SignalClient(BaseGRPCClient):
         metadata = _get_correlation_metadata()
         try:
             response = await self._stub.GetRecentSignals(request, metadata=metadata, timeout=self._default_deadline)
-            direction_map = {0: "BUY", 1: "SELL", 2: "HOLD"}
             return [
                 {
                     "ticker": s.ticker,
-                    "direction": direction_map.get(s.direction, "HOLD"),
+                    "direction": _DIRECTION_REVERSE_MAP.get(s.direction, "HOLD"),
                     "confidence": s.confidence,
                     "target_price": s.target_price,
                     "stop_loss": s.stop_loss,
@@ -311,15 +421,30 @@ class SignalClient(BaseGRPCClient):
                 for s in response.signals
             ]
         except grpc.RpcError as e:
-            logger.error("gRPC GetRecentSignals error", code=e.code(), details=e.details())
+            logger.error("gRPC GetRecentSignals hatası", code=e.code(), details=e.details())
             return []
 
 
 class PortfolioClient(BaseGRPCClient):
-    """Portföy gRPC istemcisi — Protobuf native."""
+    """Portföy gRPC istemcisi — Protobuf native.
 
-    async def connect(self) -> Any:
-        """Otomatik eklendi."""
+    Portföy durumu stream'i ve anlık portföy sorgusu sağlar.
+    """
+
+    def __repr__(self) -> str:
+        """PortfolioClient kısa temsili.
+
+        Returns:
+            Host sayısı ve stub durumu.
+        """
+        return f"PortfolioClient(hosts={len(self.hosts)}, connected={self._stub is not None})"
+
+    async def connect(self) -> bool:
+        """Portfolio servis stub'ını oluşturur ve bağlanır.
+
+        Returns:
+            True ise bağlantı başarılı, False ise başarısız.
+        """
         if await super().connect():
             self._stub = market_pb2_grpc.PortfolioServiceStub(self._channel)
             return True
@@ -327,7 +452,11 @@ class PortfolioClient(BaseGRPCClient):
 
     @otel_trace("grpc.portfolio.get_portfolio")
     async def get_portfolio(self) -> dict[str, Any]:
-        """Anlık portföy durumu (Protobuf)."""
+        """Anlık portföy durumu sorgusu (Protobuf).
+
+        Returns:
+            Portföy dict'i. Hata durumunda error anahtarı içerir.
+        """
         if not self._stub:
             from ..core.redis_helper import get_cached
 
@@ -361,7 +490,11 @@ class PortfolioClient(BaseGRPCClient):
             return {"error": str(e.details())}
 
     async def stream_portfolio(self) -> AsyncIterator[dict[str, Any]]:
-        """Portföy durumu stream'i (Protobuf binary)."""
+        """Portföy durumu stream'i (Protobuf binary).
+
+        Returns:
+            Portföy dict'leri AsyncIterator'ı.
+        """
         if not self._stub:
             from ..core.redis_helper import get_cached
 
@@ -369,7 +502,7 @@ class PortfolioClient(BaseGRPCClient):
                 pf = get_cached("portfolio:state")
                 if pf:
                     yield pf
-                await asyncio.sleep(10)  # SSD write reduction: 2s → 10s
+                await asyncio.sleep(_DEFAULT_PORTFOLIO_STREAM_INTERVAL_SEC)
             return
 
         request = market_pb2.PortfolioRequest(portfolio_id="default")
@@ -398,10 +531,25 @@ class PortfolioClient(BaseGRPCClient):
 
 
 class RiskClient(BaseGRPCClient):
-    """Risk gRPC istemcisi — Protobuf native."""
+    """Risk gRPC istemcisi — Protobuf native.
 
-    async def connect(self) -> Any:
-        """Otomatik eklendi."""
+    Risk metrikleri stream'i ve anlık risk sorgusu sağlar.
+    """
+
+    def __repr__(self) -> str:
+        """RiskClient kısa temsili.
+
+        Returns:
+            Host sayısı ve stub durumu.
+        """
+        return f"RiskClient(hosts={len(self.hosts)}, connected={self._stub is not None})"
+
+    async def connect(self) -> bool:
+        """Risk servis stub'ını oluşturur ve bağlanır.
+
+        Returns:
+            True ise bağlantı başarılı, False ise başarısız.
+        """
         if await super().connect():
             self._stub = market_pb2_grpc.RiskServiceStub(self._channel)
             return True
@@ -409,7 +557,11 @@ class RiskClient(BaseGRPCClient):
 
     @otel_trace("grpc.risk.get_risk")
     async def get_risk(self) -> dict[str, Any]:
-        """Anlık risk durumu (Protobuf)."""
+        """Anlık risk durumu sorgusu (Protobuf).
+
+        Returns:
+            Risk metrikleri dict'i. Hata durumunda error anahtarı içerir.
+        """
         if not self._stub:
             from ..core.redis_helper import get_cached
 
@@ -433,7 +585,11 @@ class RiskClient(BaseGRPCClient):
             return {"error": str(e.details())}
 
     async def stream_risk(self) -> AsyncIterator[dict[str, Any]]:
-        """Risk metrikleri stream'i (Protobuf binary)."""
+        """Risk metrikleri stream'i (Protobuf binary).
+
+        Returns:
+            Risk metrikleri dict'leri AsyncIterator'ı.
+        """
         if not self._stub:
             from ..core.redis_helper import get_cached
 
@@ -441,7 +597,7 @@ class RiskClient(BaseGRPCClient):
                 risk = get_cached("risk:metrics")
                 if risk:
                     yield risk
-                await asyncio.sleep(30)  # SSD write reduction: 5s → 30s
+                await asyncio.sleep(_DEFAULT_STREAM_INTERVAL_SEC)
             return
 
         request = market_pb2.RiskRequest(portfolio_id="default")
@@ -449,6 +605,7 @@ class RiskClient(BaseGRPCClient):
         try:
             async for risk in self._stub.StreamRisk(request, metadata=metadata):
                 yield {
+                    "var_95": risk.var_95,
                     "cvar_95": risk.cvar_95,
                     "sharpe": risk.sharpe,
                     "max_drawdown": risk.max_drawdown,
@@ -457,4 +614,13 @@ class RiskClient(BaseGRPCClient):
                     "timestamp": risk.timestamp,
                 }
         except grpc.RpcError as e:
-            logger.error("gRPC StreamRisk error", code=e.code(), details=e.details())
+            logger.error("gRPC StreamRisk hatası", code=e.code(), details=e.details())
+
+
+__all__: list[str] = [
+    "BaseGRPCClient",
+    "MarketClient",
+    "SignalClient",
+    "PortfolioClient",
+    "RiskClient",
+]
