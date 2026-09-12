@@ -16,8 +16,13 @@ from ...core.async_http import get_client
 
 logger = structlog.get_logger()
 
-KAP_BASE_URL = "https://kap.org.tr"
-KAP_API_URL = "https://www.kap.org.tr/tr/api"
+# Varsayılan sabitler
+DEFAULT_KAP_BASE_URL: str = "https://kap.org.tr"
+DEFAULT_KAP_API_URL: str = "https://www.kap.org.tr/tr/api"
+DEFAULT_KAP_TIMEOUT: float = 3.0
+DEFAULT_KAP_MAX_RETRIES: int = 1
+DEFAULT_KAP_DISCLOSURE_LIMIT: int = 50
+DEFAULT_KAP_ACTIONS_LIMIT: int = 100
 
 
 class KAPProvider:
@@ -35,18 +40,26 @@ class KAPProvider:
         "EXPLANATION": "Açıklama",
     }
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """KAPProvider örneği oluşturur."""
         self._client = get_client(
             "kap",
-            timeout=3.0,
-            max_retries=1,
+            timeout=DEFAULT_KAP_TIMEOUT,
+            max_retries=DEFAULT_KAP_MAX_RETRIES,
             headers={
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
                 "Accept": "application/json, text/html, */*",
                 "Accept-Language": "tr-TR,tr;q=0.9",
             },
         )
+
+    def __repr__(self) -> str:
+        """KAPProvider string temsili.
+
+        Returns:
+            İnsan tarafından okunabilir temsil.
+        """
+        return f"KAPProvider(base_url={DEFAULT_KAP_BASE_URL!r})"
 
     async def fetch_disclosures(
         self,
@@ -72,7 +85,7 @@ class KAPProvider:
             if category:
                 params["category"] = category
 
-            data = await self._client.get_json(f"{KAP_API_URL}/disclosures", params=params)
+            data = await self._client.get_json(f"{DEFAULT_KAP_API_URL}/disclosures", params=params)
             if not data:
                 return []
 
@@ -86,7 +99,7 @@ class KAPProvider:
                     "category": item.get("category", ""),
                     "category_name": self.CATEGORIES.get(item.get("category", ""), item.get("category", "")),
                     "publish_date": item.get("publishDate", ""),
-                    "kap_url": f"{KAP_BASE_URL}{item.get('url', '')}",
+                    "kap_url": f"{DEFAULT_KAP_BASE_URL}{item.get('url', '')}",
                     "source": "kap",
                     "is_price_sensitive": self._is_price_sensitive(item),
                     "sentiment": self._classify_sentiment(item),
@@ -98,13 +111,13 @@ class KAPProvider:
             return disclosures
 
         except Exception as e:
-            logger.debug("KAP fetch fallback activated", error=str(e))
+            logger.warning("KAP disclosures fetch failed", error=str(e))
             return []
 
     async def fetch_company_info(self, ticker: str) -> dict[str, Any] | None:
         """Şirket bilgisi çek (async)."""
         try:
-            data = await self._client.get_json(f"{KAP_API_URL}/company/{ticker}")
+            data = await self._client.get_json(f"{DEFAULT_KAP_API_URL}/company/{ticker}")
             if data:
                 return {
                     "ticker": ticker,
@@ -124,7 +137,7 @@ class KAPProvider:
     async def fetch_financial_data(self, ticker: str) -> dict[str, Any] | None:
         """Finansal veri çek (async)."""
         try:
-            data = await self._client.get_json(f"{KAP_API_URL}/financial/{ticker}")
+            data = await self._client.get_json(f"{DEFAULT_KAP_API_URL}/financial/{ticker}")
             if data:
                 return {
                     "ticker": ticker,
@@ -159,7 +172,7 @@ class KAPProvider:
             if to_date:
                 params["toDate"] = to_date
 
-            data = await self._client.get_json(f"{KAP_API_URL}/corporate-actions", params=params)
+            data = await self._client.get_json(f"{DEFAULT_KAP_API_URL}/corporate-actions", params=params)
             if not data:
                 return []
 
@@ -440,10 +453,13 @@ class KAPProvider:
             logger.info("Automated KAP market restrictions synced", count=registered_count, date=current_date)
         return registered_count
 
-    async def close(self) -> Any:
-        """Otomatik eklendi."""
+    async def close(self) -> None:
+        """HTTP istemcisini kapatır."""
         await self._client.close()
 
 
 # Singleton
 kap_provider = KAPProvider()
+
+
+__all__ = ["KAPProvider", "kap_provider"]
