@@ -21,6 +21,12 @@ import yfinance as yf
 
 logger = structlog.get_logger()
 
+# Varsayılan sabitler
+DEFAULT_MAX_HANDLERS: int = 100
+DEFAULT_STREAM_POLL_SECONDS: int = 60
+DEFAULT_STREAM_ERROR_BACKOFF: int = 30
+DEFAULT_WS_TIMEOUT: float = 5.0
+
 
 @dataclass
 class StreamTick:
@@ -34,6 +40,18 @@ class StreamTick:
     timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     source: str = ""
 
+    def __repr__(self) -> str:
+        """StreamTick string temsili.
+
+        Returns:
+            İnsan tarafından okunabilir temsil.
+        """
+        return (
+            f"StreamTick(ticker={self.ticker!r}, "
+            f"price={self.price}, volume={self.volume}, "
+            f"source={self.source!r})"
+        )
+
 
 class BISTStreamProvider:
     """
@@ -41,22 +59,46 @@ class BISTStreamProvider:
     Birden fazla kaynak destekler.
     """
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """BISTStreamProvider örneği oluşturur."""
         self._handlers: list[Callable] = []
         self._running = False
-        self._source = "yfinance"  # Varsayılan
+        self._source = "yfinance"
         self._tick_count = 0
 
-    def on_tick(self, handler: Callable) -> Any:
-        """Tick handler ata."""
+    def __repr__(self) -> str:
+        """BISTStreamProvider string temsili.
+
+        Returns:
+            İnsan tarafından okunabilir temsil.
+        """
+        return (
+            f"BISTStreamProvider(source={self._source!r}, "
+            f"running={self._running}, ticks={self._tick_count})"
+        )
+
+    def on_tick(self, handler: Callable) -> "BISTStreamProvider":
+        """Tick handler kaydeder.
+
+        Maksimum 100 handler tutulur.
+
+        Args:
+            handler: StreamTick alan fonksiyon.
+
+        Returns:
+            Kendisi (chain için).
+        """
         self._handlers.append(handler)
-        if len(self._handlers) > 100:
-            self._handlers = self._handlers[-100:]
+        if len(self._handlers) > DEFAULT_MAX_HANDLERS:
+            self._handlers = self._handlers[-DEFAULT_MAX_HANDLERS:]
         return self
 
-    async def start(self, source: str = "yfinance") -> Any:
-        """Stream'i başlat."""
+    async def start(self, source: str = "yfinance") -> None:
+        """Stream'i başlatır.
+
+        Args:
+            source: Veri kaynağı ("yfinance", "investing", "websocket").
+        """
         self._source = source
         self._running = True
 
@@ -69,14 +111,16 @@ class BISTStreamProvider:
         else:
             logger.error("Unknown stream source", source=source)
 
-    async def stop(self) -> Any:
-        """Stream'i durdur."""
+    async def stop(self) -> None:
+        """Stream'i durdurur."""
         self._running = False
+        logger.info("BIST stream stopped", source=self._source, ticks=self._tick_count)
 
-    async def _stream_yfinance(self) -> Any:
-        """
-        yfinance ile aggressive polling.
+    async def _stream_yfinance(self) -> None:
+        """yfinance ile aggressive polling yapar.
+
         Ücretsiz, 15dk gecikmeli, ama sürekli.
+        Blokluyor yf.download() asyncio.to_thread ile sarılır.
         """
         from ..bist_universe import bist_universe
 
@@ -86,7 +130,8 @@ class BISTStreamProvider:
         while self._running:
             try:
                 # Batch download for all universe tickers
-                data = yf.download(
+                data = await asyncio.to_thread(
+                    yf.download,
                     [f"{t}.IS" for t in tickers],
                     period="1d",
                     interval="1m",
@@ -128,15 +173,15 @@ class BISTStreamProvider:
                             logger.warning("Caught Exception in _stream_yfinance", exc_info=True)
 
                 # 60 saniye bekle (ücretsiz API limiti)
-                await asyncio.sleep(60)
+                await asyncio.sleep(DEFAULT_STREAM_POLL_SECONDS)
 
             except Exception as e:
                 logger.error("yfinance stream error", error=str(e))
-                await asyncio.sleep(30)
+                await asyncio.sleep(DEFAULT_STREAM_ERROR_BACKOFF)
 
-    async def _stream_investing(self) -> Any:
-        """
-        Investing.com WebSocket stream.
+    async def _stream_investing(self) -> None:
+        """Investing.com WebSocket stream.
+
         Ücretsiz, gecikmeli, ama sürekli.
         """
         try:
@@ -156,7 +201,7 @@ class BISTStreamProvider:
 
                 while self._running:
                     try:
-                        msg = await asyncio.wait_for(ws.recv(), timeout=5.0)
+                        msg = await asyncio.wait_for(ws.recv(), timeout=DEFAULT_WS_TIMEOUT)
                         data = orjson.loads(msg)
 
                         if "message" in data:
@@ -177,8 +222,8 @@ class BISTStreamProvider:
                                             await handler(tick)
                                         else:
                                             handler(tick)
-                                    except Exception:
-                                        logger.warning("Caught Exception in _stream_investing", exc_info=True)
+                                    except Exception as e:
+                                        logger.warning("Investing tick handler error", error=str(e))
 
                                 self._tick_count += 1
 
@@ -194,15 +239,23 @@ class BISTStreamProvider:
             logger.error("Investing stream failed", error=str(e))
             await self._stream_yfinance()
 
-    async def _stream_websocket(self) -> Any:
-        """
-        Generic WebSocket stream.
+    async def _stream_websocket(self) -> None:
+        """Generic WebSocket stream.
+
         BISTECH veya özel feed bağlanabilir.
+        API key ortam değişkeninden okunmalıdır.
         """
+        import os
+
+        api_key = os.getenv("BISTECH_API_KEY", "")
+        if not api_key:
+            logger.error("BISTECH_API_KEY ortam değişkeni tanımlı değil")
+            await self._stream_yfinance()
+            return
+
         try:
             import websockets
 
-            # BISTECH API endpoint (ücretli)
             uri = "wss://feed.bistech.com.tr/v1/stream"
 
             async with websockets.connect(uri) as ws:
@@ -210,7 +263,7 @@ class BISTStreamProvider:
                 auth_msg = orjson.dumps(
                     {
                         "type": "auth",
-                        "api_key": "YOUR_API_KEY",
+                        "api_key": api_key,
                     }
                 ).decode()
                 await ws.send(auth_msg)
@@ -229,7 +282,7 @@ class BISTStreamProvider:
 
                 while self._running:
                     try:
-                        msg = await asyncio.wait_for(ws.recv(), timeout=5.0)
+                        msg = await asyncio.wait_for(ws.recv(), timeout=DEFAULT_WS_TIMEOUT)
                         data = orjson.loads(msg)
 
                         if data.get("type") == "trade":
@@ -249,8 +302,8 @@ class BISTStreamProvider:
                                         await handler(tick)
                                     else:
                                         handler(tick)
-                                except Exception:
-                                    logger.warning("Caught Exception in _stream_websocket", exc_info=True)
+                                except Exception as e:
+                                    logger.warning("Bistech tick handler error", error=str(e))
 
                             self._tick_count += 1
 
@@ -261,8 +314,12 @@ class BISTStreamProvider:
             logger.error("WebSocket stream failed", error=str(e))
             await self._stream_yfinance()
 
-    def get_stats(self) -> dict:
-        """İstatistikler."""
+    def get_stats(self) -> dict[str, Any]:
+        """İstatistikleri döndürür.
+
+        Returns:
+            Provider istatistik sözlüğü.
+        """
         return {
             "source": self._source,
             "tick_count": self._tick_count,
@@ -273,3 +330,6 @@ class BISTStreamProvider:
 
 # Singleton
 bist_stream = BISTStreamProvider()
+
+
+__all__ = ["StreamTick", "BISTStreamProvider", "bist_stream"]
