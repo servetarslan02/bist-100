@@ -26,19 +26,45 @@ logger = structlog.get_logger()
 
 @dataclass
 class RetryConfig:
-    """Retry yapılandırması."""
+    """Retry yapılandırması.
 
-    max_attempts: int = 3  # Maksimum deneme sayısı
-    base_delay_s: float = 1.0  # Başlangıç gecikme süresi
-    max_delay_s: float = 30.0  # Maksimum gecikme süresi
-    backoff_factor: float = 2.0  # Gecikme çarpanı (exponential)
-    jitter: bool = True  # Rastgele gecikme ekle
-    jitter_range: float = 0.2  # Jitter aralığı (±%20)
+    Attributes:
+        max_attempts: Maksimum deneme sayısı.
+        base_delay_s: Başlangıç gecikme süresi (saniye).
+        max_delay_s: Maksimum gecikme süresi (saniye).
+        backoff_factor: Gecikme çarpanı (exponential).
+        jitter: Rastgele gecikme ekle.
+        jitter_range: Jitter aralığı (±%20 = 0.2).
+    """
+
+    max_attempts: int = 3
+    base_delay_s: float = 1.0
+    max_delay_s: float = 30.0
+    backoff_factor: float = 2.0
+    jitter: bool = True
+    jitter_range: float = 0.2
+
+    def __repr__(self) -> str:
+        return (
+            f"RetryConfig(max_attempts={self.max_attempts}, "
+            f"base_delay={self.base_delay_s}s, "
+            f"backoff={self.backoff_factor}x)"
+        )
 
 
 @dataclass
 class RetryStats:
-    """Retry istatistikleri."""
+    """Retry istatistikleri.
+
+    Attributes:
+        total_calls: Toplam çağrı sayısı.
+        total_retries: Toplam retry sayısı.
+        total_successes: Toplam başarılı çağrı.
+        total_failures: Toplam başarısız çağrı.
+        total_wait_seconds: Toplam bekleme süresi.
+        max_attempts_used: Kullanılan maksimum deneme sayısı.
+        last_retry_time: Son retry zaman damgası (epoch).
+    """
 
     total_calls: int = 0
     total_retries: int = 0
@@ -47,6 +73,13 @@ class RetryStats:
     total_wait_seconds: float = 0.0
     max_attempts_used: int = 0
     last_retry_time: float | None = None
+
+    def __repr__(self) -> str:
+        return (
+            f"RetryStats(calls={self.total_calls}, "
+            f"retries={self.total_retries}, "
+            f"successes={self.total_successes})"
+        )
 
 
 # Retryable HTTP status codes
@@ -57,37 +90,57 @@ NON_RETRYABLE_STATUS_CODES: set[int] = {400, 401, 403, 404, 405}
 
 
 class HTTPStatusError(Exception):
-    """HTTP durum hatası."""
+    """HTTP durum hatası.
 
-    def __init__(self, status_code: int, message: str = ""):
-        """Otomatik eklendi."""
+    Attributes:
+        status_code: HTTP durum kodu.
+        message: Hata mesajı.
+    """
+
+    def __init__(self, status_code: int, message: str = "") -> None:
+        """HTTPStatusError örneği oluşturur.
+
+        Args:
+            status_code: HTTP durum kodu.
+            message: Hata mesajı.
+        """
         self.status_code = status_code
         self.message = message
         super().__init__(f"HTTP {status_code}: {message}")
 
 
 class RetryExhaustedError(Exception):
-    """Tüm denemeler tükendi."""
+    """Tüm denemeler tükendi.
 
-    def __init__(self, attempts: int, last_error: Exception):
-        """Otomatik eklendi."""
+    Attributes:
+        attempts: Toplam deneme sayısı.
+        last_error: Son hata.
+    """
+
+    def __init__(self, attempts: int, last_error: Exception) -> None:
+        """RetryExhaustedError örneği oluşturur.
+
+        Args:
+            attempts: Toplam deneme sayısı.
+            last_error: Son yakalanan hata.
+        """
         self.attempts = attempts
         self.last_error = last_error
         super().__init__(f"Retry exhausted after {attempts} attempts: {last_error}")
 
 
 class RetryPolicy:
-    """
-    Exponential backoff + jitter ile retry.
+    """Exponential backoff + jitter ile retry.
 
     Args:
-        max_attempts: Maksimum deneme sayısı
-        base_delay_s: Başlangıç gecikme süresi (saniye)
-        max_delay_s: Maksimum gecikme süresi (saniye)
-        backoff_factor: Gecikme çarpanı
-        jitter: Rastgele gecikme ekle
-        retryable_exceptions: Retry yapılabilir exception tipleri
-        non_retryable_exceptions: Retry yapılamaz exception tipleri
+        max_attempts: Maksimum deneme sayısı.
+        base_delay_s: Başlangıç gecikme süresi (saniye).
+        max_delay_s: Maksimum gecikme süresi (saniye).
+        backoff_factor: Gecikme çarpanı.
+        jitter: Rastgele gecikme ekle.
+        jitter_range: Jitter aralığı.
+        retryable_exceptions: Retry yapılabilir exception tipleri.
+        non_retryable_exceptions: Retry yapılamaz exception tipleri.
     """
 
     def __init__(
@@ -100,8 +153,19 @@ class RetryPolicy:
         jitter_range: float = 0.2,
         retryable_exceptions: set[type[Exception]] | None = None,
         non_retryable_exceptions: set[type[Exception]] | None = None,
-    ):
-        """Otomatik eklendi."""
+    ) -> None:
+        """RetryPolicy örneği oluşturur.
+
+        Args:
+            max_attempts: Maksimum deneme sayısı.
+            base_delay_s: Başlangıç gecikme süresi (saniye).
+            max_delay_s: Maksimum gecikme süresi (saniye).
+            backoff_factor: Gecikme çarpanı.
+            jitter: Rastgele gecikme ekle.
+            jitter_range: Jitter aralığı.
+            retryable_exceptions: Retry yapılabilir exception tipleri.
+            non_retryable_exceptions: Retry yapılamaz exception tipleri.
+        """
         self.config = RetryConfig(
             max_attempts=max_attempts,
             base_delay_s=base_delay_s,
@@ -112,7 +176,6 @@ class RetryPolicy:
         )
         self.stats = RetryStats()
 
-        # Varsayılan retryable exceptions
         self.retryable_exceptions = retryable_exceptions or {
             ConnectionError,
             TimeoutError,
@@ -120,64 +183,71 @@ class RetryPolicy:
             asyncio.TimeoutError,
         }
 
-        # Varsayılan non-retryable exceptions
         self.non_retryable_exceptions = non_retryable_exceptions or set()
 
     def _is_retryable(self, error: Exception) -> bool:
-        """Bu hata retry yapılabilir mi?"""
-        # Non-retryable kontrolü
+        """Bu hata retry yapılabilir mi kontrol eder.
+
+        Args:
+            error: Yakalanan hata.
+
+        Returns:
+            True: Retry yapılabilir, False: Yapılamaz.
+        """
         for exc_type in self.non_retryable_exceptions:
             if isinstance(error, exc_type):
                 return False
 
-        # HTTP status code kontrolü
         if isinstance(error, HTTPStatusError):
             if error.status_code in NON_RETRYABLE_STATUS_CODES:
                 return False
             if error.status_code in RETRYABLE_STATUS_CODES:
                 return True
 
-        # Retryable exception kontrolü
         return any(isinstance(error, exc_type) for exc_type in self.retryable_exceptions)
 
     def _calculate_delay(self, attempt: int) -> float:
-        """Gecikme süresini hesapla (exponential backoff + jitter)."""
-        # Exponential backoff
+        """Gecikme süresini hesaplar (exponential backoff + jitter).
+
+        Args:
+            attempt: Mevcut deneme numarası (1'den başlar).
+
+        Returns:
+            Gecikme süresi (saniye).
+        """
         delay = self.config.base_delay_s * (self.config.backoff_factor ** (attempt - 1))
 
-        # Max delay sınırı
         delay = min(delay, self.config.max_delay_s)
 
-        # Jitter ekle
         if self.config.jitter:
             jitter_amount = delay * self.config.jitter_range
             delay += random.uniform(-jitter_amount, jitter_amount)
-            delay = max(0.1, delay)  # Minimum 100ms
+            delay = max(0.1, delay)
 
         return delay
 
     async def execute(
         self,
-        func: Callable,
-        *args,
-        **kwargs,
+        func: Callable[..., Any],
+        *args: Any,
+        **kwargs: Any,
     ) -> Any:
-        """
-        Async fonksiyonu retry ile çalıştır.
+        """Async fonksiyonu retry ile çalıştırır.
 
         Args:
-            func: Async fonksiyon
-            *args, **kwargs: Fonksiyon argümanları
+            func: Async fonksiyon.
+            *args: Fonksiyon argümanları.
+            **kwargs: Fonksiyon anahtar kelime argümanları.
 
         Returns:
-            Fonksiyon sonucu
+            Fonksiyon sonucu.
 
         Raises:
-            RetryExhaustedError: Tüm denemeler tükendiğinde
-            Exception: Non-retryable hata
+            RetryExhaustedError: Tüm denemeler tükendiğinde.
+            Exception: Non-retryable hata.
         """
         self.stats.total_calls += 1
-        last_error = None
+        last_error: Exception | None = None
 
         for attempt in range(1, self.config.max_attempts + 1):
             try:
@@ -187,20 +257,17 @@ class RetryPolicy:
                     logger.info("Retry succeeded", attempt=attempt, total_attempts=self.config.max_attempts)
                 return result
 
-            except Exception as e:
-                last_error = e
+            except Exception as exc:
+                last_error = exc
 
-                # Non-retryable hata → hemen fırlat
-                if not self._is_retryable(e):
-                    logger.warning("Non-retryable error", error=str(e), error_type=type(e).__name__)
+                if not self._is_retryable(exc):
+                    logger.warning("Non-retryable error", error=str(exc), error_type=type(exc).__name__)
                     self.stats.total_failures += 1
                     raise
 
-                # Son deneme → fırlat
                 if attempt >= self.config.max_attempts:
                     break
 
-                # Gecikme hesapla
                 delay = self._calculate_delay(attempt)
                 self.stats.total_retries += 1
                 self.stats.total_wait_seconds += delay
@@ -212,30 +279,40 @@ class RetryPolicy:
                     attempt=attempt,
                     max_attempts=self.config.max_attempts,
                     delay_seconds=round(delay, 2),
-                    error=str(e),
-                    error_type=type(e).__name__,
+                    error=str(exc),
+                    error_type=type(exc).__name__,
                 )
 
                 await asyncio.sleep(delay)
 
-        # Tüm denemeler tükendi
         self.stats.total_failures += 1
         raise RetryExhaustedError(
             attempts=self.config.max_attempts,
-            last_error=last_error,
+            last_error=last_error,  # type: ignore[arg-type]
         )
 
     def execute_sync(
         self,
-        func: Callable,
-        *args,
-        **kwargs,
+        func: Callable[..., Any],
+        *args: Any,
+        **kwargs: Any,
     ) -> Any:
-        """Sync fonksiyonu retry ile çalıştır."""
-        import time as time_module
+        """Senkron fonksiyonu retry ile çalıştırır.
 
+        Args:
+            func: Senkron fonksiyon.
+            *args: Fonksiyon argümanları.
+            **kwargs: Fonksiyon anahtar kelime argümanları.
+
+        Returns:
+            Fonksiyon sonucu.
+
+        Raises:
+            RetryExhaustedError: Tüm denemeler tükendiğinde.
+            Exception: Non-retryable hata.
+        """
         self.stats.total_calls += 1
-        last_error = None
+        last_error: Exception | None = None
 
         for attempt in range(1, self.config.max_attempts + 1):
             try:
@@ -243,10 +320,10 @@ class RetryPolicy:
                 self.stats.total_successes += 1
                 return result
 
-            except Exception as e:
-                last_error = e
+            except Exception as exc:
+                last_error = exc
 
-                if not self._is_retryable(e):
+                if not self._is_retryable(exc):
                     self.stats.total_failures += 1
                     raise
 
@@ -257,18 +334,22 @@ class RetryPolicy:
                 self.stats.total_retries += 1
                 self.stats.total_wait_seconds += delay
 
-                logger.warning("Retry attempt (sync)", attempt=attempt, delay_seconds=round(delay, 2), error=str(e))
+                logger.warning("Retry attempt (sync)", attempt=attempt, delay_seconds=round(delay, 2), error=str(exc))
 
-                time_module.sleep(delay)
+                time.sleep(delay)
 
         self.stats.total_failures += 1
         raise RetryExhaustedError(
             attempts=self.config.max_attempts,
-            last_error=last_error,
+            last_error=last_error,  # type: ignore[arg-type]
         )
 
-    def get_stats(self) -> dict:
-        """İstatistikler."""
+    def get_stats(self) -> dict[str, Any]:
+        """İstatistikleri döndürür.
+
+        Returns:
+            Retry istatistik sözlüğü.
+        """
         return {
             "total_calls": self.stats.total_calls,
             "total_retries": self.stats.total_retries,
@@ -282,7 +363,7 @@ class RetryPolicy:
 
 
 # BIST'e özgü retry policy'ler
-BIST_RETRY_POLICIES = {
+BIST_RETRY_POLICIES: dict[str, RetryPolicy] = {
     "yfinance": RetryPolicy(max_attempts=3, base_delay_s=1.0, max_delay_s=60.0),
     "kap": RetryPolicy(max_attempts=3, base_delay_s=2.0, max_delay_s=60.0),
     "tcmb": RetryPolicy(max_attempts=3, base_delay_s=2.0, max_delay_s=60.0),
@@ -294,8 +375,28 @@ BIST_RETRY_POLICIES = {
 
 
 def get_retry_policy(provider: str) -> RetryPolicy:
-    """Provider için retry policy al."""
+    """Provider için retry policy döndürür.
+
+    Args:
+        provider: Provider adı.
+
+    Returns:
+        RetryPolicy örneği (bilinmeyen provider için varsayılan).
+    """
     return BIST_RETRY_POLICIES.get(
         provider,
         RetryPolicy(max_attempts=3, base_delay_s=1.0, max_delay_s=30.0),
     )
+
+
+__all__ = [
+    "RetryConfig",
+    "RetryStats",
+    "HTTPStatusError",
+    "RetryExhaustedError",
+    "RetryPolicy",
+    "RETRYABLE_STATUS_CODES",
+    "NON_RETRYABLE_STATUS_CODES",
+    "BIST_RETRY_POLICIES",
+    "get_retry_policy",
+]

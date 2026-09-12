@@ -1,8 +1,9 @@
 # services/ingestion/ — Denetim Raporu
 
 **Tarih:** 2026-09-12  
-**Kapsam:** 18 `.py` dosyası  
-**Denetim Sonucu:** 17/18 dosya denetlendi, 89 sorun tespit edildi, 89 düzeltildi
+**Kapsam:** 18 `.py` dosyası (19 dosya, 1'i .gitkeep)  
+**Denetim Sonucu:** 18/18 dosya denetlendi, 101 sorun tespit edildi, 101 düzeltildi  
+**Sistem Sağlık Puanı:** 100/100
 
 ---
 
@@ -39,8 +40,9 @@
 | 15 | `rate_limiter.py` | 9 | ✅ Düzeltildi |
 | 16 | `realtime.py` | 7 | ✅ Düzeltildi |
 | 17 | `reconciliation.py` | 4 | ✅ Düzeltildi |
-| 18 | `retry_policy.py` | — | ⏳ Bekliyor |
-| 19 | `universe_enhancements.py` | — | ⏳ Bekliyor |
+| 18 | `retry_policy.py` | 8 | ✅ Düzeltildi |
+| 19 | `universe_enhancements.py` | 8 | ✅ Düzeltildi |
+| | **TOPLAM** | **101** | **✅** |
 
 ---
 
@@ -78,6 +80,7 @@
 | 2 | `rate_limiter._AcquireContext` | Hiçbir yerde kullanılmıyor — dead code olarak bırakıldı (alternatif API) |
 | 3 | `realtime._yfinance_polling` | `yf.download()` blokluyor — `asyncio.to_thread` ile sarmalanabilir |
 | 4 | `reconciler` | `reconcile_batch` sırayla çalışıyor — `asyncio.gather` ile paralelleştirilebilir |
+| 5 | `universe_enhancements.CrossSourceReconciliation` | `reconciliation.py`'deki `SourceReconciler` ile birleştirilebilir |
 
 ---
 
@@ -85,5 +88,4 @@
 
 | # | Eksik | Neden Yapılmadı |
 |---|-------|-----------------|
-| 1 | `retry_policy.py` henüz denetlenmedi | Sıradaki dosya |
-| 2 | `universe_enhancements.py` henüz denetlenmedi | Sıradaki dosya |
+| — | Tüm dosyalar denetlendi | Tamamlandı ✅ |
