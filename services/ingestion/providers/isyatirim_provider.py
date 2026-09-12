@@ -14,13 +14,20 @@ import structlog
 
 logger = structlog.get_logger()
 
-ISYATIRIM_BASE_URL = "https://www.isyatirim.com.tr"
+# Varsayılan sabitler
+DEFAULT_ISYATIRIM_BASE_URL: str = "https://www.isyatirim.com.tr"
+DEFAULT_ISYATIRIM_TIMEOUT: float = 10.0
 
 
 class IsYatirimProvider:
     """İş Yatırım şirket ve piyasa analizi veri sağlayıcısı."""
 
-    def __init__(self, timeout: float = 10.0):
+    def __init__(self, timeout: float = DEFAULT_ISYATIRIM_TIMEOUT) -> None:
+        """IsYatirimProvider örneği oluşturur.
+
+        Args:
+            timeout: HTTP istekleri için zaman aşımı (saniye).
+        """
         self._timeout = timeout
         self._cache: dict[str, dict[str, Any]] = {}
         self._headers = {
@@ -32,29 +39,41 @@ class IsYatirimProvider:
             "Accept": "application/json, text/html, */*",
         }
 
+    def __repr__(self) -> str:
+        """IsYatirimProvider string temsili.
+
+        Returns:
+            İnsan tarafından okunabilir temsil.
+        """
+        return f"IsYatirimProvider(base_url={DEFAULT_ISYATIRIM_BASE_URL!r}, cache_size={len(self._cache)})"
+
     async def fetch_stock_overview(self, ticker: str) -> dict[str, Any] | None:
         """İş Yatırım üzerinden hissenin temel göstergelerini ve oranlarını çeker.
 
         Args:
-            ticker: Hisse kodu (örn. THYAO)
+            ticker: Hisse kodu (örn. THYAO).
 
         Returns:
-            dict veya None
+            Temel gösterge sözlüğü veya None.
         """
         clean_ticker = ticker.strip().upper()
         if clean_ticker.endswith(".IS"):
             clean_ticker = clean_ticker[:-3]
 
-        url = f"{ISYATIRIM_BASE_URL}/tr-tr/analiz/hisse/Sayfalar/sirket-karti.aspx?hisse={clean_ticker}"
+        url = f"{DEFAULT_ISYATIRIM_BASE_URL}/tr-tr/analiz/hisse/Sayfalar/sirket-karti.aspx?hisse={clean_ticker}"
 
         try:
             async with httpx.AsyncClient(timeout=self._timeout, follow_redirects=True) as client:
                 response = await client.get(url, headers=self._headers)
                 if response.status_code != 200:
-                    logger.debug("İş Yatırım overview returned non-200", ticker=clean_ticker, status=response.status_code)
+                    logger.warning(
+                        "İş Yatırım overview non-200 yanıt döndü",
+                        ticker=clean_ticker,
+                        status=response.status_code,
+                    )
                     return None
 
-                overview = {
+                overview: dict[str, Any] = {
                     "ticker": clean_ticker,
                     "source": "isyatirim",
                     "status": "active",
@@ -66,13 +85,24 @@ class IsYatirimProvider:
                 return overview
 
         except Exception as exc:
-            logger.debug("İş Yatırım overview failed", ticker=clean_ticker, error=str(exc))
+            logger.warning("İş Yatırım overview failed", ticker=clean_ticker, error=str(exc))
             return self._cache.get(clean_ticker)
 
     async def fetch_dividend_history(self, ticker: str) -> list[dict[str, Any]]:
-        """Hissenin geçmiş temettü ödeme tarihlerini ve oranlarını döner."""
+        """Hissenin geçmiş temettü ödeme tarihlerini ve oranlarını döndürür.
+
+        Args:
+            ticker: Hisse kodu.
+
+        Returns:
+            Temettü geçmişi listesi.
+        """
+        logger.warning("Dividend history not yet implemented — returning empty list", ticker=ticker)
         return []
 
 
 # Global singleton
 isyatirim_provider = IsYatirimProvider()
+
+
+__all__ = ["IsYatirimProvider", "isyatirim_provider"]
