@@ -15,10 +15,34 @@ import structlog
 
 logger = structlog.get_logger()
 
+# Varsayılan sabitler
+DEFAULT_UNIVERSE_TIMEOUT: float = 15.0
+DEFAULT_UNIVERSE_CONNECT_TIMEOUT: float = 10.0
+DEFAULT_CACHE_TTL_HOURS: int = 12
+DEFAULT_TV_MAX_ROWS: int = 1000
+DEFAULT_TV_RECHECK_ROWS: int = 1500
+DEFAULT_CACHE_SAVE_DEBOUNCE: int = 300
+DEFAULT_MIN_UNIVERSE_SIZE: int = 100
+
 
 @dataclass
 class StockInfo:
-    """Hisse bilgisi."""
+    """Hisse bilgisi.
+
+    Attributes:
+        ticker: Hisse sembolü.
+        name: Şirket adı.
+        sector: Sektör.
+        sub_sector: Alt sektör.
+        market_cap: Piyasa değeri.
+        avg_volume_20d: 20 günlük ortalama hacim.
+        index_membership: Endeks üyelikleri.
+        listing_status: Listeleme durumu.
+        isin: ISIN kodu.
+        currency: Para birimi.
+        last_updated: Son güncelleme zamanı.
+        source: Veri kaynağı.
+    """
 
     ticker: str
     name: str
@@ -33,13 +57,20 @@ class StockInfo:
     last_updated: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     source: str = ""
 
+    def __repr__(self) -> str:
+        """StockInfo string temsili."""
+        return (
+            f"StockInfo(ticker={self.ticker!r}, "
+            f"sector={self.sector!r}, status={self.listing_status!r})"
+        )
+
 
 class LiveUniverseScraper:
     """Canlı kamu ve finans kaynaklarından tüm BIST hisselerini çeker."""
 
-    def __init__(self, timeout_seconds: float = 15.0):
-        """BIST hisse evreni tarayıcısını yapılandır."""
-        self.timeout = httpx.Timeout(timeout_seconds, connect=10.0)
+    def __init__(self, timeout_seconds: float = DEFAULT_UNIVERSE_TIMEOUT) -> None:
+        """LiveUniverseScraper örneği oluşturur."""
+        self.timeout = httpx.Timeout(timeout_seconds, connect=DEFAULT_UNIVERSE_CONNECT_TIMEOUT)
         self.headers = {
             "User-Agent": (
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -80,7 +111,7 @@ class LiveUniverseScraper:
                 "symbols": {"query": {"types": []}},
                 "columns": ["name", "description", "close", "market_cap_basic", "sector", "industry"],
                 "sort": {"sortBy": "Value.Traded", "sortOrder": "desc"},
-                "range": [0, 1000],
+                "range": [0, DEFAULT_TV_MAX_ROWS],
             }
             resp = client.post(url, json=payload)
             if resp.status_code == 200:
@@ -147,7 +178,7 @@ class LiveUniverseScraper:
                             added_count += 1
                     logger.info("mynet_backup_universe_done", total_discovered=len(discovered), newly_added=added_count)
             except Exception as e:
-                logger.debug("mynet_backup_discovery_failed", error=str(e))
+                logger.warning("mynet_backup_discovery_failed", error=str(e))
 
             # 3. YEDEK LİSTE 2: Bigpara Canlı Borsa
             try:
@@ -172,7 +203,7 @@ class LiveUniverseScraper:
                         newly_added=added_count,
                     )
             except Exception as e:
-                logger.debug("bigpara_backup_discovery_failed", error=str(e))
+                logger.warning("bigpara_backup_discovery_failed", error=str(e))
 
             # 4. YEDEK LİSTE 3: İş Yatırım
             try:
@@ -200,7 +231,7 @@ class LiveUniverseScraper:
                         newly_added=added_count,
                     )
             except Exception as e:
-                logger.debug("isyatirim_backup_discovery_failed", error=str(e))
+                logger.warning("isyatirim_backup_discovery_failed", error=str(e))
 
         return discovered
 
@@ -309,10 +340,10 @@ class UniverseAutoUpdater:
     """BIST Universe otomatik güncelleme ve yönetim motoru."""
 
     CACHE_FILE = Path("data/universe_cache.json")
-    CACHE_TTL_HOURS = 12
+    DEFAULT_CACHE_TTL_HOURS: int = 12
 
-    def __init__(self):
-        """BIST hisse evreni otomatik güncelleme motorunu başlat."""
+    def __init__(self) -> None:
+        """UniverseAutoUpdater örneği oluşturur."""
         self.scraper = LiveUniverseScraper()
         self._universe: dict[str, StockInfo] = {}
         self._indices: dict[str, list[str]] = {
@@ -328,7 +359,7 @@ class UniverseAutoUpdater:
         """Güncel hisse evrenini döndür."""
         if not force_refresh and self._is_cache_valid():
             self._load_from_cache()
-            if len(self._universe) > 100:
+            if len(self._universe) > DEFAULT_MIN_UNIVERSE_SIZE:
                 return self._universe
 
         return self.refresh_universe()
@@ -399,7 +430,7 @@ class UniverseAutoUpdater:
                 "symbols": {"query": {"types": []}},
                 "columns": ["name"],
                 "sort": {"sortBy": "Value.Traded", "sortOrder": "desc"},
-                "range": [0, 1500],  # Tüm BIST evrenini al
+                "range": [0, DEFAULT_TV_RECHECK_ROWS],
             }
             with self._get_client() as client:
                 resp = client.post(url, json=payload, timeout=20)
@@ -439,8 +470,8 @@ class UniverseAutoUpdater:
 
 
 
-    def _refresh_index_compositions(self) -> Any:
-        """BIST 100, BIST 30, BIST 50 endeks üyeliklerini belirle."""
+    def _refresh_index_compositions(self) -> None:
+        """BIST 100, BIST 30, BIST 50 endeks üyeliklerini belirler."""
         BIST_100_BENCHMARK = [
             "AEFES",
             "AGHOL",
@@ -651,12 +682,12 @@ class UniverseAutoUpdater:
             return False
         try:
             mtime = datetime.fromtimestamp(self.CACHE_FILE.stat().st_mtime, tz=UTC)
-            return (datetime.now(UTC) - mtime) < timedelta(hours=self.CACHE_TTL_HOURS)
+            return (datetime.now(UTC) - mtime) < timedelta(hours=self.DEFAULT_CACHE_TTL_HOURS)
         except Exception:
             return False
 
-    def _load_from_cache(self) -> Any:
-        """Cache'den yükle."""
+    def _load_from_cache(self) -> None:
+        """Cache'den yükler."""
         try:
             with open(self.CACHE_FILE, encoding="utf-8") as f:
                 data = orjson.loads(f.read())
@@ -665,10 +696,10 @@ class UniverseAutoUpdater:
                 self._universe[ticker] = StockInfo(**info_dict)
             self._indices = data.get("indices", self._indices)
         except Exception as e:
-            logger.debug("Cache load failed", error=str(e))
+            logger.warning("Cache load failed", error=str(e))
 
-    def _save_to_cache(self, force: bool = False) -> Any:
-        """Cache'e kaydet (debounced — SSD dostu, zorunlu veya ilk kayıtta anında yazar)."""
+    def _save_to_cache(self, force: bool = False) -> None:
+        """Cache'e kaydeder (debounced — SSD dostu)."""
         from services.core.debounce import should_save
 
         if not self._universe:
@@ -676,7 +707,7 @@ class UniverseAutoUpdater:
 
         # Cache dosyası yoksa veya içi boşsa debounce bekleme, direkt kaydet
         cache_empty = not self.CACHE_FILE.exists() or self.CACHE_FILE.stat().st_size < 100
-        if not force and not cache_empty and not should_save("universe_cache", 300):
+        if not force and not cache_empty and not should_save("universe_cache", DEFAULT_CACHE_SAVE_DEBOUNCE):
             return
 
         try:
@@ -691,7 +722,7 @@ class UniverseAutoUpdater:
                 f.write(orjson.dumps(data, option=orjson.OPT_INDENT_2).decode())
             logger.info("universe_cache_saved", count=len(self._universe), path=str(self.CACHE_FILE))
         except Exception as e:
-            logger.debug("Cache save failed", error=str(e))
+            logger.warning("Cache save failed", error=str(e))
 
 
 # Singleton
@@ -699,32 +730,46 @@ universe_updater = UniverseAutoUpdater()
 
 
 def get_current_universe() -> dict[str, StockInfo]:
-    """Otomatik eklendi."""
+    """Güncel hisse evrenini döndürür."""
     return universe_updater.get_universe()
 
 
 def get_bist_100() -> list[str]:
-    """Otomatik eklendi."""
+    """BIST 100 endeks üyelerini döndürür."""
     return universe_updater.get_index_members("XU100")
 
 
 def get_bist_30() -> list[str]:
-    """Otomatik eklendi."""
+    """BIST 30 endeks üyelerini döndürür."""
     return universe_updater.get_index_members("XU030")
 
 
 def get_bist_50() -> list[str]:
-    """Otomatik eklendi."""
+    """BIST 50 endeks üyelerini döndürür."""
     return universe_updater.get_index_members("XU050")
 
 
 def get_all_tickers() -> list[str]:
-    """Otomatik eklendi."""
+    """Tüm ticker listesini döndürür."""
     return list(universe_updater.get_universe().keys())
 
 
 def get_sector(ticker: str) -> str:
-    """Otomatik eklendi."""
+    """Hissenin sektörünü döndürür."""
     universe = universe_updater.get_universe()
     info = universe.get(ticker)
     return info.sector if info else "DIGER"
+
+
+__all__ = [
+    "StockInfo",
+    "LiveUniverseScraper",
+    "UniverseAutoUpdater",
+    "universe_updater",
+    "get_current_universe",
+    "get_bist_100",
+    "get_bist_30",
+    "get_bist_50",
+    "get_all_tickers",
+    "get_sector",
+]
