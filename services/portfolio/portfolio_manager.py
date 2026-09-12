@@ -53,17 +53,17 @@ class Position:
 
     @property
     def market_value(self) -> float:
-        """Otomatik eklendi."""
+        """Pozisyonun anlık piyasa değerini hesaplar."""
         return self.quantity * self.current_price
 
     @property
     def cost_basis(self) -> float:
-        """Otomatik eklendi."""
+        """Pozisyonun komisyon dahil toplam maliyet tabanını hesaplar."""
         return self.quantity * self.entry_price + self.entry_commission
 
     @property
     def unrealized_pnl(self) -> float:
-        """Otomatik eklendi."""
+        """Pozisyonun gerçekleşmemiş kâr/zarar tutarını hesaplar."""
         if self.direction == "LONG":
             return (self.current_price - self.entry_price) * self.quantity
         else:
@@ -71,13 +71,20 @@ class Position:
 
     @property
     def unrealized_pnl_pct(self) -> float:
-        """Otomatik eklendi."""
+        """Pozisyonun gerçekleşmemiş kâr/zarar yüzdesini hesaplar."""
         if self.cost_basis <= 0:
             return 0.0
         return (self.unrealized_pnl / self.cost_basis) * 100
 
+    def __repr__(self) -> str:
+        return (
+            f"Position({self.ticker} {self.direction}: qty={self.quantity}, "
+            f"entry={self.entry_price:.2f}, curr={self.current_price:.2f}, "
+            f"pnl={self.unrealized_pnl_pct:.2f}%)"
+        )
+
     def to_dict(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Pozisyon verilerini sözlük formatına dönüştürür."""
         return {
             "ticker": self.ticker,
             "direction": self.direction,
@@ -120,7 +127,7 @@ class Trade:
 
     @property
     def pnl_pct(self) -> float:
-        """Otomatik eklendi."""
+        """İşlem kâr/zarar yüzdesini hesaplar."""
         cost = self.entry_price * self.quantity
         if cost == 0:
             return 0.0
@@ -128,11 +135,17 @@ class Trade:
 
     @property
     def holding_days(self) -> int:
-        """Otomatik eklendi."""
+        """Pozisyonun elde tutulduğu gün sayısını döndürür."""
         return max(0, (self.exit_time - self.entry_time).days)
 
+    def __repr__(self) -> str:
+        return (
+            f"Trade({self.trade_id} {self.ticker}: pnl={self.pnl:,.2f} TL "
+            f"({self.pnl_pct:.2f}%), days={self.holding_days})"
+        )
+
     def to_dict(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """İşlem verilerini sözlük formatına dönüştürür."""
         return {
             "trade_id": self.trade_id,
             "ticker": self.ticker,
@@ -162,8 +175,14 @@ class CashLedgerEntry:
     ticker: str = ""
     reference_id: str = ""
 
+    def __repr__(self) -> str:
+        return (
+            f"CashLedgerEntry({self.entry_type}: amount={self.amount:,.2f}, "
+            f"balance={self.balance_after:,.2f}, ticker='{self.ticker}')"
+        )
+
     def to_dict(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Nakit hareket kaydını sözlük formatına dönüştürür."""
         return {
             "timestamp": self.timestamp.isoformat(),
             "amount": round(self.amount, 2),
@@ -191,8 +210,14 @@ class EquitySnapshot:
     high_water_mark: float
     drawdown_from_hwm: float  # HWM'den düşüş (%)
 
+    def __repr__(self) -> str:
+        return (
+            f"EquitySnapshot({self.date}: total={self.total_equity:,.0f} TL, "
+            f"cash={self.cash:,.0f} TL, dd={self.drawdown_from_hwm:.2%})"
+        )
+
     def to_dict(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Equity anlık görüntüsünü sözlük formatına dönüştürür."""
         return {
             "date": self.date,
             "timestamp": self.timestamp.isoformat(),
@@ -226,8 +251,14 @@ class PositionHistoryEntry:
     realized_pnl: float
     reference_id: str = ""
 
+    def __repr__(self) -> str:
+        return (
+            f"PositionHistoryEntry({self.action} {self.ticker}: qty={self.quantity} "
+            f"@ {self.price:.2f}, pnl={self.realized_pnl:,.2f})"
+        )
+
     def to_dict(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Pozisyon geçmiş kaydını sözlük formatına dönüştürür."""
         return {
             "timestamp": self.timestamp.isoformat(),
             "ticker": self.ticker,
@@ -259,8 +290,15 @@ class CommissionModel:
         exchange_rate: float = 0.000056,
         bsmv_rate: float = 0.05,
         min_commission: float = 1.0,
-    ):
-        """Otomatik eklendi."""
+    ) -> None:
+        """BIST komisyon modelini oran parametreleriyle başlatır.
+
+        Args:
+            broker_rate: Aracı kurum komisyon oranı (varsayılan onbinde 3).
+            exchange_rate: BIST borsa payı oranı.
+            bsmv_rate: Banka ve Sigorta Muameleleri Vergisi oranı.
+            min_commission: Asgari komisyon tutarı (TL).
+        """
         self.broker_rate = broker_rate
         self.exchange_rate = exchange_rate
         self.bsmv_rate = bsmv_rate
@@ -269,14 +307,17 @@ class CommissionModel:
         try:
             from services.core.fee_calculator import FeeCalculator
 
-            self._fee_calc = FeeCalculator(broker_rate=broker_rate)
-        except ImportError:
+            self._fee_calc = FeeCalculator(broker_rate=broker_rate, min_commission=min_commission)
+        except Exception:
             self._fee_calc = None
+
+    def __repr__(self) -> str:
+        return f"CommissionModel(broker_rate={self.broker_rate}, bsmv={self.bsmv_rate}, min={self.min_commission})"
 
     def calculate(self, amount: float) -> float:
         """Toplam komisyon hesapla."""
         if self._fee_calc:
-            return self._fee_calc.calculate(amount).total
+            return max(self._fee_calc.calculate(amount).total, self.min_commission)
         base = amount * (self.broker_rate + self.exchange_rate)
         bsmv = base * self.bsmv_rate
         total = base + bsmv
@@ -325,8 +366,12 @@ class PortfolioManager:
         if len(lst) > max_size:
             del lst[: len(lst) - max_size]
 
-    def __init__(self, initial_capital: float = 10000000.0):
-        """Otomatik eklendi."""
+    def __init__(self, initial_capital: float = 10000000.0) -> None:
+        """Portföy yöneticisini başlangıç sermayesi ve alt defterlerle başlatır.
+
+        Args:
+            initial_capital: Başlangıç nakit bakiyesi (TL).
+        """
         # v1.0 mevcut alanlar
         self._initial_capital = initial_capital
         self._cash = initial_capital
@@ -353,6 +398,13 @@ class PortfolioManager:
         self._record_cash(0.0, initial_capital, "DEPOSIT", "Başlangıç sermayesi")
 
         logger.info("PortfolioManager initialized", initial_capital=initial_capital)
+
+    def __repr__(self) -> str:
+        return (
+            f"PortfolioManager(cash={self._cash:,.0f} TL, "
+            f"positions={len(self._positions)}, "
+            f"trades={len(self._trades)})"
+        )
 
     # ===================== COMMISSION =====================
 

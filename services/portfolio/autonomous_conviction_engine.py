@@ -54,6 +54,12 @@ class CandidateAsset:
     is_excess_alpha: bool = True  # Model getirisi benchmark üzeri net alfa mı?
     strategy_type: str = "SWING"  # SWING, ALPHA_RUNNER, BREAKOUT
 
+    def __repr__(self) -> str:
+        return (
+            f"CandidateAsset({self.ticker}: conf={self.confidence_score:.2f}, "
+            f"exp_ret={self.expected_return:.1%}, vol={self.volatility:.1%})"
+        )
+
 
 @dataclass
 class OpenPositionState:
@@ -72,6 +78,12 @@ class OpenPositionState:
     unrealized_pnl_pct: float = 0.0
     strategy_type: str = "SWING"
 
+    def __repr__(self) -> str:
+        return (
+            f"OpenPositionState({self.ticker}: pnl={self.unrealized_pnl_pct:.2f}%, "
+            f"conf={self.current_confidence:.2f}, days={self.holding_days})"
+        )
+
 
 @dataclass
 class AllocationPlan:
@@ -89,6 +101,12 @@ class AllocationPlan:
     rationale: str = ""
     timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
+    def __repr__(self) -> str:
+        return (
+            f"AllocationPlan(selected={len(self.selected_tickers)}, "
+            f"exp={self.total_exposure:.1%}, cash={self.cash_weight:.1%}, regime='{self.market_regime}')"
+        )
+
 
 @dataclass
 class ExitDecision:
@@ -102,6 +120,9 @@ class ExitDecision:
     current_price: float
     trailing_stop_price: float
     suggested_trim_ratio: float = 0.0  # TRIM_PROFIT ise satılacak oran (örn 0.40)
+
+    def __repr__(self) -> str:
+        return f"ExitDecision({self.ticker}: {self.action.value} - {self.reason})"
 
 
 class AutonomousConvictionEngine:
@@ -117,7 +138,8 @@ class AutonomousConvictionEngine:
         min_single_stock_cap: float = 0.03,  # Minimum pozisyon eşiği (%3)
         max_sector_cap: float = 0.35,  # Maksimum sektör konsantrasyonu (%35)
         conviction_gamma: float = 2.0,  # Güven skoru üssü (yüksek güvenceye katlanarak pay ver)
-    ):
+    ) -> None:
+        """Otonom güven motorunu kural ve eşik parametreleriyle başlatır."""
         self.base_hurdle_rate = base_hurdle_rate
         self.min_entry_confidence = min_entry_confidence
         self.exit_confidence_threshold = exit_confidence_threshold
@@ -136,12 +158,18 @@ class AutonomousConvictionEngine:
             max_stock_cap=max_single_stock_cap,
         )
 
+    def __repr__(self) -> str:
+        return (
+            f"AutonomousConvictionEngine(hurdle={self.base_hurdle_rate:.1%}, "
+            f"min_conf={self.min_entry_confidence:.2f}, max_stock={self.max_single_stock_cap:.1%})"
+        )
+
     def compute_dynamic_hurdle_rate(
         self,
         market_regime: str = "SIDEWAYS",
         macro_risk_free_rate: float | None = None,
         estimated_friction: float = 0.005,  # %0.5 komisyon + kayma
-        is_excess_alpha: bool = True,
+        is_excess_alpha: bool = False,
         horizon_days: int | None = None,
     ) -> float:
         """Piyasa rejimine, alfa hedefine ve vadeye göre dinamik eşik hesaplar.

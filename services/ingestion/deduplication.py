@@ -57,25 +57,33 @@ class EventDeduplicator:
         window_hours: Deduplikasyon penceresi (saat).
     """
 
-    def __init__(self, window_hours: int = 24) -> None:
+    def __init__(self, window_hours: int = 24, window_seconds: float | None = None) -> None:
         """EventDeduplicator örneği oluşturur.
 
         Args:
             window_hours: Deduplikasyon penceresi (saat cinsinden).
+            window_seconds: Deduplikasyon penceresi (saniye cinsinden).
         """
         self._seen: dict[str, float] = {}
-        self._window_seconds = window_hours * 3600
+        self._window_seconds = window_seconds if window_seconds is not None else window_hours * 3600
         self._stats = DedupStats()
 
-    def _compute_hash(self, event_data: dict[str, Any]) -> str:
+    def __repr__(self) -> str:
+        """EventDeduplicator string temsili."""
+        return f"EventDeduplicator(entries={len(self._seen)}, window_hours={self._window_seconds / 3600})"
+
+    def _compute_hash(self, event_data: dict[str, Any] | str) -> str:
         """Event verisinden benzersiz hash oluşturur.
 
         Args:
-            event_data: Event verisi (CanonicalEvent.data veya dict).
+            event_data: Event verisi (dict veya string id).
 
         Returns:
             SHA-256 hex digest.
         """
+        if isinstance(event_data, str):
+            return hashlib.sha256(event_data.encode("utf-8")).hexdigest()
+
         price_val = event_data.get("price")
         try:
             price_str = str(round(float(price_val), 2)) if price_val is not None and price_val != "" else "0.0"
@@ -94,11 +102,11 @@ class EventDeduplicator:
         key = "|".join(key_parts)
         return hashlib.sha256(key.encode("utf-8")).hexdigest()
 
-    def is_duplicate(self, event_data: dict[str, Any]) -> bool:
+    def is_duplicate(self, event_data: dict[str, Any] | str) -> bool:
         """Bu event daha önce işlendi mi kontrol eder.
 
         Args:
-            event_data: Event verisi (CanonicalEvent.data veya dict).
+            event_data: Event verisi (dict veya string id).
 
         Returns:
             True: Duplicate (işlenmemeli), False: Unique.
@@ -110,20 +118,29 @@ class EventDeduplicator:
 
         if event_hash in self._seen:
             self._stats.total_duplicates += 1
-            logger.debug("Duplicate event detected", event_hash=event_hash[:8], event_type=event_data.get("event_type"))
+            event_type = event_data.get("event_type") if isinstance(event_data, dict) else str(event_data)
+            logger.debug("Duplicate event detected", event_hash=event_hash[:8], event_type=event_type)
             return True
 
         return False
 
-    def mark_seen(self, event_data: dict[str, Any]) -> None:
+    def mark_seen(self, event_data: dict[str, Any] | str) -> None:
         """Event'i işlenmiş olarak işaretler.
 
         Args:
-            event_data: Event verisi.
+            event_data: Event verisi (dict veya string id).
         """
         event_hash = self._compute_hash(event_data)
         self._seen[event_hash] = time.time()
         self._stats.total_unique += 1
+
+    def record(self, event_data: dict[str, Any] | str) -> None:
+        """mark_seen için alternatif metot.
+
+        Args:
+            event_data: Event verisi.
+        """
+        self.mark_seen(event_data)
 
     def check_and_mark(self, event_data: dict[str, Any]) -> bool:
         """Kontrol eder ve işaretler (tek adımda).

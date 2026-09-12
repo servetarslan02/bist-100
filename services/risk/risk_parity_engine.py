@@ -22,7 +22,7 @@ SLIPPAGE_RATE = 0.0010  # %0.10 slippage
 
 @dataclass
 class RiskParityParameters:
-    """Otomatik eklendi."""
+    """Risk Parity ve portföy tahsis parametreleri."""
     # Risk Yönetimi
     risk_per_trade_pct: float = 0.010  # Her işlemde portföyün en fazla %1.0'ı riske atılır
     max_position_size_pct: float = 0.10  # Tek bir hisseye asla portföyün %10'undan fazlası bağlanmaz
@@ -49,10 +49,16 @@ class RiskParityParameters:
     max_positions_bull: int = 8
     max_positions_bear: int = 3
 
+    def __repr__(self) -> str:
+        return (
+            f"RiskParityParameters(risk_per_trade={self.risk_per_trade_pct:.1%}, "
+            f"max_pos={self.max_position_size_pct:.1%}, heat={self.max_portfolio_heat_pct:.1%})"
+        )
+
 
 @dataclass
 class RiskAuditResult:
-    """Otomatik eklendi."""
+    """Risk denetim ve simülasyon sonuç metrikleri."""
     total_return_pct: float = 0.0
     cagr: float = 0.0
     sharpe_ratio: float = 0.0
@@ -61,21 +67,45 @@ class RiskAuditResult:
     win_rate: float = 0.0
     max_drawdown: float = 0.0
     total_trades: int = 0
-    equity_curve: list[float] = None
-    trade_logs: list[dict[str, Any]] = None
+    equity_curve: list[float] | None = None
+    trade_logs: list[dict[str, Any]] | None = None
+
+    def __repr__(self) -> str:
+        return (
+            f"RiskAuditResult(return={self.total_return_pct:.2f}%, "
+            f"sharpe={self.sharpe_ratio:.2f}, max_dd={self.max_drawdown:.2f}%, "
+            f"trades={self.total_trades})"
+        )
 
 
 class RiskParityEngine:
     """Kurumsal Risk Parity ve Teyitli Kriz Kontrol Motoru."""
 
-    def __init__(self, bm_df: pl.DataFrame, stock_dict: dict[str, pl.DataFrame], sector_map: dict[str, str] = None):
-        """Otomatik eklendi."""
+    def __init__(
+        self,
+        bm_df: pl.DataFrame,
+        stock_dict: dict[str, pl.DataFrame],
+        sector_map: dict[str, str] | None = None,
+    ) -> None:
+        """Risk Parity motorunu başlatır ve göstergeleri önbellekler.
+
+        Args:
+            bm_df: Benchmark endeks verisi.
+            stock_dict: Hisse senetleri fiyat serileri sözlüğü.
+            sector_map: Hisse-sektör eşleme haritası.
+        """
         self.bm_df = bm_df
         self.stock_dict = stock_dict
         self.sector_map = sector_map or {}  # {ticker: sector_name}
         if not self.sector_map:
             logger.warning("sector_map boş — sektör yoğunlaşma kontrolü devre dışı")
         self._precompute_technicals()
+
+    def __repr__(self) -> str:
+        return (
+            f"RiskParityEngine(stocks={len(self.stock_dict)}, "
+            f"sectors={len(self.sector_map)}, cache={len(getattr(self, 'tech_cache', {}))})"
+        )
 
     def _precompute_technicals(self) -> Any:
         """Teknik göstergeleri RAM'e önbellekler."""

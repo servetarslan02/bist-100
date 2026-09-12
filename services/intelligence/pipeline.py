@@ -54,17 +54,26 @@ class IntelligenceOutput:
     phase_durations_ms: dict[str, float] = field(default_factory=dict)
     total_elapsed_ms: float = 0.0
 
+    def __repr__(self) -> str:
+        return (
+            f"IntelligenceOutput(ticker={self.ticker!r}, direction={self.fused_direction!r}, "
+            f"conf={self.fused_confidence:.2f}, modules_used={len(self.modules_used)})"
+        )
+
 
 class IntelligencePipeline:
     """Intelligence modüllerini orchestrator'a bağlayan pipeline."""
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """İstihbarat ardışık düzenini başlatır ve alt modülleri dinamik olarak yükler."""
         self._modules = {}
         self._load_modules()
 
-    def _load_modules(self) -> Any:
-        """Otomatik eklendi."""
+    def __repr__(self) -> str:
+        return f"IntelligencePipeline(loaded_modules={len(self._modules)}/16)"
+
+    def _load_modules(self) -> None:
+        """Kayıtlı 16 intelligence alt modülünü importlib ile yükler ve registry sözlüğüne ekler."""
         module_map = {
             "signal_fusion": "services.intelligence.signal_fusion",
             "trade_planner": "services.intelligence.trade_planner",
@@ -306,7 +315,11 @@ class IntelligencePipeline:
             output.modules_failed.append(f"spec_engine:{str(e)[:80]}")
 
     def get_health(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """İstihbarat ardışık düzeni alt modüllerinin yükleme ve sağlık durumunu döndürür.
+
+        Returns:
+            Toplam modül, yüklenen modül adedi ve mevcut modül anahtarlarını içeren sözlük.
+        """
         return {
             "total_modules": 16,
             "loaded_modules": len(self._modules),

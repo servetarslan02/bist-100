@@ -66,6 +66,12 @@ class AgentAnalysis:
     timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     is_mock: bool = False
 
+    def __repr__(self) -> str:
+        return (
+            f"AgentAnalysis(ticker={self.ticker!r}, type={self.analysis_type!r}, "
+            f"direction={self.ai_direction!r}, score={self.ai_score:.1f}, tools={len(self.tool_calls_made)})"
+        )
+
 
 class LLMAgent:
     """
@@ -74,6 +80,9 @@ class LLMAgent:
     """
 
     MAX_TOOL_ROUNDS = 3  # Sonsuz araç döngüsünü önle
+
+    def __repr__(self) -> str:
+        return "LLMAgent(max_tool_rounds=3)"
 
     def analyze_news(
         self,
@@ -311,7 +320,7 @@ Maksimum 3 cümle. Formatı:
     # ── Prompt Üreticiler ────────────────────────────────────────────────────
 
     def _build_news_prompt(self, text: str, ticker: str | None) -> str:
-        """Otomatik eklendi."""
+        """Haber metni ve hisse bağlamına uygun finansal analiz istemi üretir."""
         ticker_context = f"İlgili hisse: {ticker}." if ticker else ""
         return f"""Sen BIST-100 uzmanı bir finansal analistsın. {ticker_context}
 Aşağıdaki haberi analiz et. Gerekirse araçları kullanarak:
@@ -325,7 +334,7 @@ HABER:
 Analizini tamamla ve yapılandırılmış JSON çıktı ver."""
 
     def _build_kap_prompt(self, ticker: str, text: str, history: list[dict] | None) -> str:
-        """Otomatik eklendi."""
+        """KAP duyurusu ve geçmiş bildirimleri karşılaştıran analiz istemi üretir."""
         history_note = ""
         if history:
             history_note = f"\nŞirketin son {len(history)} KAP bildirimi bağlamda mevcut."
@@ -348,7 +357,7 @@ geçmiş bildirimleri göz önünde bulundurarak belirle."""
         signals: dict[str, Any],
         conflicts: list[str],
     ) -> str:
-        """Otomatik eklendi."""
+        """Çelişen ve çoklu sinyalleri uzlaştıran meta-karar istemi üretir."""
         signal_summary = ", ".join(
             f"{k}: {v.get('direction', 'N')} ({v.get('score', 50):.0f})" for k, v in signals.items()
         )

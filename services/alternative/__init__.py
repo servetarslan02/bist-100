@@ -4,18 +4,18 @@ ALPHA BIST — Alternative Data Package v2.0
 Tüm alternative data modülleri.
 
 Modüller:
-- base: Temel altyapı (BaseAdapter, RateLimiter, CircuitBreaker, DataQuality)
+- base: Temel altyapı (BaseAdapter, RateLimiter, CircuitBreaker, DataQuality, DuckDB export)
 - google_trends: Google Trends adapter
 - bkm_adapter: BKM kredi kartı adapter
 - kariyer_net: Kariyer.net iş ilanı adapter
 - eksi_sozluk: Ekşi Sözlük sentiment adapter
 - llm_sentiment: LLM Türkçe sentiment analizi
 - feature_engine: Feature hesaplama motoru (60+ feature)
-- social: Sosyal medya feature'ları (mevcut)
-- jobs: İş ilanı feature'ları (mevcut)
-- credit_card: Kredi kartı feature'ları (mevcut)
-- satellite: Uydu verisi feature'ları (mevcut)
-- web_scraping: Web scraping feature'ları (mevcut)
+- social: Sosyal medya feature'ları ve adapter
+- jobs: İş ilanı feature'ları ve adapter
+- credit_card: Kredi kartı feature'ları ve adapter
+- satellite: Uydu verisi feature'ları ve adapter
+- web_scraping: Web scraping feature'ları ve adapter
 """
 
 __version__ = "2.0.0"
@@ -30,9 +30,10 @@ from .base import (
     QualityReport,
     RateLimiter,
     adapter_registry,
+    export_alternative_features_to_duckdb,
 )
 from .bkm_adapter import BKMAdapter, bkm_adapter
-from .credit_card import compute_cc_features
+from .credit_card import CreditCardAdapter, compute_cc_features, credit_card_adapter
 from .eksi_sozluk import EksiSozlukAdapter, eksi_sozluk_adapter
 
 # === Feature Engine ===
@@ -44,7 +45,7 @@ from .feature_store import FeatureManifest, FeatureStore, feature_store
 # === Adapters ===
 from .google_trends import GoogleTrendsAdapter, google_trends_adapter
 from .investing_adapter import InvestingAdapter, investing_adapter
-from .jobs import compute_job_features
+from .jobs import JobPostingAdapter, compute_job_features, jobs_adapter
 from .kariyer_net import KariyerNetAdapter, kariyer_net_adapter
 
 # === LLM Sentiment ===
@@ -53,24 +54,8 @@ from .llm_sentiment import LLMSentimentAnalyzer, llm_sentiment
 # === Reconciliation ===
 from .reconciliation import CrossSourceReconciler, ReconciliationReport, reconciler
 from .satellite_adapter import SatelliteAdapter, compute_satellite_features, satellite_adapter
-
-# === Legacy Feature Functions (backward compatibility) ===
-# Lazy import: nadiren kullanılan modüller __getattr__ ile yüklenir
-_LAZY_IMPORTS = {
-    "compute_social_features": (".social", "compute_social_features"),
-    "compute_web_features": (".web_scraping", "compute_web_features"),
-}
-
-
-def __getattr__(name: str):
-    """Nadiren kullanılan adapter'lar için lazy import."""
-    if name in _LAZY_IMPORTS:
-        module_path, attr_name = _LAZY_IMPORTS[name]
-        import importlib
-        module = importlib.import_module(module_path, __package__)
-        return getattr(module, attr_name)
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-
+from .social import SocialMediaAdapter, compute_social_features, social_adapter
+from .web_scraping import WebScrapingAdapter, compute_web_features, web_scraping_adapter
 
 __all__ = [
     # Base
@@ -82,6 +67,7 @@ __all__ = [
     "QualityReport",
     "AdapterRegistry",
     "adapter_registry",
+    "export_alternative_features_to_duckdb",
     # Adapters
     "GoogleTrendsAdapter",
     "google_trends_adapter",
@@ -95,6 +81,14 @@ __all__ = [
     "investing_adapter",
     "SatelliteAdapter",
     "satellite_adapter",
+    "CreditCardAdapter",
+    "credit_card_adapter",
+    "JobPostingAdapter",
+    "jobs_adapter",
+    "SocialMediaAdapter",
+    "social_adapter",
+    "WebScrapingAdapter",
+    "web_scraping_adapter",
     # LLM
     "LLMSentimentAnalyzer",
     "llm_sentiment",
@@ -109,7 +103,7 @@ __all__ = [
     # Feature Engine
     "AlternativeFeatureEngine",
     "alt_feature_engine",
-    # Legacy
+    # Functions
     "compute_social_features",
     "compute_job_features",
     "compute_cc_features",

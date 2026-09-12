@@ -40,13 +40,16 @@ async def _db_fetchval(query, *args) -> Any:
 class RiskEngine:
     """Independent risk management engine. Operates ABOVE the AI layer."""
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """Risk motorunu ve iç durum değişkenlerini başlatır."""
         self._running = False
-        self._consumer: EventConsumer = None
+        self._consumer: EventConsumer | None = None
         self._risk_limits: dict[str, float] = {}
         self._risk_limits_loaded: bool = False  # P0-6: Fail-closed flag
         self._portfolio_state: dict[str, Any] = {}
+
+    def __repr__(self) -> str:
+        return f"RiskEngine(running={self._running}, limits_loaded={self._risk_limits_loaded})"
 
     async def start(self) -> Any:
         """Start the risk engine."""
@@ -550,8 +553,8 @@ async def _health_server(port: int = 8080) -> Any:
     """Lightweight health check HTTP server for Docker healthcheck."""
     from aiohttp import web
 
-    async def health_handler(request) -> Any:
-        """Otomatik eklendi."""
+    async def health_handler(request: web.Request) -> web.Response:
+        """Risk servisi sağlık durumu kontrol endpoint'i."""
         return web.json_response({"status": "healthy", "service": "risk"})
 
     app = web.Application()

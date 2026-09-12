@@ -931,16 +931,84 @@ class BacktestEngine:
         strategy: str = "momentum",
         **kwargs: Any,
     ) -> dict[str, Any]:
-        """Asenkron backtest çalıştırır ve metrik özetini döndürür."""
+        """Asenkron backtest çalıştırır ve metrik özetini döndürür.
+
+        Args:
+            ticker: Hisse sembolü (örn. THYAO)
+            period: Backtest dönemi (örn. 1y, 6m, 3m)
+            strategy: Strateji adı (momentum, mean_reversion vb.)
+            **kwargs: Ek parametreler (price_data, signals, initial_capital vb.)
+
+        Returns:
+            Özet metrikleri ve durum bilgilerini içeren sözlük
+        """
+        price_data = kwargs.get("price_data")
+        signals = kwargs.get("signals")
+        initial_capital = float(kwargs.get("initial_capital", 100_000.0))
+
+        # Eğer hazır price_data ve signals verilmişse doğrudan run_backtest çalıştır
+        if price_data and signals:
+            result = self.run_backtest(
+                strategy_name=strategy,
+                price_data=price_data,
+                signals=signals,
+                initial_capital=initial_capital,
+                commission_rate=float(kwargs.get("commission_rate", 0.001)),
+                slippage_pct=float(kwargs.get("slippage_pct", 0.001)),
+            )
+            m = result.metrics
+            return {
+                "ticker": ticker,
+                "period": period,
+                "strategy": strategy,
+                "initial_capital": result.initial_capital,
+                "final_capital": result.final_capital,
+                "total_return_pct": m.total_return_pct,
+                "cagr_pct": m.cagr_pct,
+                "sharpe_ratio": m.sharpe_ratio,
+                "sortino_ratio": m.sortino_ratio,
+                "max_drawdown_pct": m.max_drawdown_pct,
+                "win_rate": m.win_rate,
+                "profit_factor": m.profit_factor,
+                "total_trades": m.total_trades,
+                "status": "completed",
+            }
+
+        # DuckDB veya yerel veri tabanından fiyat verisi temin etmeye çalış
+        try:
+            from services.backtest.persistence import backtest_persistence
+
+            # Geçmiş backtest kayıtlarından en son metrikleri sorgula
+            cached = backtest_persistence.get_run_summary(f"{ticker}_{strategy}_{period}")
+            if cached:
+                return {
+                    "ticker": ticker,
+                    "period": period,
+                    "strategy": strategy,
+                    "sharpe_ratio": cached.get("sharpe_ratio", 0.0),
+                    "total_return_pct": cached.get("total_return_pct", 0.0),
+                    "max_drawdown_pct": cached.get("max_drawdown_pct", 0.0),
+                    "win_rate": cached.get("win_rate", 0.0),
+                    "status": "completed",
+                    "source": "duckdb_persistence",
+                }
+        except Exception as e:
+            logger.debug("persistence_cache_kontrolu_atlandi: hata=%s", str(e))
+
+        # Standart simülasyon çıktısı
         return {
             "ticker": ticker,
             "period": period,
             "strategy": strategy,
-            "sharpe_ratio": 1.75,
-            "total_return_pct": 28.4,
-            "max_drawdown_pct": 8.2,
-            "win_rate": 0.62,
+            "initial_capital": initial_capital,
+            "final_capital": initial_capital,
+            "sharpe_ratio": 0.0,
+            "total_return_pct": 0.0,
+            "max_drawdown_pct": 0.0,
+            "win_rate": 0.0,
+            "total_trades": 0,
             "status": "completed",
+            "message": "Fiyat veya sinyal verisi verilmediğinde sıfır pozisyon simülasyonu tamamlandı",
         }
 
 

@@ -23,19 +23,24 @@ from typing import Any
 
 import structlog
 
-from .base import adapter_registry
+from .base import adapter_registry, export_alternative_features_to_duckdb
 from .bkm_adapter import bkm_adapter
+from .credit_card import credit_card_adapter
 from .eksi_sozluk import eksi_sozluk_adapter
 from .feature_store import feature_store
 from .google_trends import google_trends_adapter
+from .jobs import jobs_adapter
 from .kariyer_net import kariyer_net_adapter
 from .llm_sentiment import llm_sentiment
 from .reconciliation import reconciler
+from .social import social_adapter
+from .web_scraping import web_scraping_adapter
 
 logger = structlog.get_logger(__name__)
 
 __all__ = [
     "AlternativeFeatureEngine",
+    "alt_feature_engine",
 ]
 
 
@@ -72,6 +77,10 @@ class AlternativeFeatureEngine:
         adapter_registry.register(bkm_adapter)
         adapter_registry.register(kariyer_net_adapter)
         adapter_registry.register(eksi_sozluk_adapter)
+        adapter_registry.register(credit_card_adapter)
+        adapter_registry.register(jobs_adapter)
+        adapter_registry.register(social_adapter)
+        adapter_registry.register(web_scraping_adapter)
 
         # Lazy import: nadiren kullanılan adapter'lar
         from .investing_adapter import investing_adapter
@@ -143,8 +152,12 @@ class AlternativeFeatureEngine:
         composite = self._compute_composite_features(all_features)
         all_features.update(composite)
 
-        # 6. Feature store'a yaz
-        feature_store.put(ticker, datetime.now(UTC).strftime("%Y-%m-%d"), all_features)
+        # 6. Feature store'a yaz (Point-in-time)
+        today_iso = datetime.now(UTC).strftime("%Y-%m-%d")
+        feature_store.put(ticker, today_iso, all_features)
+
+        # 7. DuckDB'ye kalıcı export (GEMINI.md kuralı)
+        export_alternative_features_to_duckdb(ticker, all_features, source="feature_engine")
 
         duration = (time.monotonic() - start) * 1000
 
@@ -161,6 +174,34 @@ class AlternativeFeatureEngine:
         self._feature_cache_ttl[cache_key] = time.time()
 
         return all_features
+
+    async def compute_batch_features(
+        self,
+        tickers: list[str],
+        sources: list[str] | None = None,
+    ) -> dict[str, dict[str, float]]:
+        """Birden fazla hisse için paralel alternative feature hesaplama.
+
+        Args:
+            tickers: Hisse sembolleri listesi.
+            sources: Kullanılacak kaynaklar.
+
+        Returns:
+            {ticker: {feature_name: value}} sözlüğü.
+        """
+        import asyncio
+
+        tasks = [self.compute_all_features(t, sources=sources) for t in tickers]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        batch_out: dict[str, dict[str, float]] = {}
+        for ticker, res in zip(tickers, results, strict=True):
+            if isinstance(res, Exception):
+                logger.error("Batch feature extraction failed for ticker", ticker=ticker, error=str(res))
+                batch_out[ticker] = {}
+            else:
+                batch_out[ticker] = res
+        return batch_out
 
     async def _compute_llm_features(
         self,
@@ -346,6 +387,12 @@ class AlternativeFeatureEngine:
             "feature_cache_size": len(self._feature_cache),
             "total_feature_names": len(self.get_feature_names()),
         }
+
+    def __repr__(self) -> str:
+        return (
+            f"AlternativeFeatureEngine(initialized={self._initialized}, "
+            f"cached_items={len(self._feature_cache)})"
+        )
 
 
 # Singleton

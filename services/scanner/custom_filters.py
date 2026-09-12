@@ -39,6 +39,10 @@ class CustomFilter:
     score_adjustment: float = 0.0  # adjust_score için
     enabled: bool = True
 
+    def __repr__(self) -> str:
+        """CustomFilter okunabilir nesne temsili."""
+        return f"CustomFilter(name='{self.name}', action='{self.action}', enabled={self.enabled})"
+
 
 class CustomFilterEngine:
     """Özel filtre motoru.
@@ -53,10 +57,14 @@ class CustomFilterEngine:
     Kullanıcı tanımlı filtreler eklenebilir.
     """
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """CustomFilterEngine filtre motorunu başlatır ve hazır BIST filtrelerini yükler."""
         self._filters: list[CustomFilter] = []
         self._setup_bist_filters()
+
+    def __repr__(self) -> str:
+        """CustomFilterEngine okunabilir durum temsili."""
+        return f"CustomFilterEngine(filters_count={len(self._filters)})"
 
     def _setup_bist_filters(self) -> Any:
         """BIST'e özel hazır filtreler."""

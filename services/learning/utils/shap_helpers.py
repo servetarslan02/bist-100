@@ -35,6 +35,13 @@ class SHAPResult:
     feature_importance: dict[str, float]  # mean |SHAP|
     top_features: list[tuple[str, float]]  # (feature, importance)
 
+    def __repr__(self) -> str:
+        return (
+            f"SHAPResult(features={len(self.feature_names)}, "
+            f"samples={len(self.shap_values) if hasattr(self.shap_values, '__len__') else 0}, "
+            f"base_value={self.base_value:.4f}, top_features={len(self.top_features)})"
+        )
+
 
 @dataclass
 class SHAPInteractionResult:
@@ -43,6 +50,12 @@ class SHAPInteractionResult:
     feature_pairs: list[tuple[str, str]]
     interaction_values: np.ndarray
     top_interactions: list[dict]
+
+    def __repr__(self) -> str:
+        return (
+            f"SHAPInteractionResult(pairs={len(self.feature_pairs)}, "
+            f"top_interactions={len(self.top_interactions)})"
+        )
 
 
 class SHAPHelpers:
@@ -741,13 +754,24 @@ class SHAPCache:
     """SHAP value cache — tekrar hesaplama önleme."""
 
     def __init__(self, max_size: int = 50):
-        """Otomatik eklendi."""
+        """SHAP önbellek yöneticisini başlat.
+
+        Args:
+            max_size: Tutulacak maksimum önbellek kayıt sayısı.
+        """
         self._cache: dict[str, SHAPResult] = {}
         self._max_size = max_size
         self._access_order: list[str] = []
 
     def get(self, key: str) -> SHAPResult | None:
-        """Otomatik eklendi."""
+        """Önbellekten SHAP sonucunu oku.
+
+        Args:
+            key: Önbellek anahtarı.
+
+        Returns:
+            Bulunursa SHAPResult, yoksa None.
+        """
         if key in self._cache:
             self._access_order.remove(key)
             self._access_order.append(key)
@@ -755,7 +779,12 @@ class SHAPCache:
         return None
 
     def put(self, key: str, result: SHAPResult) -> None:
-        """Otomatik eklendi."""
+        """Önbelleğe yeni SHAP sonucu kaydet.
+
+        Args:
+            key: Önbellek anahtarı.
+            result: Kaydedilecek SHAPResult.
+        """
         if len(self._cache) >= self._max_size:
             oldest = self._access_order.pop(0)
             del self._cache[oldest]
@@ -763,9 +792,12 @@ class SHAPCache:
         self._access_order.append(key)
 
     def clear(self) -> None:
-        """Otomatik eklendi."""
+        """Önbellekteki tüm kayıtları temizle."""
         self._cache.clear()
         self._access_order.clear()
+
+    def __repr__(self) -> str:
+        return f"SHAPCache(size={len(self._cache)}, max_size={self._max_size})"
 
 
 # Singleton

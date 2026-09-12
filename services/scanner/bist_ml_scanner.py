@@ -20,14 +20,18 @@ from services.data.historical_warehouse import HistoricalDataWarehouse
 class BistMLScanner:
     """Canlı ML Ensemble Tarayıcı."""
 
-    def __init__(self, models_dir: str = "ml/saved_models"):
+    def __init__(self, models_dir: str = "ml/saved_models") -> None:
         """Canlı ML Ensemble tarayıcısını başlatır ve kayıtlı modelleri yükler."""
         self.models_dir = Path(models_dir)
-        self.models = {}
+        self.models: dict[str, Any] = {}
         self._load_models()
         self.warehouse = HistoricalDataWarehouse()
         self.bm_df = None
         self.stock_dict = None
+
+    def __repr__(self) -> str:
+        """BistMLScanner okunabilir durum temsili."""
+        return f"BistMLScanner(loaded_models={list(self.models.keys())}, models_dir='{self.models_dir}')"
 
     def _load_models(self) -> Any:
         """Kayıtlı modelleri RAM'e yükler (models/ ve ml/saved_models/ destekli)."""

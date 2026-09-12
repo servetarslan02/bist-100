@@ -51,6 +51,12 @@ class PreTradeOrderRequest:
     is_gross_settlement: bool = False
     data_timestamp: float | None = None
 
+    def __repr__(self) -> str:
+        return (
+            f"PreTradeOrderRequest({self.ticker}: {self.side} {self.quantity} @ {self.price:.2f}, "
+            f"phase={self.market_phase.value})"
+        )
+
 
 class RiskOrchestrator:
     """Tüm risk servislerini birleştiren merkezi risk kontrol orkestratörü."""
@@ -68,8 +74,22 @@ class RiskOrchestrator:
         hedger: TailRiskHedger = tail_hedger,
         parity: RiskParityOptimizer = risk_parity_optimizer,
         cov_est: CovarianceEstimator = covariance_estimator,
-    ):
-        """Otomatik eklendi."""
+    ) -> None:
+        """Tüm alt risk motorlarını entegre eden merkezi orkestratörü başlatır.
+
+        Args:
+            gate: Ön-emir geçit denetleyicisi.
+            pre_trade: İşlem öncesi risk motoru.
+            liquidity: Likidite ve kayma hesaplama motoru.
+            drawdown: Drawdown koruma ve kademe sistemi.
+            dyn_limits: Rejim bazlı dinamik limit motoru.
+            monitor: Anlık risk izleme ve alarm yöneticisi.
+            var_calc: VaR / CVaR analitik motoru.
+            stress: Tarihsel ve sentetik stres testi motoru.
+            hedger: Kuyruk riski ve VIOP hedging motoru.
+            parity: Risk parity portföy dağıtım motoru.
+            cov_est: Ledoit-Wolf kovaryans matrisi tahmincisi.
+        """
         self.gate = gate
         self.pre_trade = pre_trade
         self.liquidity = liquidity
@@ -86,6 +106,12 @@ class RiskOrchestrator:
         self._kill_switch_reason: str = ""
 
         logger.info("RiskOrchestrator successfully initialized with all connected subsystems")
+
+    def __repr__(self) -> str:
+        return (
+            f"RiskOrchestrator(kill_switch={self._kill_switch_active}, "
+            f"system_halted={self.drawdown.is_system_halted()})"
+        )
 
     # =====================================================
     # 1. UNIFIED PRE-TRADE RISK CHECK

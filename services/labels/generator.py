@@ -20,6 +20,8 @@ Look-ahead bias = ölüm.
 Kaynak: Du (2026) — target variable design, cross-sectional ranking
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 import numpy as np
@@ -30,19 +32,41 @@ logger = structlog.get_logger()
 
 @dataclass
 class LabelResult:
-    """Label sonucu."""
+    """Label sonucu veri yapısı.
+
+    Attributes:
+        ticker: Hisse senedi kodu.
+        labels: Label adı → NumPy dizisi sözlüğü.
+        valid_mask: Hissenin işlem görebilirlik ve geçerlilik maskesi.
+        stats: Her label için özet istatistikler.
+    """
 
     ticker: str
-    labels: dict[str, np.ndarray]  # label_name → values
-    valid_mask: np.ndarray  # Label hesaplanabilir mi?
-    stats: dict[str, float]  # İstatistikler
+    labels: dict[str, np.ndarray]
+    valid_mask: np.ndarray
+    stats: dict[str, dict[str, float]]
+
+    def __repr__(self) -> str:
+        """LabelResult kısa temsili."""
+        valid_ratio = float(np.mean(self.valid_mask)) if len(self.valid_mask) > 0 else 0.0
+        return (
+            f"LabelResult(ticker={self.ticker!r}, labels_count={len(self.labels)}, "
+            f"valid_ratio={valid_ratio:.1%})"
+        )
 
 
 class LabelGenerator:
-    """Label generation pipeline."""
+    """Gelecek getiri ve risk label'ları üreten ana motor.
+
+    Lookahead sızıntısını önlemek için purge gap ve katı tradability mask kontrolleri uygular.
+    """
 
     # Forward return periods
-    FORWARD_PERIODS = [1, 5, 10, 20]
+    FORWARD_PERIODS: list[int] = [1, 5, 10, 20]
+
+    def __repr__(self) -> str:
+        """LabelGenerator kısa temsili."""
+        return f"LabelGenerator(periods={self.FORWARD_PERIODS})"
 
     def generate_labels(
         self,
@@ -53,15 +77,26 @@ class LabelGenerator:
         benchmark_returns: np.ndarray | None = None,
         purge_days: int = 0,
     ) -> LabelResult:
-        """Tek hisse için tüm label'ları üret.
+        """Tek hisse için tüm forward return ve risk label'larını üretir.
 
         Args:
-            ticker: Hisse kodu
-            close: Kapanış fiyatları (mask-aware)
-            mask: Tradability mask (1=valid, 0=invalid)
-            sector_returns: Sektör getiri serisi (cross-sectional için)
-            benchmark_returns: BIST100 getiri serisi (relative için)
+            ticker: Hisse senedi kodu.
+            close: Kapanış fiyatları dizisi (tradability mask uyumlu).
+            mask: İşlem görebilirlik maskesi (1 = geçerli, 0 = geçersiz).
+            sector_returns: Opsiyonel sektör getiri serisi (cross-sectional getiri için).
+            benchmark_returns: Opsiyonel BIST100 endeks getiri serisi (göreli getiri için).
+            purge_days: Lookahead sızıntısını önlemek için hariç tutulacak son bar sayısı.
+
+        Returns:
+            Tüm hesaplanmış label ve istatistikleri içeren LabelResult nesnesi.
+
+        Raises:
+            ValueError: close veya mask uzunlukları eşleşmezse ya da dizi boşsa.
         """
+        if len(close) != len(mask):
+            raise ValueError(f"close ({len(close)}) ve mask ({len(mask)}) boyutları eşleşmelidir.")
+        if len(close) == 0:
+            raise ValueError("close dizisi boş olamaz.")
         n = len(close)
         labels = {}
         valid_mask = np.ones(n, dtype=bool)
@@ -164,45 +199,59 @@ class LabelGenerator:
 
     def generate_cross_sectional_ranks(
         self,
-        all_labels: dict[str, np.ndarray],
+        all_labels: dict[str, dict[str, np.ndarray] | np.ndarray],
         label_name: str = "y_5d",
     ) -> dict[str, np.ndarray]:
-        """Tüm hisseler için cross-sectional rank üret.
+        """Tüm hisseler için cross-sectional rank üretir.
 
         Args:
-            all_labels: {ticker: label_values} — her hissenin label dizisi
-            label_name: Rank'lenecek label
+            all_labels: {ticker: label_dict} veya {ticker: label_array} sözlüğü.
+            label_name: Sıralanacak label ismi (varsayılan: "y_5d").
 
         Returns:
-            {ticker: rank_values} — her hissenin rank dizisi (0-1)
+            {ticker: rank_values} — her hissenin 0-1 aralığında normalize edilmiş rank dizisi.
+
+        Raises:
+            Yok — veri yetersizse boş sözlük döner.
         """
-        if label_name not in next(iter(all_labels.values()), {}):
+        if not all_labels:
             return {}
 
-        # Tüm hisselerin label'larını birleştir
         tickers = list(all_labels.keys())
-        n_tickers = len(tickers)
-        if n_tickers == 0:
+        if not tickers:
             return {}
 
-        # Ortak uzunluk bul
-        min_len = min(len(all_labels[t]) for t in tickers)
+        extracted_labels: dict[str, np.ndarray] = {}
+        for t in tickers:
+            item = all_labels[t]
+            if isinstance(item, dict):
+                arr = item.get(label_name)
+            elif isinstance(item, np.ndarray):
+                arr = item
+            else:
+                arr = None
+            if arr is not None and len(arr) > 0:
+                extracted_labels[t] = arr
 
-        ranks = {}
+        if not extracted_labels:
+            return {}
+
+        min_len = min(len(arr) for arr in extracted_labels.values())
+        if min_len == 0:
+            return {}
+
+        ranks: dict[str, np.ndarray] = {}
         for i in range(min_len):
-            # Bu gün için tüm hisselerin değerlerini topla
             values = []
             valid_tickers = []
-            for t in tickers:
-                label_vals = all_labels[t].get(label_name)
-                if label_vals is not None and i < len(label_vals) and not np.isnan(label_vals[i]):
-                    values.append(label_vals[i])
+            for t, arr in extracted_labels.items():
+                if i < len(arr) and not np.isnan(arr[i]):
+                    values.append(arr[i])
                     valid_tickers.append(t)
 
             if len(values) < 2:
                 continue
 
-            # Rank hesapla (0-1 arası)
             sorted_indices = np.argsort(values)
             n_valid = len(values)
             for rank_idx, orig_idx in enumerate(sorted_indices):
@@ -214,8 +263,12 @@ class LabelGenerator:
         return ranks
 
     def get_label_names(self) -> list[str]:
-        """Tüm label isimlerini döndür."""
-        names = []
+        """Tüm üretilebilir kanonik label isimlerini döndürür.
+
+        Returns:
+            Label isimleri listesi.
+        """
+        names: list[str] = []
         for period in self.FORWARD_PERIODS:
             names.extend(
                 [
@@ -229,6 +282,12 @@ class LabelGenerator:
         names.extend(["y_max_dd_20d", "y_volatility_20d"])
         return names
 
+
+__all__: list[str] = [
+    "LabelResult",
+    "LabelGenerator",
+    "label_generator",
+]
 
 # Singleton
 label_generator = LabelGenerator()

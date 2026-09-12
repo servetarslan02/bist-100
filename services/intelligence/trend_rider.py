@@ -22,7 +22,7 @@ class TrendRiderEngine:
     """Tamamen dinamik volatiliteye (ATR) ve trende dayalı kurumsal çıkış algoritması."""
 
     def __init__(self):
-        """Otomatik eklendi."""
+        """TrendRiderEngine dinamik ATR ve trend çıkış algoritmasını başlatır."""
         # ATR tabanlı çıkış parametreleri
         self.atr_period = 14  # ATR periyodu
         self.atr_multiplier_entry = 2.0  # Giriş ATR çarpanı
@@ -42,6 +42,10 @@ class TrendRiderEngine:
 
         # Durum takibi
         self._active_positions: dict[str, dict] = {}
+
+    def __repr__(self) -> str:
+        """Sınıfın metinsel temsilini döndürür."""
+        return f"TrendRiderEngine(atr_period={self.atr_period}, active_positions={len(self._active_positions)})"
 
     def evaluate_position_exit(
         self, pos: dict[str, Any], current_candle: pl.Series, history_df: pl.DataFrame, is_bear_crash: bool = False

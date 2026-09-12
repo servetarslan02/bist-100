@@ -46,6 +46,9 @@ class SystemHealth:
     drift_detected: bool
     retrain_needed: bool
 
+    def __repr__(self) -> str:
+        return f"SystemHealth(status={self.overall_status!r}, uptime={self.uptime_hours:.1f}h, acc={self.accuracy_today:.1f}%)"
+
 
 @dataclass
 class ModelVersion:
@@ -60,6 +63,12 @@ class ModelVersion:
     feature_importance: dict[str, float]
     is_active: bool
     is_champion: bool  # A/B test kazananı
+
+    def __repr__(self) -> str:
+        return (
+            f"ModelVersion(ver={self.version_id!r}, regime={self.regime!r}, "
+            f"sharpe={self.test_sharpe:.2f}, active={self.is_active}, champ={self.is_champion})"
+        )
 
 
 @dataclass
@@ -76,6 +85,9 @@ class ABTestResult:
     p_value: float
     winner: str
 
+    def __repr__(self) -> str:
+        return f"ABTestResult(id={self.test_id!r}, winner={self.winner!r}, imp={self.improvement_pct:+.1f}%, sig={self.is_significant})"
+
 
 class SuperIntelligenceEngine:
     """Süper akıllı, tam otomatik öğrenme motoru."""
@@ -87,8 +99,8 @@ class SuperIntelligenceEngine:
         drift_threshold: float | None = None,
         max_models_history: int | None = None,
         ab_test_window_days: int | None = None,
-    ):
-        """Otomatik eklendi."""
+    ) -> None:
+        """Süper zeka öğrenme ve öz-iyileştirme motorunu eşik ve geçmiş parametreleriyle ilklendirir."""
         cfg = learning_settings
         self.retrain_threshold_sharpe = retrain_threshold_sharpe or cfg.retrain.sharpe_threshold
         self.retrain_threshold_ic = retrain_threshold_ic or cfg.retrain.ic_threshold
@@ -139,6 +151,12 @@ class SuperIntelligenceEngine:
             "SuperIntelligenceEngine v3.0 initialized",
             retrain_sharpe=retrain_threshold_sharpe,
             drift_threshold=drift_threshold,
+        )
+
+    def __repr__(self) -> str:
+        return (
+            f"SuperIntelligenceEngine(models={len(self._model_versions)}, "
+            f"ab_active={self._ab_test_active}, health={self._health_status.overall_status!r})"
         )
 
     # === SELF-HEALING ===

@@ -72,7 +72,13 @@ class MarketStateService:
     """
 
     def __init__(self):
-        """Otomatik eklendi."""
+        """MarketStateService'i başlatır; tüm alt motorları ve bağlanma durumunu hazırlar.
+
+        V2.0 pipeline bileşenlerini (BreadthEngine, ComponentStateEngine,
+        EnsembleRegimeDetector, TransitionTracker, RiskAppetiteEngine,
+        MultiTimeframeEngine) oluşturur. Geçmiş hesaplamalar için iç tampon
+        başlatılır. Çağrı zinciri: start() → _consume() → _process_tick() → publish.
+        """
         self._running = False
         self._consumer: EventConsumer = None
 
@@ -123,6 +129,13 @@ class MarketStateService:
         # News sentiment
         self._news_sentiment: float = 0.0
         self._social_sentiment: float = 0.0
+
+    def __repr__(self) -> str:
+        """Sınıfın metinsel temsilini döndürür."""
+        return (
+            f"MarketStateService(running={self._running}, current_regime={self._current_regime!r}, "
+            f"instruments_count={len(self._instrument_states)})"
+        )
 
     async def start(self) -> Any:
         """Start the market state service."""
@@ -650,7 +663,11 @@ async def _health_server(port: int = 8080) -> Any:
     from aiohttp import web
 
     async def health_handler(request) -> Any:
-        """Otomatik eklendi."""
+        """Docker health check için /health endpoint'ini yönetir.
+
+        Returns:
+            {"status": "healthy", "service": "market_state"} içeren JSON yanıtı.
+        """
         return web.json_response({"status": "healthy", "service": "market_state"})
 
     app = web.Application()

@@ -22,6 +22,7 @@ import uuid
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+import orjson
 import structlog
 
 from .agent_system import (
@@ -59,7 +60,7 @@ class ParallelRunResult:
     def success_rate(self) -> float:
         """Başarı oranı (0-1 arası)."""
         total = self.success_count + self.failure_count + self.timeout_count
-        return self.success_count / total if total > 0 else 0
+        return self.success_count / total if total > 0 else 0.0
 
     @property
     def all_failed(self) -> bool:
@@ -71,6 +72,25 @@ class ParallelRunResult:
         """Kısmi başarı — bazı agent'lar başarılı, bazıları başarısız mı?"""
         total = self.success_count + self.failure_count + self.timeout_count
         return 0 < self.success_count < total
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serileştirme için sözlük formatına dönüştürür."""
+        return {
+            "results": {
+                getattr(role, "value", str(role)): res.to_dict() if hasattr(res, "to_dict") else res
+                for role, res in self.results.items()
+            },
+            "total_duration_ms": self.total_duration_ms,
+            "success_count": self.success_count,
+            "failure_count": self.failure_count,
+            "timeout_count": self.timeout_count,
+            "success_rate": round(self.success_rate, 4),
+            "agent_durations": self.agent_durations,
+        }
+
+    def to_json(self) -> str:
+        """orjson ile yüksek performanslı JSON serileştirme."""
+        return orjson.dumps(self.to_dict()).decode("utf-8")
 
     def __repr__(self) -> str:
         return (
@@ -321,13 +341,19 @@ class AgentPipelineBuilder:
         return self
 
     def with_default_agents(self) -> AgentPipelineBuilder:
-        """Varsayılan agent'ları ekle (TECHNICAL, FUNDAMENTAL, NEWS, MACRO)."""
+        """Varsayılan temel agent'ları ekle (TECHNICAL, FUNDAMENTAL, NEWS, MACRO)."""
         for role in [
             AgentRole.TECHNICAL,
             AgentRole.FUNDAMENTAL,
             AgentRole.NEWS,
             AgentRole.MACRO,
         ]:
+            self._agents[role] = BaseAgent(role, llm_client=self.llm_client)
+        return self
+
+    def with_all_agents(self) -> AgentPipelineBuilder:
+        """Tüm 9 agent rolünü ekler (Technical, Fundamental, News, Macro, Valuation, Risk, Portfolio, Scenario, Backtest)."""
+        for role in AgentRole:
             self._agents[role] = BaseAgent(role, llm_client=self.llm_client)
         return self
 
@@ -350,6 +376,11 @@ class AgentPipelineBuilder:
             AgentRole.FUNDAMENTAL: "fundamental",
             AgentRole.NEWS: "news",
             AgentRole.MACRO: "macro",
+            AgentRole.VALUATION: "valuation",
+            AgentRole.RISK: "risk",
+            AgentRole.PORTFOLIO: "portfolio",
+            AgentRole.SCENARIO: "scenario",
+            AgentRole.BACKTEST: "backtest",
         }
 
         tasks = {}
@@ -360,7 +391,7 @@ class AgentPipelineBuilder:
                 ticker=ticker,
                 prompt=f"Analyze {ticker} from {role.value} perspective",
                 context=context,
-                template_name=template_map.get(role),
+                template_name=template_map.get(role, role.value),
             )
 
         return await self._runner.run_agents(self._agents, tasks, self.llm_client)

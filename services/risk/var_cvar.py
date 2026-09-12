@@ -24,7 +24,7 @@ logger = structlog.get_logger()
 
 
 class VaRMethod(StrEnum):
-    """Otomatik eklendi."""
+    """VaR hesaplama metodolojileri."""
     PARAMETRIC = "parametric"
     HISTORICAL = "historical"
     MONTE_CARLO = "monte_carlo"
@@ -46,6 +46,12 @@ class VaRResult:
     cvar_95_amount: float  # %95 CVaR (TL)
     cvar_99_amount: float  # %99 CVaR (TL)
 
+    def __repr__(self) -> str:
+        return (
+            f"VaRResult({self.method}: VaR95={self.var_95:.2%}, "
+            f"CVaR95={self.cvar_95:.2%}, amount={self.var_95_amount:,.0f} TL)"
+        )
+
 
 @dataclass
 class ComponentVaRResult:
@@ -56,6 +62,12 @@ class ComponentVaRResult:
     component_var_95: float  # Bu pozisyonun portföy VaR'ına katkısı
     marginal_var_95: float  # Yeni pozisyon eklenince risk değişimi
     pct_of_total_var: float  # Toplam VaR'ın yüzdesi
+
+    def __repr__(self) -> str:
+        return (
+            f"ComponentVaRResult({self.ticker}: weight={self.weight:.1%}, "
+            f"comp_var={self.component_var_95:.2%}, total_share={self.pct_of_total_var:.1%})"
+        )
 
 
 @dataclass
@@ -74,6 +86,12 @@ class MonteCarloResult:
     n_days: int
     percentiles: dict[int, float]  # percentile → return
 
+    def __repr__(self) -> str:
+        return (
+            f"MonteCarloResult(sims={self.n_simulations}, days={self.n_days}, "
+            f"VaR95={self.var_95:.2%}, CVaR95={self.cvar_95:.2%})"
+        )
+
 
 class VaRCalculator:
     """VaR/CVaR hesaplama motoru.
@@ -84,9 +102,16 @@ class VaRCalculator:
     3. Monte Carlo (Stokastik simülasyon)
     """
 
-    def __init__(self, trading_days_per_year: int = 252):
-        """Otomatik eklendi."""
+    def __init__(self, trading_days_per_year: int = 252) -> None:
+        """VaR ve CVaR hesaplayıcısını başlatır.
+
+        Args:
+            trading_days_per_year: Yıllık işlem günü sayısı (varsayılan 252).
+        """
         self.trading_days_per_year = trading_days_per_year
+
+    def __repr__(self) -> str:
+        return f"VaRCalculator(trading_days_per_year={self.trading_days_per_year})"
 
     @staticmethod
     def _historical_percentile_index(confidence: float, n: int) -> int:

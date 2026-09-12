@@ -30,9 +30,17 @@ class PerformanceTracker:
     """Paper trading performans motoru — incremental."""
 
     def __init__(self, state_store=None):
-        """Otomatik eklendi."""
+        """PerformanceTracker performans izleme motorunu başlatır.
+
+        Args:
+            state_store: Günlük performans kayıtlarını kalıcı saklayan durum deposu.
+        """
         self._state_store = state_store
         self._daily_perf_cache: list[dict[str, Any]] = []
+
+    def __repr__(self) -> str:
+        """Sınıfın metinsel temsilini döndürür."""
+        return f"PerformanceTracker(cache_size={len(self._daily_perf_cache)}, has_store={self._state_store is not None})"
 
     def compute_daily_performance(
         self,
@@ -227,20 +235,20 @@ class PerformanceTracker:
     # ===================== INTERNAL =====================
 
     def _sharpe(self, returns: np.ndarray) -> float:
-        """Otomatik eklendi."""
+        """Yıllıklandırılmış Sharpe oranını hesaplar."""
         if len(returns) < 2 or np.std(returns) == 0:
             return 0.0
         return float(np.mean(returns) / np.std(returns) * np.sqrt(252))
 
     def _sortino(self, returns: np.ndarray) -> float:
-        """Otomatik eklendi."""
+        """Yıllıklandırılmış Sortino oranını (sadece negatif getirilerin standart sapmasını) hesaplar."""
         downside = returns[returns < 0]
         if len(downside) < 1 or np.std(downside) == 0:
             return 0.0
         return float(np.mean(returns) / np.std(downside) * np.sqrt(252))
 
     def _max_drawdown(self, equities: list[float]) -> float:
-        """Otomatik eklendi."""
+        """Özvarlık değerleri serisinden maksimum düşüş (drawdown) yüzdesini hesaplar."""
         peak = equities[0]
         max_dd = 0.0
         for e in equities:
@@ -269,7 +277,7 @@ class PerformanceTracker:
         return max_dd
 
     def _compute_daily_turnover(self, orders: list[dict[str, Any]], portfolio_value: float) -> float:
-        """Otomatik eklendi."""
+        """Günlük toplam işlem hacminin portföy değerine oranını (turnover %) hesaplar."""
         if portfolio_value <= 0:
             return 0.0
         total_value = sum(
@@ -278,7 +286,7 @@ class PerformanceTracker:
         return (total_value / portfolio_value) * 100
 
     def _alpha_beta(self, returns: np.ndarray, benchmark: np.ndarray) -> tuple:
-        """Otomatik eklendi."""
+        """Strateji ve benchmark getirileri arasındaki Jensen Alfası, Beta ve korelasyon katsayılarını hesaplar."""
         if len(returns) < 2 or len(returns) != len(benchmark):
             return 0, 0, 0
         cov = np.cov(returns, benchmark)[0, 1]
@@ -289,7 +297,7 @@ class PerformanceTracker:
         return alpha, beta, corr if not np.isnan(corr) else 0
 
     def load_history(self) -> list[dict[str, Any]]:
-        """Otomatik eklendi."""
+        """Kalıcı depodan geçmiş günlük performans kayıtlarını yükler."""
         if self._state_store:
             return self._state_store.load_daily_performance()
         return []

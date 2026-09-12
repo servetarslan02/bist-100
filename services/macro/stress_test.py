@@ -32,6 +32,13 @@ class PositionImpact:
     impact_pct: float
     impact_value: float
 
+    def __repr__(self) -> str:
+        """Pozisyon stres etkisi okunabilir string temsili."""
+        return (
+            f"PositionImpact(ticker='{self.ticker}', sector='{self.sector}', "
+            f"weight={self.weight:.2%}, impact={self.impact_pct:+.2f}%)"
+        )
+
 
 @dataclass
 class StressTestResult:
@@ -48,6 +55,14 @@ class StressTestResult:
     best_position: str
     timestamp: str
 
+    def __repr__(self) -> str:
+        """Stres testi sonucu okunabilir string temsili."""
+        return (
+            f"StressTestResult(scenario='{self.scenario}', "
+            f"total_impact={self.total_impact_pct:+.2f}%, "
+            f"worst='{self.worst_position}', best='{self.best_position}')"
+        )
+
 
 @dataclass
 class BreakingPointResult:
@@ -57,6 +72,13 @@ class BreakingPointResult:
     breaking_point_pct: float
     portfolio_impact_at_breaking: float
     description: str
+
+    def __repr__(self) -> str:
+        """Kırılma noktası sonucu okunabilir string temsili."""
+        return (
+            f"BreakingPointResult(shock='{self.shock_type}', "
+            f"threshold={self.breaking_point_pct:+.2f}%)"
+        )
 
 
 class MacroStressTest:
@@ -177,6 +199,14 @@ class MacroStressTest:
         "INFLATION_HIGH": "Enflasyon %5 artış",
         "BIST_CRASH_10_PCT": "BIST-100 %10 düşüş",
     }
+
+    def __init__(self) -> None:
+        """Makro stres testi motoru başlatıcı."""
+        self._scenarios = dict(self.PREDEFINED_SCENARIOS)
+
+    def __repr__(self) -> str:
+        """Makro stres testi motoru okunabilir string temsili."""
+        return f"MacroStressTest(scenarios={len(self._scenarios)})"
 
     def run_stress_test(
         self,
@@ -379,3 +409,11 @@ class MacroStressTest:
 
 # Singleton
 macro_stress_test = MacroStressTest()
+
+__all__ = [
+    "PositionImpact",
+    "StressTestResult",
+    "BreakingPointResult",
+    "MacroStressTest",
+    "macro_stress_test",
+]

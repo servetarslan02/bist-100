@@ -154,6 +154,9 @@ class RetryPolicy:
         jitter_range: float = 0.2,
         retryable_exceptions: set[type[Exception]] | None = None,
         non_retryable_exceptions: set[type[Exception]] | None = None,
+        max_retries: int | None = None,
+        base_delay: float | None = None,
+        max_delay: float | None = None,
     ) -> None:
         """RetryPolicy örneği oluşturur.
 
@@ -166,7 +169,17 @@ class RetryPolicy:
             jitter_range: Jitter aralığı.
             retryable_exceptions: Retry yapılabilir exception tipleri.
             non_retryable_exceptions: Retry yapılamaz exception tipleri.
+            max_retries: max_attempts için alternatif parametre.
+            base_delay: base_delay_s için alternatif parametre.
+            max_delay: max_delay_s için alternatif parametre.
         """
+        if max_retries is not None:
+            max_attempts = max_retries
+        if base_delay is not None:
+            base_delay_s = base_delay
+        if max_delay is not None:
+            max_delay_s = max_delay
+
         self.config = RetryConfig(
             max_attempts=max_attempts,
             base_delay_s=base_delay_s,
@@ -187,6 +200,14 @@ class RetryPolicy:
         }
 
         self.non_retryable_exceptions = non_retryable_exceptions or set()
+
+    def __repr__(self) -> str:
+        """RetryPolicy string temsili."""
+        return (
+            f"RetryPolicy(max_attempts={self.config.max_attempts}, "
+            f"base_delay_s={self.config.base_delay_s}, "
+            f"backoff_factor={self.config.backoff_factor})"
+        )
 
     def _is_retryable(self, error: Exception) -> bool:
         """Bu hata retry yapılabilir mi kontrol eder.

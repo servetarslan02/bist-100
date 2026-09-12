@@ -158,10 +158,14 @@ class HolidayProvider:
     )
 
     def __init__(self):
-        """Otomatik eklendi."""
+        """Dinamik tatil takvim yöneticisini başlatır."""
         self._dynamic_holidays: set | None = None
         self._last_fetch: float = 0
         self._fetch_interval: float = 3600  # 1 saatte bir yenile
+
+    def __repr__(self) -> str:
+        dyn_count = len(self._dynamic_holidays) if self._dynamic_holidays is not None else 0
+        return f"_HolidayManager(fallbacks={len(self._FALLBACK_HOLIDAYS)}, dynamic={dyn_count})"
 
     def get_holidays(self) -> set:
         """Tatil günlerini al (dinamik + fallback)."""
@@ -255,10 +259,13 @@ class MarketSessionManager:
     ]
 
     def __init__(self, holiday_provider: HolidayProvider | None = None):
-        """Otomatik eklendi."""
+        """BIST seans evresi ve piyasa saatleri yöneticisini başlatır."""
         self._holiday_provider = holiday_provider or HolidayProvider()
         self._current_phase: MarketPhase | None = None
         self._phase_callbacks: dict[MarketPhase, list[Callable]] = {}
+
+    def __repr__(self) -> str:
+        return f"MarketSessionManager(phase={self._current_phase}, holiday_provider={self._holiday_provider!r})"
 
     def now_istanbul(self) -> datetime:
         """Şu anki Istanbul zamanı."""
@@ -398,6 +405,7 @@ class JobType(StrEnum):
     # Night
     BACKUP = "backup"
     HOLIDAY_SYNC = "holiday_sync"
+    HEARTBEAT = "heartbeat"  # Ani kapanmaya karşı periyodik kalp atışı
 
 
 # =====================================================
@@ -407,7 +415,18 @@ class JobType(StrEnum):
 
 @dataclass
 class JobConfig:
-    """Job konfigürasyonu."""
+    """Zamanlanmış görev parametreleri ve çalışma kuralları.
+
+    Args:
+        job_type: Görev tipi adı (JobType enum veya string).
+        interval_seconds: Görevin periyodik çalışma sıklığı (saniye).
+        trading_only: Sadece borsa seansı açıkken çalışsın (True/False).
+        priority: Öncelik düzeyi (1=en yüksek, 10=en düşük).
+        enabled: Görevin aktif olup olmadığı.
+        max_retries: Başarısızlık halinde izin verilen maksimum yeniden deneme sayısı.
+        timeout_seconds: Görev için maksimum izin verilen çalışma süresi.
+        description: Görev amacı ve açıklaması.
+    """
 
     job_type: str
     interval_seconds: int
@@ -417,6 +436,12 @@ class JobConfig:
     max_retries: int = 3
     timeout_seconds: int = 300
     description: str = ""
+
+    def __repr__(self) -> str:
+        return (
+            f"JobConfig(type={self.job_type!r}, interval={self.interval_seconds}s, "
+            f"priority={self.priority}, enabled={self.enabled})"
+        )
 
 
 # Varsayılan job konfigürasyonları — priority bazlı
@@ -552,6 +577,15 @@ DEFAULT_JOB_CONFIGS = {
         priority=9,
         description="Takvim senkronizasyonu (BIST resmi + dini bayram hesaplama)",
     ),
+    # Heartbeat — ani kapanma (crash/elektrik) sonrası downtime doğru hesaplanır
+    JobType.HEARTBEAT: JobConfig(
+        job_type=JobType.HEARTBEAT,
+        interval_seconds=300,  # Her 5 dakika
+        trading_only=False,
+        priority=1,
+        timeout_seconds=10,
+        description="Sistem kalp atışı — downtime tracker + offline queue flush tetikleyici",
+    ),
 }
 
 
@@ -562,7 +596,18 @@ DEFAULT_JOB_CONFIGS = {
 
 @dataclass
 class JobResult:
-    """Job çalıştırma sonucu."""
+    """Görev çalıştırma sonucu ve performans istatistikleri.
+
+    Args:
+        job_type: Görev tipi adı.
+        status: Çalışma sonucu ('SUCCESS', 'FAILED', 'TIMEOUT', 'RETRY').
+        duration_ms: Çalışma süresi (milisaniye).
+        timestamp: Tamamlanma zaman damgası.
+        error: Hata oluştuysa hata detayı.
+        retry_count: Denenen retry sayısı.
+        result: Görev dönüş verisi.
+        triggered_by: Tetikleyen kaynak ('scheduler', 'manual', 'phase_change').
+    """
 
     job_type: str
     status: str  # SUCCESS, FAILED, TIMEOUT, RETRY
@@ -572,6 +617,12 @@ class JobResult:
     retry_count: int = 0
     result: Any = None
     triggered_by: str = "scheduler"  # scheduler, manual, phase_change
+
+    def __repr__(self) -> str:
+        return (
+            f"JobResult(type={self.job_type!r}, status={self.status!r}, "
+            f"duration={self.duration_ms:.1f}ms, error={self.error!r})"
+        )
 
 
 # =====================================================
@@ -587,10 +638,13 @@ class DBJobTracker:
     """
 
     def __init__(self):
-        """Otomatik eklendi."""
+        """Veritabanı tabanlı görev geçmişi takipçisini başlatır."""
         self._db_available: bool | None = None
         self._memory_history: list[dict[str, Any]] = []
         self._max_memory = 1000
+
+    def __repr__(self) -> str:
+        return f"DBJobTracker(db_available={self._db_available}, in_memory_records={len(self._memory_history)})"
 
     async def record_job(self, result: JobResult) -> bool:
         """Job sonucunu kaydet (DB veya memory)."""
@@ -752,7 +806,11 @@ class UnifiedScheduler:
     """
 
     def __init__(self, job_configs: dict[str, JobConfig] | None = None):
-        """Otomatik eklendi."""
+        """Merkezi ve birleşik görev zamanlayıcı motorunu başlatır.
+
+        Args:
+            job_configs: Özel görev konfigürasyonları sözlüğü.
+        """
         self._market = MarketSessionManager()
         self._configs = {**DEFAULT_JOB_CONFIGS, **(job_configs or {})}
         self._handlers: dict[str, Callable[..., Awaitable[Any]]] = {}
@@ -773,13 +831,21 @@ class UnifiedScheduler:
         # Phase callbacks
         self._phase_callbacks: dict[str, list[Callable]] = {}
 
-        # State persistence — SQLite
+        # State persistence — DuckDB
         self._state_db_path = "data/scheduler_state.db"
         self._init_state_db()
         self._load_state()
 
         # Tatil senkronizasyon handler'ı — otomatik kaydet
         self.register_handler(JobType.HOLIDAY_SYNC, self._holiday_sync_handler)
+        # Heartbeat handler — otomatik kaydet
+        self.register_handler(JobType.HEARTBEAT, self._heartbeat_handler)
+
+    def __repr__(self) -> str:
+        return (
+            f"UnifiedScheduler(running={self._running}, configs={len(self._configs)}, "
+            f"handlers={len(self._handlers)}, history={len(self._job_history)})"
+        )
 
     def register_handler(self, job_type: str, handler: Callable[..., Awaitable[Any]]) -> Any:
         """Job handler kaydet."""
@@ -850,6 +916,14 @@ class UnifiedScheduler:
 
         logger.info("=== UNIFIED SCHEDULER STARTING ===", phase=self._market.current_phase().value)
 
+        # İnternet gelince bekleyen sinyalleri otomatik gönder
+        try:
+            from services.core.offline_queue import offline_queue
+            offline_queue.start_background_flusher(interval_seconds=15)
+            logger.info("Offline queue background flusher başlatıldı")
+        except Exception as _oq_err:
+            logger.warning("Offline queue flusher başlatılamadı", error=str(_oq_err))
+
         # Startup sequence
         await self._startup_sequence()
 
@@ -859,19 +933,73 @@ class UnifiedScheduler:
             self._trigger_consumer(),
         )
 
+        # Scheduler durduğunda offline flusher'ı da durdur
+        try:
+            from services.core.offline_queue import offline_queue
+            offline_queue.stop_background_flusher()
+        except Exception:
+            pass
+
         logger.info("=== UNIFIED SCHEDULER STOPPED ===")
 
     async def stop(self) -> Any:
-        """Scheduler'ı durdur."""
+        """Scheduler'ı durdur ve graceful shutdown pipeline'ını çalıştır."""
         self._running = False
         self._shutdown_event.set()
         logger.info("Scheduler stop requested")
+
+        # Graceful shutdown: downtime kayıt + offline queue flush
+        try:
+            from services.core.recovery import graceful_shutdown
+            await graceful_shutdown.shutdown(reason="scheduler_stop")
+        except Exception as _gs_err:
+            logger.warning("Graceful shutdown pipeline hatası", error=str(_gs_err))
 
     def _signal_handler(self, sig) -> Any:
         """SIGTERM/SIGINT callback."""
         logger.info(f"Signal {sig} received, shutting down")
         self._running = False
         self._shutdown_event.set()
+
+    async def _heartbeat_handler(self) -> dict[str, Any]:
+        """Periyodik kalp atışı — ani kapanmaya (crash/elektrik kesintisi) karşı koruma.
+
+        Her 5 dakikada çalışır. downtime_tracker.record_heartbeat() sayesinde
+        beklenmeyen kapanma durumunda bir sonraki açılışta kesinti süresi
+        doğru hesaplanır ve uygun catch-up modu tetiklenir.
+        Aynı zamanda bağlantı durumunu kontrol eder ve offline kuyruğu flush eder.
+        """
+        result: dict[str, Any] = {}
+
+        # 1. Downtime tracker'a heartbeat kaydet
+        try:
+            from services.core.downtime_tracker import downtime_tracker
+            downtime_tracker.record_heartbeat()
+            result["heartbeat"] = "ok"
+        except Exception as hb_err:
+            logger.warning("Heartbeat kaydedilemedi", error=str(hb_err))
+            result["heartbeat"] = "error"
+
+        # 2. Scheduler state'i kaydet (debounced — SSD dostu, maks 1 kez/dk)
+        try:
+            self.save_state()
+            result["state_saved"] = True
+        except Exception as st_err:
+            logger.debug("State kayıt hatası", error=str(st_err))
+            result["state_saved"] = False
+
+        # 3. Offline kuyruğu flush et (internet bağlantısı varsa bekleyenleri gönder)
+        try:
+            from services.core.offline_queue import offline_queue
+            flushed = await offline_queue.flush()
+            if flushed > 0:
+                logger.info("Offline kuyruk heartbeat sırasında boşaltıldı", sinyal_adedi=flushed)
+            result["offline_flushed"] = flushed
+        except Exception as oq_err:
+            logger.debug("Offline queue flush hatası", error=str(oq_err))
+            result["offline_flushed"] = 0
+
+        return result
 
     async def _holiday_sync_handler(self) -> dict[str, Any]:
         """Takvim senkronizasyonu — BIST resmi + dini bayram hesaplama."""
@@ -922,8 +1050,31 @@ class UnifiedScheduler:
         return result
 
     async def _startup_sequence(self) -> Any:
-        """Startup kontrolleri."""
+        """Startup kontrolleri — recovery pipeline dahil."""
         logger.info("Running startup sequence...")
+
+        # ── 0. StartupRecovery: downtime hesaplama + connectivity monitor başlatma ──
+        try:
+            from services.core.recovery import startup_recovery
+            recovery_result = await startup_recovery.recover()
+            if recovery_result.get("success"):
+                logger.info(
+                    "Startup recovery tamamlandı",
+                    steps=len(recovery_result.get("steps", [])),
+                    downtime_s=next(
+                        (s.get("downtime_seconds", 0)
+                         for s in recovery_result.get("steps", [])
+                         if s.get("step") == "downtime_tracker"),
+                        0,
+                    ),
+                )
+            else:
+                logger.warning(
+                    "Startup recovery kısmi başarısız",
+                    errors=recovery_result.get("errors", []),
+                )
+        except Exception as _sr_err:
+            logger.warning("Startup recovery pipeline çalıştırılamadı", error=str(_sr_err))
 
         # Market session
         status = self._market.get_status()
@@ -1225,30 +1376,33 @@ class UnifiedScheduler:
 
         import duckdb
 
-        Path(self._state_db_path).parent.mkdir(parents=True, exist_ok=True)
-        conn = duckdb.connect(self._state_db_path)
-        # SSD write reduction: DuckDB WAL ayarları
         try:
-            from services.core.debounce import configure_duckdb_wal
-            configure_duckdb_wal(conn)
-        except Exception:
-            logger.debug("Silent exception caught", exc_info=True)
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS scheduler_state (
-                key TEXT PRIMARY KEY,
-                value TEXT NOT NULL,
-                updated_at TEXT NOT NULL
-            )
-        """)
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS job_runs (
-                job_type TEXT PRIMARY KEY,
-                last_run_ts REAL NOT NULL,
-                updated_at TEXT NOT NULL
-            )
-        """)
-        conn.commit()
-        conn.close()
+            Path(self._state_db_path).parent.mkdir(parents=True, exist_ok=True)
+            conn = duckdb.connect(self._state_db_path)
+            # SSD write reduction: DuckDB WAL ayarları
+            try:
+                conn.execute("SET wal_autocheckpoint = '2MB'")
+                conn.execute("SET checkpoint_threshold = '4MB'")
+            except Exception:
+                pass
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS scheduler_state (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+            """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS job_runs (
+                    job_type TEXT PRIMARY KEY,
+                    last_run_ts REAL NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+            """)
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            logger.warning("Failed to initialize scheduler state db", error=str(e))
 
     def save_state(self) -> Any:
         """Scheduler durumunu SQLite'a kaydet (debounced — SSD dostu)."""

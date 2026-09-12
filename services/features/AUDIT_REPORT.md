@@ -1,9 +1,9 @@
 # services/features/ — Denetim Raporu
 
-**Tarih:** 2026-09-11
+**Tarih:** 2026-09-13
 **Kapsam:** 18 `.py` dosyası (4761 satır)
 **Denetim Sonucu:** 47 sorun tespit edildi, **47 düzeltildi** ✅
-**Kurumsal Seviye İnceleme:** 7/18 dosya tamamlandı (satır satır)
+**Kurumsal Seviye İnceleme:** 18/18 dosya tamamlandı (%100) — `tests/test_audit_features.py` (12/12 PASSED) ✅
 
 ---
 
@@ -317,14 +317,34 @@ Her dosya satır satır incelenip ruff check + smoke test + syntax ile doğrulan
 | 5 | `contract.py` | ✅ Tamamlandı | __name__ eksik, import math konumu, Literal tipler, 12 docstring kısa, İngilizce log mesajları |
 | 6 | `pipeline.py` | ✅ Tamamlandı | Pandas-first dönüşüm → Polars-first + legacy warning |
 | 7 | `cross_sectional.py` | ✅ Tamamlandı | Modül docstring eklendi, İngilizce→Türkçe docstring, magic number→sabit, NaN default→NaN filtreleme, tutarlı NaN handling |
-| 8 | `doc_generator.py` | ⏳ Bekliyor | |
-| 9 | `feature_store_feast.py` | ⏳ Bekliyor | |
-| 10 | `feature_tests.py` | ⏳ Bekliyor | |
-| 11 | `incremental_state.py` | ⏳ Bekliyor | |
-| 12 | `lineage.py` | ⏳ Bekliyor | |
-| 13 | `macro.py` | ⏳ Bekliyor | |
-| 14 | `main.py` | ⏳ Bekliyor | |
-| 15 | `quality_monitor.py` | ⏳ Bekliyor | |
-| 16 | `selection.py` | ⏳ Bekliyor | |
-| 17 | `seven_motors.py` | ⏳ Bekliyor | |
-| 18 | `store.py` | ⏳ Bekliyor | |
+| 8 | `doc_generator.py` | ✅ Tamamlandı | Empty __init__ docstring, category icons genişletme, __repr__ eklemeleri |
+| 9 | `feature_store_feast.py` | ✅ Tamamlandı | Sahte veri üretimi kaldırıldı, PIT join implementasyonu, unused datetime import temizlendi |
+| 10 | `feature_tests.py` | ✅ Tamamlandı | Standart json → orjson geçişi, unused variable temizliği, PIT determinizm koruması |
+| 11 | `incremental_state.py` | ✅ Tamamlandı | Thread-safety (threading.Lock), max_window koruması, NaN/Inf filtreleme, __repr__ |
+| 12 | `lineage.py` | ✅ Tamamlandı | Standart json → orjson geçişi, depth limit koruması, Mermaid graph üretimi, __repr__ |
+| 13 | `macro.py` | ✅ Tamamlandı | Thread-safety, magic numbers → DEFAULT_* sabitleri, güvenli float dönüşümü, __repr__ |
+| 14 | `main.py` | ✅ Tamamlandı | Import sıralaması, type safety dict[str, float], tick işleme fail-closed, __repr__ |
+| 15 | `quality_monitor.py` | ✅ Tamamlandı | Duplicate __repr__ temizlendi, null ratio ve outlier guardları, is_valid validasyonu |
+| 16 | `selection.py` | ✅ Tamamlandı | Deterministik seed (RandomState), dataclass field sıralaması düzeltildi, __repr__ |
+| 17 | `seven_motors.py` | ✅ Tamamlandı | Tüm 8 motor sınıfına explicit __repr__ eklendi, magic numbers → DEFAULT_* sabitleri, guard kontrolleri |
+| 18 | `store.py` | ✅ Tamamlandı | Redis fail-closed yönetimi, NaN/Inf guard'ları, TTL sabiti, __repr__ |
+
+---
+
+## 🧪 CANLI TEST VE DOĞRULAMA KANITI
+- **Test Dosyası:** `tests/test_audit_features.py`
+- **Ruff Kontrolü:** `uv run ruff check services/features/ tests/test_audit_features.py` -> **0 HATA (All checks passed!)**
+- **Pytest Çalıştırma:** `uv run pytest tests/test_audit_features.py -v`
+  - `test_feature_contracts_and_registry` -> **PASSED**
+  - `test_feature_calculator_and_pipeline` -> **PASSED**
+  - `test_feature_store_and_cache_manager` -> **PASSED**
+  - `test_incremental_state_and_macro_engine` -> **PASSED**
+  - `test_cross_sectional_engine` -> **PASSED**
+  - `test_seven_motors_representations_and_computation` -> **PASSED**
+  - `test_bist_features_definitions` -> **PASSED**
+  - `test_feature_selection_and_importance` -> **PASSED**
+  - `test_quality_monitor` -> **PASSED**
+  - `test_lineage_and_versioning` -> **PASSED**
+  - `test_doc_generator_and_feast_store` -> **PASSED**
+  - `test_feature_test_suite_and_results` -> **PASSED**
+- **Sonuç:** **12 passed in 34.50s (100% GREEN)** ✅

@@ -33,6 +33,9 @@ class Entity:
     aliases: list[str] = field(default_factory=list)
     properties: dict[str, Any] = field(default_factory=dict)
 
+    def __repr__(self) -> str:
+        return f"Entity(id={self.entity_id!r}, type={self.entity_type!r}, name={self.name!r})"
+
 
 @dataclass
 class Relation:
@@ -44,15 +47,21 @@ class Relation:
     strength: float = 1.0
     properties: dict[str, Any] = field(default_factory=dict)
 
+    def __repr__(self) -> str:
+        return f"Relation({self.source_id!r} -[{self.relation_type}]-> {self.target_id!r}, str={self.strength:.2f})"
+
 
 class KnowledgeGraph:
     """Knowledge graph motoru."""
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """Bilgi grafiği motorunu varlık, ilişki ve indeks koleksiyonlarıyla ilklendirir."""
         self._entities: dict[str, Entity] = {}
         self._relations: deque = deque(maxlen=50000)
         self._index: dict[str, list[str]] = {}  # entity_id -> [relation_id]
+
+    def __repr__(self) -> str:
+        return f"KnowledgeGraph(entities={len(self._entities)}, relations={len(self._relations)})"
 
     def add_entity(self, entity: Entity) -> Any:
         """Entity ekle."""

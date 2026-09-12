@@ -31,6 +31,13 @@ class ShockEvent:
     indicator: str
     half_life_days: int
 
+    def __repr__(self) -> str:
+        """Şok olayı kaydının okunabilir string temsili."""
+        return (
+            f"ShockEvent(type='{self.shock_type}', indicator='{self.indicator}', "
+            f"magnitude={self.magnitude:+.2f}, half_life={self.half_life_days}d)"
+        )
+
 
 @dataclass
 class ImpactResult:
@@ -44,6 +51,14 @@ class ImpactResult:
     remaining_impact: float
     days_elapsed: int
     cumulative_impact: float
+
+    def __repr__(self) -> str:
+        """Şok etki sonucunun okunabilir string temsili."""
+        return (
+            f"ImpactResult(ticker='{self.ticker}', sector='{self.sector}', "
+            f"shock='{self.shock_type}', remaining={self.remaining_impact:+.4f}, "
+            f"decay={self.decay_factor:.2f})"
+        )
 
 
 class MacroImpactAnalyzer:
@@ -63,9 +78,16 @@ class MacroImpactAnalyzer:
         "OTHER": {"usdtry": -0.4, "interest_rate": -0.4, "oil": -0.2, "inflation": -0.4, "global": 0.4, "vix": -0.3},
     }
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """Makro şok etki analiz motoru başlatıcı.
+
+        Şok olay geçmişi listesini ilklendirir.
+        """
         self._shock_history: list[ShockEvent] = []
+
+    def __repr__(self) -> str:
+        """Makro şok etki analiz motoru okunabilir string temsili."""
+        return f"MacroImpactAnalyzer(recorded_shocks={len(self._shock_history)})"
 
     def record_shock(
         self,
@@ -211,3 +233,10 @@ class MacroImpactAnalyzer:
 
 # Singleton
 macro_impact_analyzer = MacroImpactAnalyzer()
+
+__all__ = [
+    "ShockEvent",
+    "ImpactResult",
+    "MacroImpactAnalyzer",
+    "macro_impact_analyzer",
+]

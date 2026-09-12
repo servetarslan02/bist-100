@@ -36,6 +36,13 @@ class MacroEvent:
     surprise: float | None = None
     status: str = "UPCOMING"  # UPCOMING, COMPLETED, ANALYZED
 
+    def __repr__(self) -> str:
+        """Makro olay kaydının okunabilir string temsili."""
+        return (
+            f"MacroEvent(id='{self.event_id}', type='{self.event_type}', "
+            f"date='{self.date}', status='{self.status}')"
+        )
+
 
 class MacroCalendarEngine:
     """Makro takvim motoru."""
@@ -77,11 +84,21 @@ class MacroCalendarEngine:
         "2026-12-16",
     ]
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """Makro takvim motoru başlatıcı.
+
+        Olay listesini ve piyasa beklentilerini ilklendirir, tanımlı makro olayları yükler.
+        """
         self._events: list[MacroEvent] = []
         self._expectations: dict[str, float] = {}  # event_id → expected
         self._initialize_events()
+
+    def __repr__(self) -> str:
+        """Makro takvim motoru okunabilir string temsili."""
+        return (
+            f"MacroCalendarEngine(total_events={len(self._events)}, "
+            f"expectations={len(self._expectations)})"
+        )
 
     def _initialize_events(self) -> Any:
         """Takvim olaylarını başlat."""
@@ -230,3 +247,9 @@ class MacroCalendarEngine:
 
 # Singleton
 macro_calendar_engine = MacroCalendarEngine()
+
+__all__ = [
+    "MacroEvent",
+    "MacroCalendarEngine",
+    "macro_calendar_engine",
+]

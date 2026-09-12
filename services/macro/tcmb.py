@@ -19,27 +19,26 @@ import structlog
 
 logger = structlog.get_logger()
 
+# Para politikası duruşu reel faiz eşik sabitleri (%)
+DEFAULT_TCMB_STANCE_VERY_TIGHT: float = 3.0
+DEFAULT_TCMB_STANCE_TIGHT: float = 0.0
+DEFAULT_TCMB_STANCE_LOOSE: float = -3.0
+DEFAULT_TCMB_SURPRISE_THRESHOLD: float = 0.02
+
 
 def compute_tcmb_features(tcmb_data: dict[str, Any]) -> dict[str, float]:
-    """TCMB faiz ve para politikası feature'ları.
+    """TCMB politika faizi, reel faiz, faiz sürprizi ve para politikası duruşu feature'larını hesaplar.
 
     Args:
-        tcmb_data: {
-            "policy_rate": float,        # Politika faizi
-            "inflation": float,          # Enflasyon (CPI YoY)
-            "actual_rate": float,        # Gerçekleşen faiz
-            "expected_rate": float,       # Beklenti faiz
-            "us_rate": float,            # ABD faizi
-            "wacf": float,               # Ağırlıklı ortalama fonlama maliyeti
-            "rate_change": float,        # Son faiz değişimi
-            "corridor_upper": float,     # Koridor üst
-            "corridor_lower": float,     # Koridor alt
-        }
+        tcmb_data: Politika faizi, enflasyon, gerçekleşen faiz, beklenti faiz ve WACF verilerini içeren sözlük.
 
     Returns:
-        Feature dictionary
+        dict[str, float]: Hesaplanmış TCMB feature sözlüğü.
+
+    Raises:
+        ValueError: Sayısal dönüştürme hatası oluştuğunda (yakalanıp loglanır).
     """
-    features = {}
+    features: dict[str, float] = {}
 
     try:
         # Politika faizi
@@ -61,17 +60,18 @@ def compute_tcmb_features(tcmb_data: dict[str, Any]) -> dict[str, float]:
             surprise_pct = (float(actual_rate) - float(expected_rate)) / max(abs(float(expected_rate)), 0.01)
             features["tcmb_rate_surprise_pct"] = round(surprise_pct, 4)
             features["tcmb_rate_surprise_direction"] = (
-                1.0 if surprise_pct > 0.02 else (-1.0 if surprise_pct < -0.02 else 0.0)
+                1.0 if surprise_pct > DEFAULT_TCMB_SURPRISE_THRESHOLD
+                else (-1.0 if surprise_pct < -DEFAULT_TCMB_SURPRISE_THRESHOLD else 0.0)
             )
 
         # Para politikası duruşu
         if policy_rate and inflation:
             real_rate = float(policy_rate) - float(inflation)
-            if real_rate > 3:
+            if real_rate > DEFAULT_TCMB_STANCE_VERY_TIGHT:
                 features["tcmb_policy_stance"] = 2.0  # ÇOK SIKI
-            elif real_rate > 0:
+            elif real_rate > DEFAULT_TCMB_STANCE_TIGHT:
                 features["tcmb_policy_stance"] = 1.0  # SIKI
-            elif real_rate > -3:
+            elif real_rate > DEFAULT_TCMB_STANCE_LOOSE:
                 features["tcmb_policy_stance"] = -1.0  # GEVŞEK
             else:
                 features["tcmb_policy_stance"] = -2.0  # ÇOK GEVŞEK
@@ -103,6 +103,16 @@ def compute_tcmb_features(tcmb_data: dict[str, Any]) -> dict[str, float]:
             features["tcmb_corridor_width"] = round(float(corridor_upper) - float(corridor_lower), 2)
 
     except Exception as e:
-        logger.error("TCMB feature computation failed", error=str(e))
+        logger.error("TCMB feature hesaplaması başarısız oldu", error=str(e))
 
     return features
+
+
+__all__ = [
+    "DEFAULT_TCMB_STANCE_VERY_TIGHT",
+    "DEFAULT_TCMB_STANCE_TIGHT",
+    "DEFAULT_TCMB_STANCE_LOOSE",
+    "DEFAULT_TCMB_SURPRISE_THRESHOLD",
+    "compute_tcmb_features",
+]
+

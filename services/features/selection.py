@@ -51,10 +51,6 @@ class SelectionResult:
         timestamp: İşlem zamanı (ISO 8601).
     """
 
-    def __repr__(self) -> str:
-        """SelectionResult kısa temsili."""
-        return f"SelectionResult(selected={self.n_selected}, removed={self.n_removed}, ratio={self.reduction_ratio:.1%})"
-
     selected_features: list[str]
     removed_features: list[str]
     removal_reasons: dict[str, str]  # feature → reason
@@ -63,6 +59,10 @@ class SelectionResult:
     n_removed: int
     reduction_ratio: float
     timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
+
+    def __repr__(self) -> str:
+        """SelectionResult kısa temsili."""
+        return f"SelectionResult(selected={self.n_selected}, removed={self.n_removed}, ratio={self.reduction_ratio:.1%})"
 
 
 @dataclass
@@ -75,13 +75,13 @@ class FeatureImportance:
         rank: Sıralama (1 = en önemli).
     """
 
-    def __repr__(self) -> str:
-        """FeatureImportance kısa temsili."""
-        return f"FeatureImportance({self.feature_name!r}, imp={self.importance:.4f}, rank={self.rank})"
-
     feature_name: str
     importance: float
     rank: int
+
+    def __repr__(self) -> str:
+        """FeatureImportance kısa temsili."""
+        return f"FeatureImportance({self.feature_name!r}, imp={self.importance:.4f}, rank={self.rank})"
 
 
 class FeatureSelector:

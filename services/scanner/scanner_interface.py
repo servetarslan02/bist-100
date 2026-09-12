@@ -54,8 +54,19 @@ class ScanResult:
     evidence: list[str] = field(default_factory=list)
     risks: list[str] = field(default_factory=list)
 
+    def __repr__(self) -> str:
+        """ScanResult okunabilir nesne temsili."""
+        return (
+            f"ScanResult(ticker='{self.ticker}', score={self.opportunity_score:.1f}, "
+            f"signal='{self.signal_type}', dir='{self.signal_direction}', tier={self.current_tier})"
+        )
+
     def to_dict(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Tarama sonucunu serileştirilebilir sözlük formatına dönüştürür.
+
+        Returns:
+            dict[str, Any]: BIST sembolü, skorlar, sinyal ve risk gerekçelerini içeren sözlük.
+        """
         return {
             "ticker": self.ticker,
             "timestamp": self.timestamp.isoformat(),

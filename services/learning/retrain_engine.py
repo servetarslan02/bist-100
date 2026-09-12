@@ -39,6 +39,12 @@ class WalkForwardMetrics:
     passed_splits: int
     pass_rate: float
 
+    def __repr__(self) -> str:
+        return (
+            f"WalkForwardMetrics(sharpe={self.avg_sharpe:.2f}, deflated_sharpe={self.deflated_sharpe:.2f}, "
+            f"acc={self.avg_direction_accuracy:.1f}%, pass_rate={self.pass_rate:.1f}%)"
+        )
+
 
 @dataclass
 class RetrainResult:
@@ -53,15 +59,21 @@ class RetrainResult:
     training_samples: int
     regime: str
 
+    def __repr__(self) -> str:
+        return f"RetrainResult(success={self.success}, ver={self.version_id!r}, samples={self.training_samples}, regime={self.regime!r})"
+
 
 class RetrainEngine:
     """Walk-forward validated retrain orchestrator."""
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """Model yeniden eğitim motorunu geçmiş ve sayaç durumlarıyla ilklendirir."""
         self._retrain_history: deque = deque(maxlen=500)
         self._last_retrain: RetrainResult | None = None
         self._retrain_count: int = 0
+
+    def __repr__(self) -> str:
+        return f"RetrainEngine(retrain_count={self._retrain_count}, history={len(self._retrain_history)})"
 
     def validate_and_retrain(
         self,

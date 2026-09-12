@@ -30,7 +30,11 @@ class PaperStateStore:
     """DuckDB tabanlı persistent state store — paper trading için."""
 
     def __init__(self, db_path: str = "data/paper_trading_state.db"):
-        """Otomatik eklendi."""
+        """PaperStateStore kalıcı durum deposunu başlatır.
+
+        Args:
+            db_path: Durumun saklanacağı DuckDB veritabanı dosya yolu.
+        """
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._write_buffer: list[tuple[str, tuple]] = []
@@ -46,6 +50,10 @@ class PaperStateStore:
         else:
             logger.warning("PaperStateStore initialized without persistence (duckdb not installed)")
         self._start_periodic_flush()
+
+    def __repr__(self) -> str:
+        """Sınıfın metinsel temsilini döndürür."""
+        return f"PaperStateStore(db_path={self.db_path!s}, buffer_size={len(self._write_buffer)})"
 
     def _init_db(self) -> Any:
         """SQLite tablolarini olustur."""
@@ -175,7 +183,7 @@ class PaperStateStore:
 
     @contextmanager
     def _connect(self) -> Any:
-        """Otomatik eklendi."""
+        """DuckDB veritabanı bağlantısı açan ve güvenli bir context yöneticisi sağlayan yardımcı metot."""
         if duckdb is None:
             raise RuntimeError("DuckDB module is not installed in the environment.")
 
@@ -538,7 +546,12 @@ class PaperStateStore:
     # ===================== CONFIG =====================
 
     def set_config(self, key: str, value: str) -> Any:
-        """Otomatik eklendi (buffered — SSD dostu)."""
+        """Yapılandırma tablosuna anahtar-değer çifti kaydeder (SSD dostu tamponlu yazma).
+
+        Args:
+            key: Ayar anahtarı adı.
+            value: Ayar değeri dizgesi.
+        """
         self._buffered_write(
             """
             INSERT OR REPLACE INTO config (key, value, updated_at)
@@ -548,7 +561,15 @@ class PaperStateStore:
         )
 
     def get_config(self, key: str, default: str | None = None) -> str | None:
-        """Otomatik eklendi."""
+        """Yapılandırma tablosundan belirtilen anahtara ait değeri okur.
+
+        Args:
+            key: Ayar anahtarı adı.
+            default: Anahtar bulunamazsa döndürülecek varsayılan değer.
+
+        Returns:
+            str | None: Ayar değeri dizgesi veya default.
+        """
         with self._connect() as conn:
             row = conn.execute("SELECT value FROM config WHERE key = ?", (key,)).fetchone()
             if not row:
@@ -575,7 +596,14 @@ class PaperStateStore:
 
     @staticmethod
     def _compute_hash(entry: dict[str, Any]) -> str:
-        """Otomatik eklendi."""
+        """Verilen sözlük girdisinin deterministik SHA-256 özetini üretir.
+
+        Args:
+            entry: Özetlenecek veri sözlüğü.
+
+        Returns:
+            str: 16 karakterlik SHA-256 özet dizgesi.
+        """
         import hashlib
 
         data = orjson.dumps(entry, option=orjson.OPT_SORT_KEYS, default=str).decode()

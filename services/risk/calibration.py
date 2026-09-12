@@ -25,17 +25,25 @@ class CalibrationParams:
     b: float = 0.0  # Platt: shift
     empirical_bins: dict[str, float] = None  # Bin bazli mapping
 
+    def __repr__(self) -> str:
+        """CalibrationParams okunabilir nesne temsili."""
+        return f"CalibrationParams(method='{self.method}', a={self.a:.2f}, b={self.b:.2f})"
+
 
 class ScoreCalibrator:
     """Ranking score -> win_probability kalibrasyonu."""
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """ScoreCalibrator kalibratör motorunu başlatır."""
         self.params = CalibrationParams()
         self._trade_history: list[dict] = []  # Historical OOS trades
         self._fitted = False
         self._brier_scores: list[float] = []  # Brier score geçmişi
         self._calibration_curve: dict[str, list] = {"predicted": [], "actual": []}
+
+    def __repr__(self) -> str:
+        """ScoreCalibrator okunabilir durum temsili."""
+        return f"ScoreCalibrator(fitted={self._fitted}, trades={len(self._trade_history)}, method='{self.params.method}')"
 
     def fit_from_trades(self, trades: list[dict]) -> Any:
         """Historical OOS trades'ten calibration fit et.

@@ -36,7 +36,18 @@ class PaperRiskGate:
         liquidity_min_volume: int = 100_000,
         data_quality_min_stocks: int = 50,
     ):
-        """Otomatik eklendi."""
+        """PaperRiskGate risk kapısı denetleyicisini başlatır.
+
+        Args:
+            max_position_pct: Tek bir hisse pozisyonunun portföy değerine maksimum yüzdesi (varsayılan %10).
+            max_sector_pct: Tek bir sektörün portföy değerine maksimum yoğunlaşma yüzdesi (varsayılan %30).
+            max_portfolio_exposure_pct: Toplam hisse pozisyonlarının portföy değerine maksimum kaldıraçsız oranı.
+            max_drawdown_pct: Uyarı verilmesine neden olan maksimum tepe-dip düşüş yüzdesi (varsayılan %20).
+            kill_switch_drawdown_pct: Otomatik işlemleri kilitleyen acil durum düşüş eşiği (varsayılan %25).
+            daily_loss_limit_pct: Günlük izin verilen maksimum kayıp yüzdesi (varsayılan %5).
+            liquidity_min_volume: İşlem görecek hisse için aranan asgari günlük hacim.
+            data_quality_min_stocks: Veri kalitesi denetiminde aranan asgari hisse sayısı.
+        """
         self.max_position_pct = max_position_pct
         self.max_sector_pct = max_sector_pct
         self.max_portfolio_exposure_pct = max_portfolio_exposure_pct
@@ -51,12 +62,20 @@ class PaperRiskGate:
         self._consecutive_errors = 0
         self._max_consecutive_errors = 3
 
+    def __repr__(self) -> str:
+        """Sınıfın metinsel temsilini döndürür."""
+        return (
+            f"PaperRiskGate(kill_switch={self._kill_switch_active}, "
+            f"max_pos={self.max_position_pct}%, max_sector={self.max_sector_pct}%, "
+            f"kill_dd={self.kill_switch_drawdown_pct}%)"
+        )
+
     def is_kill_switch_active(self) -> bool:
         """Kill switch aktif mi?"""
         return self._kill_switch_active
 
     def get_kill_switch_reason(self) -> str:
-        """Otomatik eklendi."""
+        """Kill switch'in tetiklenme gerekçesini döndürür."""
         return self._kill_switch_reason
 
     def reset_kill_switch(self) -> Any:
@@ -123,7 +142,7 @@ class PaperRiskGate:
     # ===================== INDIVIDUAL CHECKS =====================
 
     def _check_kill_switch(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Kill switch'in aktif olup olmadığını kontrol eder."""
         if self._kill_switch_active:
             return {
                 "check_name": "kill_switch",
@@ -134,7 +153,7 @@ class PaperRiskGate:
         return {"check_name": "kill_switch", "result": "PASS", "details": "OK", "severity": "INFO"}
 
     def _check_data_quality(self, ok: bool) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Veri kalitesi durumunu denetler; yetersizse NO_TRADE üretir."""
         if not ok:
             return {
                 "check_name": "data_quality",
@@ -145,7 +164,7 @@ class PaperRiskGate:
         return {"check_name": "data_quality", "result": "PASS", "details": "OK", "severity": "INFO"}
 
     def _check_model_validity(self, valid: bool) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Şampiyon ML modelinin geçerli ve yüklü olup olmadığını doğrular."""
         if not valid:
             return {
                 "check_name": "model_validity",
@@ -156,7 +175,7 @@ class PaperRiskGate:
         return {"check_name": "model_validity", "result": "PASS", "details": "OK", "severity": "INFO"}
 
     def _check_position_size(self, portfolio, ticker: str, side: str, quantity: int, price: float) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Yeni hisse alımının tek hisse tavan yüzdesini aşıp aşmadığını denetler."""
         if side == "SELL":
             return {
                 "check_name": "position_size",
@@ -200,7 +219,7 @@ class PaperRiskGate:
     def _check_sector_concentration(
         self, portfolio, ticker: str, side: str, quantity: int, price: float, sector: str
     ) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Yeni hisse alımının sektör yoğunlaşma sınırını aşıp aşmadığını denetler."""
         if not sector or side == "SELL":
             return {
                 "check_name": "sector_concentration",
@@ -245,7 +264,7 @@ class PaperRiskGate:
     def _check_portfolio_exposure(
         self, portfolio, ticker: str, side: str, quantity: int, price: float
     ) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Toplam portföy hisse risk maruziyetini (exposure %) denetler."""
         total_value = portfolio.get_total_value()
         if total_value <= 0:
             return {
@@ -280,7 +299,7 @@ class PaperRiskGate:
         }
 
     def _check_drawdown(self, portfolio) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Mevcut tepe-dip düşüşünü alarm ve kill switch sınırlarına göre denetler."""
         current_dd = portfolio.get_current_drawdown()
 
         if current_dd >= self.kill_switch_drawdown_pct:
@@ -309,7 +328,7 @@ class PaperRiskGate:
         }
 
     def _check_daily_loss(self, portfolio) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Günlük kayıp oranını izin verilen günlük limit yüzdesine göre denetler."""
         if len(portfolio._equity_curve) < 2:
             return {"check_name": "daily_loss", "result": "PASS", "details": "Not enough history", "severity": "INFO"}
 

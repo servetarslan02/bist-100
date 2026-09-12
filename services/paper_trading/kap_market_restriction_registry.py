@@ -30,16 +30,27 @@ class MarketRestrictionRecord:
     end_date: str | None = None  # Tedbirin bittiği tarih (YYYY-MM-DD)
     details: str = ""
 
+    def __repr__(self) -> str:
+        """Sınıfın metinsel temsilini döndürür."""
+        return f"MarketRestrictionRecord(ticker={self.ticker!r}, type={self.restriction_type!r}, date={self.effective_date})"
+
 
 class KAPMarketRestrictionRegistry:
     """Zaman damgalı KAP piyasa tedbir ve kısıt sicil yöneticisi."""
 
     def __init__(self):
-        """Otomatik eklendi."""
+        """KAPMarketRestrictionRegistry piyasa tedbir yöneticisini başlatır."""
         self._restrictions: dict[str, list[MarketRestrictionRecord]] = {}
         self._halted_tickers: set[str] = set()
         self._gross_settlement_tickers: set[str] = set()
         self._short_ban_tickers: set[str] = set()
+
+    def __repr__(self) -> str:
+        """Sınıfın metinsel temsilini döndürür."""
+        return (
+            f"KAPMarketRestrictionRegistry(halted={len(self._halted_tickers)}, "
+            f"gross_settlement={len(self._gross_settlement_tickers)}, short_ban={len(self._short_ban_tickers)})"
+        )
 
     def register_restriction(
         self,
@@ -77,6 +88,15 @@ class KAPMarketRestrictionRegistry:
             published=published_at,
             effective=effective_date,
         )
+
+    def get_active_restrictions(self, ticker: str, current_date: str) -> list[MarketRestrictionRecord]:
+        """Belirtilen hisse senedi için verilen tarihte geçerli olan tüm tedbir kayıtlarını döndürür."""
+        active = []
+        for rec in self._restrictions.get(ticker, []):
+            if rec.effective_date <= current_date:
+                if rec.end_date is None or rec.end_date >= current_date:
+                    active.append(rec)
+        return active
 
     def is_halted(self, ticker: str, current_date: str) -> bool:
         """Hisse belirtilen işlem gününde durdurulmuş mu?"""

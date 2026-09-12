@@ -34,7 +34,7 @@ logger = structlog.get_logger()
 class BreadthResult:
     """Market breadth sonucu — 7 gösterge + state."""
 
-    timestamp: datetime
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     # Temel breadth
     advancing: int = 0
@@ -64,7 +64,12 @@ class BreadthResult:
     fx_adjustment: float = 0.0  # Breadth'e uygulanan döviz düzeltmesi
 
     def to_dict(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """BreadthResult'u serileştirilebilir dict formatına dönüştürür.
+
+        Returns:
+            Tüm breadth göstergelerini içeren dict. Ondalık değerler
+            4 basamağa yuvarlanır; timestamp ISO-8601 formatındadır.
+        """
         return {
             "timestamp": self.timestamp.isoformat(),
             "advancing": self.advancing,
@@ -105,7 +110,15 @@ class MarketBreadthEngine:
         thrust_threshold: float = 0.615,
         volume_min: float = None,
     ):
-        """Otomatik eklendi."""
+        """Market Breadth Engine'i yapılandırır.
+
+        Args:
+            mcclellan_short_ema: McClellan Osilatörü kısa EMA periyodu (varsayılan 19).
+            mcclellan_long_ema: McClellan Osilatörü uzun EMA periyodu (varsayılan 39).
+            thrust_threshold: Breadth Thrust sinyal eşiği (Zweig: 0.615).
+            volume_min: Hesaplamaya dahil edilecek minimum günlük hacim; None ise
+                DEFAULT_VOLUME_MIN (10.000) kullanılır.
+        """
         self._mcclellan_short = mcclellan_short_ema
         self._mcclellan_long = mcclellan_long_ema
         self._thrust_threshold = thrust_threshold
@@ -115,6 +128,14 @@ class MarketBreadthEngine:
         self._ad_line_cumulative = 0
         self._mcclellan_summation = 0.0
         self._net_advances_history: list[int] = []
+
+    def __repr__(self) -> str:
+        """Sınıfın metinsel temsilini döndürür."""
+        return (
+            f"MarketBreadthEngine(mcclellan_short={self._mcclellan_short}, "
+            f"mcclellan_long={self._mcclellan_long}, thrust_threshold={self._thrust_threshold}, "
+            f"volume_min={self._volume_min}, ad_line={self._ad_line_cumulative})"
+        )
 
     def compute(
         self,

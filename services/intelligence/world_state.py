@@ -199,13 +199,20 @@ class WorldStateManager:
     }
 
     def __init__(self):
-        """Otomatik eklendi."""
+        """WorldStateEngine makroekonomik dünya durumu takip motorunu başlatır."""
         self._current_state = WorldState(timestamp=datetime.now(UTC))
         self._last_update = datetime.now(UTC)
 
+    def __repr__(self) -> str:
+        """Sınıfın metinsel temsilini döndürür."""
+        return (
+            f"WorldStateEngine(last_update={self._last_update.isoformat()}, "
+            f"turkey_risk={self._current_state.turkey_macro_risk:.2f}, vix={self._current_state.vix_level:.1f})"
+        )
+
     @property
     def current_state(self) -> WorldState:
-        """Otomatik eklendi."""
+        """Güncel dünya makroekonomik durum nesnesini döndürür."""
         return self._current_state
 
     def update_from_event(self, event_type: str, event_data: dict[str, Any]) -> dict[str, float]:

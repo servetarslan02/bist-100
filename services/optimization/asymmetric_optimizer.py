@@ -46,10 +46,24 @@ class StrategyParameters:
     position_alloc_bull: float = 0.15  # Boğada kazanan hisseye daha yüksek ağırlık
     position_alloc_bear: float = 0.05
 
+    def __repr__(self) -> str:
+        return (
+            f"StrategyParameters(buyer_pressure={self.min_buyer_pressure}, "
+            f"candle_score={self.min_candle_score}, rsi_oversold={self.rsi_oversold}, "
+            f"atr_bull={self.atr_trailing_bull_mult}, atr_bear={self.atr_trailing_bear_mult}, "
+            f"alloc_bull={self.position_alloc_bull})"
+        )
+
 
 @dataclass
 class OptimizationTrialResult:
-    """Otomatik eklendi."""
+    """
+    Asimetrik rejim optimizasyonu deneme sonuç karnesi.
+
+    Optuna aramasında değerlendirilen asimetrik parametrelerin getiri,
+    Sharpe oranı, kâr faktörü, işlem sayısı ve fitness skorunu depolar.
+    """
+
     trial_id: int
     params: StrategyParameters
     total_return_pct: float = 0.0
@@ -61,15 +75,35 @@ class OptimizationTrialResult:
     total_trades: int = 0
     fitness_score: float = 0.0
 
+    def __repr__(self) -> str:
+        return (
+            f"OptimizationTrialResult(trial_id={self.trial_id}, "
+            f"return={self.total_return_pct:+.1f}%, sharpe={self.sharpe_ratio:.2f}, "
+            f"pf={self.profit_factor:.2f}, dd={self.max_drawdown:.1f}%, "
+            f"fitness={self.fitness_score:.3f})"
+        )
+
 
 class AsymmetricBayesianOptimizer:
     """24 Çekirdekli Asimetrik Bayesian Optimizasyon Motoru."""
 
-    def __init__(self, bm_df: pl.DataFrame, stock_dict: dict[str, pl.DataFrame]):
-        """Otomatik eklendi."""
+    def __init__(self, bm_df: Any, stock_dict: dict[str, Any]) -> None:
+        """
+        Asimetrik Bayesian optimizasyon motorunu ilklendirir ve göstergeleri önbellekler.
+
+        Args:
+            bm_df: BIST 100 gösterge endeks verisi.
+            stock_dict: Hisse senedi DataFrame sözlüğü.
+        """
         self.bm_df = bm_df
         self.stock_dict = stock_dict
         self._precompute_technicals()
+
+    def __repr__(self) -> str:
+        return (
+            f"AsymmetricBayesianOptimizer(stocks_count={len(self.stock_dict)}, "
+            f"cached_tickers={len(getattr(self, 'tech_cache', {}))})"
+        )
 
     def _precompute_technicals(self) -> Any:
         """Teknik göstergeleri RAM'e önbellekler."""
@@ -286,21 +320,31 @@ class AsymmetricBayesianOptimizer:
         total_ret = ((final_eq - initial_capital) / initial_capital) * 100
 
         # Metrikler
-        df_eq = pl.Series(equity_curve)
-        peak = df_eq.cummax()
-        dd = (df_eq - peak) / peak * 100
-        max_dd = float(dd.min()) if len(dd) > 0 else 0.0
+        eq_arr = np.array(equity_curve, dtype=np.float64)
+        if len(eq_arr) > 0:
+            peak = np.maximum.accumulate(eq_arr)
+            dd = (eq_arr - peak) / np.maximum(peak, 1e-9) * 100
+            max_dd = float(np.min(dd))
+        else:
+            max_dd = 0.0
 
-        df_t = pl.DataFrame(trade_logs)
+        df_t = pl.DataFrame(trade_logs) if trade_logs else pl.DataFrame({"pnl": []})
         t_cnt = len(df_t)
-        w_cnt = len(df_t.filter(pl.col("pnl") > 0)) if t_cnt > 0 else 0
-        w_rate = (w_cnt / t_cnt * 100) if t_cnt > 0 else 0.0
-        w_sum = df_t.filter(pl.col("pnl") > 0)["pnl"].sum() if t_cnt > 0 else 0
-        l_sum = abs(df_t.filter(pl.col("pnl") < 0)["pnl"].sum()) if t_cnt > 0 else 1e-9
-        pf = round(float(w_sum / max(l_sum, 1e-9)), 2)
+        if t_cnt > 0 and "pnl" in df_t.columns:
+            w_cnt = len(df_t.filter(pl.col("pnl") > 0))
+            w_rate = (w_cnt / t_cnt * 100)
+            w_sum = float(df_t.filter(pl.col("pnl") > 0)["pnl"].sum()) if w_cnt > 0 else 0.0
+            l_sum = abs(float(df_t.filter(pl.col("pnl") < 0)["pnl"].sum())) if (t_cnt - w_cnt) > 0 else 1e-9
+            pf = round(float(w_sum / max(l_sum, 1e-9)), 2)
+        else:
+            w_rate = 0.0
+            pf = 1.0
 
-        returns = df_eq.pct_change().dropna()
-        sharpe = float(np.mean(returns) / (np.std(returns) + 1e-9) * np.sqrt(252)) if len(returns) > 10 else 0.0
+        if len(eq_arr) > 10:
+            returns = np.diff(eq_arr) / np.maximum(eq_arr[:-1], 1e-9)
+            sharpe = float(np.mean(returns) / (np.std(returns) + 1e-9) * np.sqrt(252))
+        else:
+            sharpe = 0.0
 
         # Dengeli Fitness: Yüksek Kâr + Sharpe + Düşük DD + Yeterli İşlem
         cagr_score = np.log10(max(1.0, total_ret + 100.0))
@@ -326,7 +370,15 @@ class AsymmetricBayesianOptimizer:
         trial_results: list[OptimizationTrialResult] = []
 
         def objective(trial: optuna.Trial) -> float:
-            """Otomatik eklendi."""
+            """
+            Asimetrik strateji parametrelerini örnekler ve fitness hedefini hesaplar.
+
+            Args:
+                trial: Optuna deneme nesnesi.
+
+            Returns:
+                float: Maksimize edilecek fitness skoru.
+            """
             params = StrategyParameters(
                 min_buyer_pressure=trial.suggest_float("min_buyer_pressure", 45.0, 60.0, step=1.0),
                 min_candle_score=trial.suggest_float("min_candle_score", 60.0, 80.0, step=5.0),
@@ -375,3 +427,10 @@ class AsymmetricBayesianOptimizer:
         )
 
         return best_params, trial_results
+
+
+__all__ = [
+    "AsymmetricBayesianOptimizer",
+    "OptimizationTrialResult",
+    "StrategyParameters",
+]

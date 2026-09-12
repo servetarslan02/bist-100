@@ -22,7 +22,15 @@ logger = structlog.get_logger()
 
 @dataclass
 class LiquidityProfile:
-    """Likidite profili."""
+    """Hisse senedine ait likidite ve derinlik profili.
+
+    Args:
+        avg_daily_volume: Günlük ortalama işlem adedi (ADV).
+        bid_depth: Alış kademelerindeki ortalama derinlik tutarı (TL).
+        ask_depth: Satış kademelerindeki ortalama derinlik tutarı (TL).
+        spread_pct: Alış-satış makası yüzdesi (%0.1 gibi).
+        tick_size: Minimum fiyat adımı.
+    """
 
     avg_daily_volume: int  # Günlük ortalama hacim
     bid_depth: float = 0.0  # Bid derinliği (TL)
@@ -30,10 +38,25 @@ class LiquidityProfile:
     spread_pct: float = 0.1  # Spread %
     tick_size: float = 0.01  # Minimum fiyat adımı
 
+    def __repr__(self) -> str:
+        return (
+            f"LiquidityProfile(adv={self.avg_daily_volume}, spread={self.spread_pct:.2f}%, "
+            f"bid_depth={self.bid_depth:.0f}, ask_depth={self.ask_depth:.0f})"
+        )
+
 
 @dataclass
 class MarketImpactResult:
-    """Market impact sonucu."""
+    """Piyasa etkisi (Market Impact) hesaplama sonucu.
+
+    Args:
+        base_slippage: Temel spread kayması.
+        volume_impact: Emir büyüklüğüne bağlı hacim etkisi.
+        regime_impact: Piyasa rejimine bağlı ek kayma.
+        total_slippage: Toplam kayma yüzdesi.
+        fill_price: Gerçekleşme fiyatı.
+        impact_breakdown: Etki bileşenlerinin ayrıntılı dökümü.
+    """
 
     base_slippage: float
     volume_impact: float
@@ -41,6 +64,12 @@ class MarketImpactResult:
     total_slippage: float
     fill_price: float
     impact_breakdown: dict[str, float]
+
+    def __repr__(self) -> str:
+        return (
+            f"MarketImpactResult(fill_price={self.fill_price:.2f}, total_slip={self.total_slippage:.4f}, "
+            f"vol_impact={self.volume_impact:.4f}, regime_impact={self.regime_impact:.4f})"
+        )
 
 
 class SquareRootMarketImpact:
@@ -57,8 +86,15 @@ class SquareRootMarketImpact:
     """
 
     def __init__(self, eta: float = 0.3):
-        """Otomatik eklendi."""
+        """Karekök piyasa etkisi motorunu başlatır.
+
+        Args:
+            eta: Piyasa etkisi katsayısı (varsayılan 0.3).
+        """
         self.eta = eta  # Impact coefficient
+
+    def __repr__(self) -> str:
+        return f"SquareRootMarketImpact(eta={self.eta})"
 
     def calculate(
         self,
@@ -122,6 +158,9 @@ class RegimeAwareSlippage:
         multiplier = self.REGIME_MULTIPLIERS.get(regime, 1.0)
         return base_slippage * multiplier
 
+    def __repr__(self) -> str:
+        return f"RegimeAwareSlippage(regimes={len(self.REGIME_MULTIPLIERS)})"
+
 
 class EnhancedExecutionSimulator:
     """Gelişmiş execution simülatörü.
@@ -141,9 +180,15 @@ class EnhancedExecutionSimulator:
     MIN_COMMISSION = 1.0  # Minimum 1 TL
 
     def __init__(self):
-        """Otomatik eklendi."""
+        """Gelişmiş emir yürütme simülatörünü başlatır."""
         self._impact_model = SquareRootMarketImpact(eta=0.3)
         self._regime_slippage = RegimeAwareSlippage()
+
+    def __repr__(self) -> str:
+        return (
+            f"EnhancedExecutionSimulator(impact_model={self._impact_model!r}, "
+            f"broker_comm={self.BROKER_COMMISSION_RATE}, min_comm={self.MIN_COMMISSION})"
+        )
 
     def execute_order(
         self,

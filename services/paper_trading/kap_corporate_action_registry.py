@@ -27,16 +27,27 @@ class CorporateActionRecord:
     details: str = ""
     timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
+    def __repr__(self) -> str:
+        """Sınıfın metinsel temsilini döndürür."""
+        return f"CorporateActionRecord(ticker={self.ticker!r}, action={self.action_type!r}, date={self.effective_date})"
+
 
 class KAPCorporateActionRegistry:
     """Zaman damgalı KAP tedbir ve kısıt sicil yöneticisi."""
 
     def __init__(self):
-        """Otomatik eklendi."""
+        """KAPCorporateActionRegistry kurumsal eylem sicil yöneticisini başlatır."""
         self._actions: dict[str, list[CorporateActionRecord]] = {}
         self._halted_tickers: set[str] = set()
         self._gross_settlement_tickers: set[str] = set()
         self._short_ban_tickers: set[str] = set()
+
+    def __repr__(self) -> str:
+        """Sınıfın metinsel temsilini döndürür."""
+        return (
+            f"KAPCorporateActionRegistry(halted={len(self._halted_tickers)}, "
+            f"gross_settlement={len(self._gross_settlement_tickers)}, short_ban={len(self._short_ban_tickers)})"
+        )
 
     def register_action(
         self,
@@ -66,6 +77,10 @@ class KAPCorporateActionRegistry:
             self._short_ban_tickers.add(ticker)
 
         logger.info("KAP Corporate Action Registered", ticker=ticker, action=action_type, effective=effective_date)
+
+    def get_actions_for_ticker(self, ticker: str) -> list[CorporateActionRecord]:
+        """Belirtilen hisse senedine ait tüm kurumsal işlem kayıtlarını döndürür."""
+        return self._actions.get(ticker, [])
 
     def is_halted(self, ticker: str, date: str) -> bool:
         """Hisse belirtilen tarihte durdurulmuş mu?"""

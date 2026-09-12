@@ -11,6 +11,7 @@ Kaynaklar:
 - ScienceDirect — Dynamic Market-Aware Portfolio Optimization (2026)
 """
 
+import threading
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
@@ -21,7 +22,7 @@ logger = structlog.get_logger()
 
 
 class DrawdownAction(StrEnum):
-    """Otomatik eklendi."""
+    """Drawdown aksiyon tipleri ve müdahale dereceleri."""
     NONE = "NONE"
     REDUCE_SIZE = "REDUCE_SIZE"  # Pozisyon boyutunu azalt
     STOP_NEW = "STOP_NEW"  # Yeni pozisyon durdur
@@ -30,7 +31,7 @@ class DrawdownAction(StrEnum):
 
 
 class DrawdownSeverity(StrEnum):
-    """Otomatik eklendi."""
+    """Drawdown ciddiyet seviyesi sınıflandırması."""
     NORMAL = "NORMAL"
     WARNING = "WARNING"
     CRITICAL = "CRITICAL"
@@ -113,14 +114,23 @@ class DrawdownResponseSystem:
         {"threshold": 1.0, "action": DrawdownAction.NONE, "position_scale": 1.0},
     ]
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """Drawdown yanıt motoru bileşenlerini ve kilit mekanizmasını başlatır."""
+        self._lock = threading.RLock()
         self._peak_equity: float = 0.0
         self._current_equity: float = 0.0
         self._current_action: DrawdownAction = DrawdownAction.NONE
         self._drawdown_start: datetime | None = None
         self._events: list[DrawdownEvent] = []
         self._max_drawdown_pct: float = 0.0
+
+    def __repr__(self) -> str:
+        return (
+            f"DrawdownResponseSystem(peak={self._peak_equity:.2f}, "
+            f"current={self._current_equity:.2f}, "
+            f"max_dd={self._max_drawdown_pct:.2f}%, "
+            f"action={self._current_action.value})"
+        )
 
     def update_equity(self, current_equity: float) -> DrawdownState:
         """Equity güncelle ve drawdown hesapla.
@@ -131,88 +141,89 @@ class DrawdownResponseSystem:
         Returns:
             DrawdownState
         """
-        now = datetime.now(UTC)
+        with self._lock:
+            now = datetime.now(UTC)
 
-        # Peak equity güncelle
-        if current_equity > self._peak_equity:
-            self._peak_equity = current_equity
-            self._drawdown_start = None  # Recovery
+            # Peak equity güncelle
+            if current_equity > self._peak_equity:
+                self._peak_equity = current_equity
+                self._drawdown_start = None  # Recovery
 
-        self._current_equity = current_equity
+            self._current_equity = current_equity
 
-        # Drawdown hesapla
-        drawdown_pct = 0.0 if self._peak_equity <= 0 else (self._peak_equity - current_equity) / self._peak_equity * 100
+            # Drawdown hesapla
+            drawdown_pct = 0.0 if self._peak_equity <= 0 else (self._peak_equity - current_equity) / self._peak_equity * 100
 
-        # Max drawdown güncelle
-        self._max_drawdown_pct = max(self._max_drawdown_pct, drawdown_pct)
+            # Max drawdown güncelle
+            self._max_drawdown_pct = max(self._max_drawdown_pct, drawdown_pct)
 
-        # Drawdown süresi
-        if drawdown_pct > 0 and self._drawdown_start is None:
-            self._drawdown_start = now
+            # Drawdown süresi
+            if drawdown_pct > 0 and self._drawdown_start is None:
+                self._drawdown_start = now
 
-        duration_days = 0
-        if self._drawdown_start:
-            duration_days = (now - self._drawdown_start).days
+            duration_days = 0
+            if self._drawdown_start:
+                duration_days = (now - self._drawdown_start).days
 
-        # Aksiyon belirle
-        previous_action = self._current_action
-        action, severity, position_scale, description = self._determine_action(drawdown_pct)
+            # Aksiyon belirle
+            previous_action = self._current_action
+            action, severity, position_scale, description = self._determine_action(drawdown_pct)
 
-        # Aksiyon değiştiyse event kaydet
-        if action != previous_action:
-            event = DrawdownEvent(
+            # Aksiyon değiştiyse event kaydet
+            if action != previous_action:
+                event = DrawdownEvent(
+                    timestamp=now.isoformat(),
+                    drawdown_pct=drawdown_pct,
+                    action_taken=action,
+                    previous_action=previous_action,
+                    equity_before=self._current_equity,
+                )
+                self._events.append(event)
+                if len(self._events) > 500:
+                    self._events = self._events[-500:]
+
+                logger.warning(
+                    "Drawdown action changed",
+                    drawdown_pct=f"{drawdown_pct:.1f}%",
+                    action=action.value,
+                    severity=severity.value,
+                )
+
+                # KILL_SWITCH_TRIGGERED event publish (audit #5)
+                if severity.value == "EMERGENCY":
+                    try:
+                        from services.core.event_bus import publish_event
+                        from services.core.event_schema import CanonicalEvent, EventType
+
+                        kill_event = CanonicalEvent(
+                            event_type=EventType.KILL_SWITCH_TRIGGERED,
+                            payload={
+                                "drawdown_pct": round(drawdown_pct, 2),
+                                "action": action.value,
+                                "equity": current_equity,
+                                "peak_equity": self._peak_equity,
+                                "description": description,
+                            },
+                        )
+                        publish_event(kill_event, key="system")
+                        logger.critical("KILL_SWITCH_TRIGGERED event published", drawdown_pct=f"{drawdown_pct:.1f}%")
+                    except Exception as e:
+                        logger.error("Failed to publish KILL_SWITCH event", error=str(e))
+
+            self._current_action = action
+
+            return DrawdownState(
+                current_drawdown_pct=round(drawdown_pct, 2),
+                max_drawdown_pct=round(self._max_drawdown_pct, 2),
+                peak_equity=self._peak_equity,
+                current_equity=current_equity,
+                drawdown_duration_days=duration_days,
+                action=action,
+                severity=severity,
+                position_scale=position_scale,
+                description=description,
                 timestamp=now.isoformat(),
-                drawdown_pct=drawdown_pct,
-                action_taken=action,
-                previous_action=previous_action,
-                equity_before=self._current_equity,
             )
-            self._events.append(event)
-            if len(self._events) > 500:
-                self._events = self._events[-500:]
-
-            logger.warning(
-                "Drawdown action changed",
-                drawdown_pct=f"{drawdown_pct:.1f}%",
-                action=action.value,
-                severity=severity.value,
-            )
-
-            # KILL_SWITCH_TRIGGERED event publish (audit #5)
-            if severity.value == "EMERGENCY":
-                try:
-                    from services.core.event_bus import publish_event
-                    from services.core.event_schema import CanonicalEvent, EventType
-
-                    kill_event = CanonicalEvent(
-                        event_type=EventType.KILL_SWITCH_TRIGGERED,
-                        payload={
-                            "drawdown_pct": round(drawdown_pct, 2),
-                            "action": action.value,
-                            "equity": current_equity,
-                            "peak_equity": self._peak_equity,
-                            "description": description,
-                        },
-                    )
-                    publish_event(kill_event, key="system")
-                    logger.critical("KILL_SWITCH_TRIGGERED event published", drawdown_pct=f"{drawdown_pct:.1f}%")
-                except Exception as e:
-                    logger.error("Failed to publish KILL_SWITCH event", error=str(e))
-
-        self._current_action = action
-
-        return DrawdownState(
-            current_drawdown_pct=round(drawdown_pct, 2),
-            max_drawdown_pct=round(self._max_drawdown_pct, 2),
-            peak_equity=self._peak_equity,
-            current_equity=current_equity,
-            drawdown_duration_days=duration_days,
-            action=action,
-            severity=severity,
-            position_scale=position_scale,
-            description=description,
-            timestamp=now.isoformat(),
-        )
 
     def _determine_action(self, drawdown_pct: float) -> tuple:
         """Drawdown yüzdesine göre aksiyon belirle."""
@@ -312,18 +323,19 @@ class DrawdownResponseSystem:
             force: True ise kill switch aktif olsa bile sıfırlar
             reason: Sıfırlama nedeni (audit trail için)
         """
-        if self._current_action == DrawdownAction.HALT_SYSTEM and not force:
-            logger.warning("Drawdown reset blocked — kill switch active. Use force=True to override.")
-            return
-        logger.warning(
-            "Drawdown system reset", reason=reason, force=force, peak=self._peak_equity, max_dd=self._max_drawdown_pct
-        )
-        self._peak_equity = 0.0
-        self._current_equity = 0.0
-        self._current_action = DrawdownAction.NONE
-        self._drawdown_start = None
-        self._events = []
-        self._max_drawdown_pct = 0.0
+        with self._lock:
+            if self._current_action == DrawdownAction.HALT_SYSTEM and not force:
+                logger.warning("Drawdown reset blocked — kill switch active. Use force=True to override.")
+                return
+            logger.warning(
+                "Drawdown system reset", reason=reason, force=force, peak=self._peak_equity, max_dd=self._max_drawdown_pct
+            )
+            self._peak_equity = 0.0
+            self._current_equity = 0.0
+            self._current_action = DrawdownAction.NONE
+            self._drawdown_start = None
+            self._events = []
+            self._max_drawdown_pct = 0.0
 
     def get_alert_message(self, state: DrawdownState) -> str | None:
         """Drawdown alert mesajı oluştur."""

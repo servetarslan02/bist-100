@@ -43,14 +43,16 @@ from .agent_pipeline import AgentPipelineOrchestrator, PipelineMetrics, Pipeline
 from .agent_system import (
     AgentResult,
     AgentRole,
+    AgentSystem,
     AgentTask,
     AgentToolRegistry,
     AIFallback,
     AIOutputValidator,
     BaseAgent,
+    agent_system,
     run_agent_analysis,
 )
-from .circuit_breaker import CircuitBreaker, CircuitBreakerLLMClient, CircuitState
+from .circuit_breaker import CircuitBreaker, CircuitBreakerLLMClient, CircuitBreakerOpenError, CircuitState
 
 # === Phase 4: Communication + Synthesis ===
 from .communication_bus import (
@@ -88,11 +90,19 @@ from .risk_assessor import RiskAssessment, RiskAssessor
 # === Schemas ===
 from .schemas import (
     AgentOutputSchema,
+    BacktestOutputSchema,
     DebateArgumentSchema,
     Direction,
+    FundamentalOutputSchema,
+    MacroOutputSchema,
+    NewsOutputSchema,
+    PortfolioOutputSchema,
     RiskAssessmentSchema,
     RiskLevel,
+    ScenarioOutputSchema,
     SynthesisResultSchema,
+    TechnicalOutputSchema,
+    ValuationOutputSchema,
     validate_agent_output,
 )
 
@@ -110,6 +120,8 @@ __all__: Final[list[str]] = [
     "AIOutputValidator",
     "AIFallback",
     "BaseAgent",
+    "AgentSystem",
+    "agent_system",
     "run_agent_analysis",
     # LLM
     "BaseLLMClient",
@@ -122,6 +134,14 @@ __all__: Final[list[str]] = [
     "parse_llm_json",
     # Schemas
     "AgentOutputSchema",
+    "TechnicalOutputSchema",
+    "FundamentalOutputSchema",
+    "NewsOutputSchema",
+    "MacroOutputSchema",
+    "ValuationOutputSchema",
+    "PortfolioOutputSchema",
+    "ScenarioOutputSchema",
+    "BacktestOutputSchema",
     "Direction",
     "RiskLevel",
     "SynthesisResultSchema",
@@ -172,6 +192,7 @@ __all__: Final[list[str]] = [
     # Circuit Breaker
     "CircuitBreaker",
     "CircuitBreakerLLMClient",
+    "CircuitBreakerOpenError",
     "CircuitState",
     # Trace
     "TraceContext",

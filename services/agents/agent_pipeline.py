@@ -25,6 +25,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
+import orjson
 import structlog
 
 from .agent_memory import AgentMemory, MemoryConsolidator
@@ -96,6 +97,10 @@ class PipelineMetrics:
             "last_run_timestamp": self.last_run_timestamp,
         }
 
+    def to_json(self) -> str:
+        """orjson ile JSON serileştirme."""
+        return orjson.dumps(self.to_dict()).decode("utf-8")
+
     def __repr__(self) -> str:
         return (
             f"PipelineMetrics(runs={self.total_runs}, "
@@ -134,7 +139,12 @@ class PipelineResult:
             "risk": self.risk_assessment.to_dict(),
             "resolution": self.resolution.to_dict(),
             "total_duration_ms": self.total_duration_ms,
+            "risk_approved": self.risk_approved,
         }
+
+    def to_json(self) -> str:
+        """orjson ile yüksek hızlı JSON serileştirme."""
+        return orjson.dumps(self.to_dict()).decode("utf-8")
 
     @property
     def direction(self) -> str:
@@ -146,10 +156,16 @@ class PipelineResult:
         """Nihai güven skoru (0-1)."""
         return self.synthesis.final_confidence
 
+    @property
+    def risk_approved(self) -> bool:
+        """Risk agent işlemi onayladı mı?"""
+        return self.risk_assessment.approved
+
     def __repr__(self) -> str:
         return (
             f"PipelineResult(ticker={self.ticker!r}, direction={self.direction!r}, "
-            f"confidence={self.confidence:.2f}, duration={self.total_duration_ms:.0f}ms)"
+            f"confidence={self.confidence:.2f}, risk_approved={self.risk_approved}, "
+            f"duration={self.total_duration_ms:.0f}ms)"
         )
 
 
@@ -182,6 +198,7 @@ class AgentPipelineOrchestrator:
         enable_memory: bool = True,
         enable_self_eval: bool = True,
         memory_path: str | None = None,
+        default_roles: list[AgentRole] | None = None,
     ):
         self.llm_client = llm_client
         self.max_concurrent = max_concurrent
@@ -189,6 +206,13 @@ class AgentPipelineOrchestrator:
         self.enable_debate = enable_debate
         self.enable_memory = enable_memory
         self.enable_self_eval = enable_self_eval
+        self.default_roles = default_roles or [
+            AgentRole.TECHNICAL,
+            AgentRole.FUNDAMENTAL,
+            AgentRole.NEWS,
+            AgentRole.MACRO,
+            AgentRole.VALUATION,
+        ]
 
         # Modüller
         self.runner = ParallelAgentRunner(
@@ -208,7 +232,11 @@ class AgentPipelineOrchestrator:
         if enable_memory:
             _default_path = memory_path or "data/agent_memory"
             os.makedirs(_default_path, exist_ok=True)
-            for role in ["TECHNICAL", "FUNDAMENTAL", "NEWS", "MACRO", "RISK", "SYNTHESIS"]:
+            all_roles_to_track = [
+                "TECHNICAL", "FUNDAMENTAL", "NEWS", "MACRO",
+                "VALUATION", "RISK", "PORTFOLIO", "SCENARIO", "BACKTEST", "SYNTHESIS",
+            ]
+            for role in all_roles_to_track:
                 path = f"{_default_path}/{role}_memory.json"
                 self._memories[role] = AgentMemory(
                     agent_role=role,
@@ -240,7 +268,6 @@ class AgentPipelineOrchestrator:
         """
         self.llm_client = client
         self._wrapped_llm = CircuitBreakerLLMClient(client, self.circuit_breaker)
-        # Cache'lenmiş agent'ların client'ını da güncelle (wrapped)
         for agent in self._agent_cache.values():
             agent.llm_client = self._wrapped_llm
 
@@ -253,17 +280,19 @@ class AgentPipelineOrchestrator:
         regime: str | None = None,
         price: float | None = None,
         portfolio_info: dict | None = None,
+        active_roles: list[AgentRole] | None = None,
     ) -> PipelineResult:
-        """Tam agent pipeline çalıştır.
+        """Tam kurumsal agent pipeline çalıştır.
 
         Args:
             ticker: Hisse kodu (ör: "THYAO") — boş olamaz
-            features: Feature'lar (teknik göstergeler) — boş dict bile kabul edilir
+            features: Feature'lar (teknik göstergeler)
             context: Ek bağlam (prompt değişkenleri vb.)
             sector: Sektör adı
             regime: Piyasa rejimi (RISK_ON/RISK_OFF/NEUTRAL)
             price: Güncel fiyat
             portfolio_info: Portföy bilgisi (pozisyon sayısı, ağırlık vb.)
+            active_roles: Bu çalıştırmada görev alacak agent rolleri (None ise default_roles)
 
         Returns:
             PipelineResult — tüm fazların çıktılarını içerir
@@ -271,7 +300,6 @@ class AgentPipelineOrchestrator:
         Raises:
             ValueError: ticker boş ise
         """
-        # Input validation
         if not ticker or not ticker.strip():
             raise ValueError("Ticker boş olamaz")
 
@@ -281,19 +309,56 @@ class AgentPipelineOrchestrator:
 
         try:
             result = await self._run_pipeline(
-                ticker, features, context, sector, regime, price, portfolio_info
+                ticker, features, context, sector, regime, price, portfolio_info, active_roles
             )
             success = True
             return result
         except ValueError:
-            raise  # ValueError'ı yukarı fırlat
+            raise
         except Exception as e:
             logger.error("Pipeline failed unexpectedly", ticker=ticker, error=str(e), exc_info=True)
-            # Konservatif fallback — NO_TRADE
             return self._create_fallback_result(ticker, str(e), start)
         finally:
             duration = (time.monotonic() - start) * 1000
             self.metrics.record_run(success, duration, ticker)
+
+    async def run_batch(
+        self,
+        tickers_data: list[dict[str, Any]],
+        common_context: dict[str, Any] | None = None,
+    ) -> list[PipelineResult]:
+        """Çoklu hisse için sıralı/güvenli batch çalıştırma.
+
+        Args:
+            tickers_data: [{"ticker": "THYAO", "features": {...}, "sector": "HAVACILIK", ...}, ...]
+            common_context: Tüm hisseler için ortak bağlam (makro, faiz, rejim vb.)
+
+        Returns:
+            list[PipelineResult]: Her hisse için elde edilen sonuçlar
+        """
+        results: list[PipelineResult] = []
+        for item in tickers_data:
+            ticker = item.get("ticker", "")
+            if not ticker:
+                continue
+            features = item.get("features", {})
+            ctx = {**(common_context or {}), **(item.get("context", {}))}
+            try:
+                res = await self.run(
+                    ticker=ticker,
+                    features=features,
+                    context=ctx,
+                    sector=item.get("sector"),
+                    regime=item.get("regime"),
+                    price=item.get("price"),
+                    portfolio_info=item.get("portfolio_info"),
+                    active_roles=item.get("active_roles"),
+                )
+                results.append(res)
+            except Exception as e:
+                logger.error("Batch item pipeline error", ticker=ticker, error=str(e))
+                results.append(self._create_fallback_result(ticker, str(e), time.monotonic()))
+        return results
 
     async def _run_pipeline(
         self,
@@ -304,11 +369,11 @@ class AgentPipelineOrchestrator:
         regime: str | None,
         price: float | None,
         portfolio_info: dict | None,
+        active_roles: list[AgentRole] | None,
     ) -> PipelineResult:
-        """Pipeline'ın asıl çalışma mantığı (ayrılmış hata yönetimi için)."""
+        """Pipeline'ın asıl çalışma mantığı."""
         start = time.monotonic()
 
-        # Bağlam hazırla — context'ten gelen anahtarlar features/sector/regime üzerine yazmaz
         safe_context = {
             k: v for k, v in (context or {}).items()
             if k not in ("features", "sector", "regime", "price")
@@ -332,9 +397,12 @@ class AgentPipelineOrchestrator:
 
         logger.info("Agent pipeline started", ticker=ticker, regime=regime)
 
-        # Trace context — tüm pipeline boyunca takip
+        roles_to_run = active_roles or self.default_roles
+
         with TraceContext(ticker=ticker) as trace:
-            return await self._run_phases(ticker, features, full_context, portfolio_info, trace, start)
+            return await self._run_phases(
+                ticker, features, full_context, portfolio_info, trace, start, roles_to_run
+            )
 
     async def _run_phases(
         self,
@@ -344,21 +412,15 @@ class AgentPipelineOrchestrator:
         portfolio_info: dict | None,
         trace: TraceContext,
         start: float,
+        roles: list[AgentRole],
     ) -> PipelineResult:
         """Pipeline fazlarını çalıştır (trace context ile)."""
 
         # === PHASE 1: PARALLEL RESEARCH ===
         trace.set_phase("PHASE_1_PARALLEL_RESEARCH")
-        research_roles = [
-            AgentRole.TECHNICAL,
-            AgentRole.FUNDAMENTAL,
-            AgentRole.NEWS,
-            AgentRole.MACRO,
-        ]
-        agents = self._get_or_create_agents(research_roles)
-        tasks = self._create_tasks(ticker, research_roles, full_context)
+        agents = self._get_or_create_agents(roles)
+        tasks = self._create_tasks(ticker, roles, full_context)
 
-        # Circuit breaker kontrollü LLM client kullan
         effective_llm = self._wrapped_llm or self.llm_client
         parallel_result = await self.runner.run_agents(agents, tasks, effective_llm)
 
@@ -532,11 +594,16 @@ class AgentPipelineOrchestrator:
             AgentRole.FUNDAMENTAL: "fundamental",
             AgentRole.NEWS: "news",
             AgentRole.MACRO: "macro",
+            AgentRole.VALUATION: "valuation",
+            AgentRole.RISK: "risk",
+            AgentRole.PORTFOLIO: "portfolio",
+            AgentRole.SCENARIO: "scenario",
+            AgentRole.BACKTEST: "backtest",
         }
 
         tasks = {}
         for role in roles:
-            template = template_map.get(role)
+            template = template_map.get(role, getattr(role, "value", str(role)))
             if template:
                 try:
                     _, user_prompt = PromptFactory.get_prompts(
@@ -550,13 +617,15 @@ class AgentPipelineOrchestrator:
                         template=template,
                         error=str(e),
                     )
-                    user_prompt = f"Analyze {ticker} from {role.value} perspective"
+                    role_val = getattr(role, "value", str(role))
+                    user_prompt = f"Analyze {ticker} from {role_val} perspective"
             else:
-                user_prompt = f"Analyze {ticker} from {role.value} perspective"
+                role_val = getattr(role, "value", str(role))
+                user_prompt = f"Analyze {ticker} from {role_val} perspective"
 
-            # Benzersiz task_id — uuid ile çarpışma riski sıfır
+            role_val = getattr(role, "value", str(role))
             tasks[role] = AgentTask(
-                task_id=f"{ticker}-{role.value}-{uuid.uuid4().hex[:8]}",
+                task_id=f"{ticker}-{role_val}-{uuid.uuid4().hex[:8]}",
                 agent_role=role,
                 ticker=ticker,
                 prompt=user_prompt,
@@ -564,6 +633,68 @@ class AgentPipelineOrchestrator:
                 template_name=template,
             )
         return tasks
+
+    def export_result_to_duckdb(
+        self,
+        result: PipelineResult,
+        duckdb_conn: Any = None,
+        db_path: str = "data/agent_pipeline_history.duckdb",
+    ) -> bool:
+        """Pipeline sonucunu analiz ve geriye dönük doğrulama için DuckDB'ye kaydeder.
+
+        Args:
+            result: Kaydedilecek PipelineResult
+            duckdb_conn: Açık duckdb bağlantısı (yoksa db_path ile geçici açılır)
+            db_path: DuckDB dosya yolu
+
+        Returns:
+            bool: Kayıt başarılı ise True
+        """
+        import duckdb
+
+        con = duckdb_conn or duckdb.connect(db_path)
+        should_close = duckdb_conn is None
+        try:
+            con.execute("""
+                CREATE TABLE IF NOT EXISTS agent_pipeline_history (
+                    ticker VARCHAR,
+                    timestamp VARCHAR,
+                    direction VARCHAR,
+                    confidence DOUBLE,
+                    weighted_score DOUBLE,
+                    risk_approved BOOLEAN,
+                    risk_score DOUBLE,
+                    conflict_severity VARCHAR,
+                    debate_occurred BOOLEAN,
+                    method VARCHAR,
+                    duration_ms DOUBLE,
+                    PRIMARY KEY (ticker, timestamp)
+                )
+            """)
+            con.execute("""
+                INSERT OR REPLACE INTO agent_pipeline_history VALUES (
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                )
+            """, (
+                result.ticker,
+                result.timestamp,
+                result.direction,
+                result.confidence,
+                result.synthesis.weighted_score,
+                result.risk_approved,
+                result.risk_assessment.risk_score,
+                result.conflict_report.severity.value if hasattr(result.conflict_report.severity, "value") else str(result.conflict_report.severity),
+                result.synthesis.debate_occurred,
+                result.resolution.method,
+                result.total_duration_ms,
+            ))
+            return True
+        except Exception as e:
+            logger.error("Failed to export pipeline result to duckdb", ticker=result.ticker, error=str(e))
+            return False
+        finally:
+            if should_close:
+                con.close()
 
     def _update_memories(
         self,

@@ -40,6 +40,12 @@ class RegimeRiskLimits:
     max_positions: int = 30  # Rejim bazlı maksimum hisse sayısı (0 ile max arası dinamik)
     min_cash_pct: float = 0.08  # Fırsatlar için nakit rezerv tamponu (%5-10)
 
+    def __repr__(self) -> str:
+        return (
+            f"RegimeRiskLimits({self.regime}: max_pos={self.max_position_pct:.1%}, "
+            f"exposure={self.max_total_exposure:.1%}, min_cash={self.min_cash_pct:.1%})"
+        )
+
 
 class RegimeLimitsManager:
     """Rejime göre risk limitleri yöneticisi.
@@ -147,9 +153,12 @@ class RegimeLimitsManager:
         ),
     }
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """Rejim bazlı risk limit yöneticisini başlatır."""
         self._custom_limits: dict[str, RegimeRiskLimits] = {}
+
+    def __repr__(self) -> str:
+        return f"RegimeLimitsManager(custom_regimes={list(self._custom_limits.keys())})"
 
     def get_limits(self, regime: str) -> RegimeRiskLimits:
         """Rejim için limitleri döndür.

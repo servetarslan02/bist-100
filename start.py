@@ -427,9 +427,9 @@ def wait_for_containers_healthy(timeout_s: int = 180) -> Any:
 
 
 def setup_backup_cron() -> Any:
-    """Otomatik backup cron'u kur (sadece Linux/Mac)."""
+    """Otomatik backup görevi kur (Linux/Mac: cron, Windows: Task Scheduler)."""
     if platform.system() == "Windows":
-        logger.info("[*] Windows: Backup cron atlandı (Task Scheduler ile kurulabilir)")
+        _setup_windows_backup_task()
         return
 
     script_path = PROJECT_ROOT / "scripts" / "backup_alpha.sh"
@@ -469,6 +469,71 @@ def setup_backup_cron() -> Any:
         logger.info("[UYARI] crontab bulunamadı, backup cron atlandı")
     except Exception as e:
         logger.info(f"[UYARI] Backup cron hatası: {e}")
+
+
+def _setup_windows_backup_task() -> Any:
+    """Windows Task Scheduler'a gece 02:00 backup görevi kur.
+
+    Görev adı: AlphaBIST_Backup
+    Tetikleyici: Her gün 02:00
+    Eylem: docker compose exec alpha-postgres pg_dumpall komutu
+    Koşul: Yalnızca bilgisayar açıksa çalışır
+    """
+    task_name = "AlphaBIST_Backup"
+
+    # Görev zaten var mı?
+    try:
+        check = subprocess.run(
+            ["schtasks", "/Query", "/TN", task_name],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if check.returncode == 0:
+            logger.info(f"[OK] Windows Task Scheduler backup görevi zaten mevcut: {task_name}")
+            return
+    except Exception:
+        pass  # Yoksa oluştur
+
+    # Logs dizini oluştur
+    logs_dir = PROJECT_ROOT / "logs"
+    logs_dir.mkdir(exist_ok=True)
+    log_file = logs_dir / "backup_windows.log"
+
+    # PowerShell backup komutu — Docker içinden pg_dumpall çalıştır
+    backup_cmd = (
+        f"docker compose -f \"{PROJECT_ROOT}\\docker-compose.yml\" "
+        f"exec -T alpha-postgres pg_dumpall -U postgres "
+        f">> \"{log_file}\" 2>&1"
+    )
+    ps_action = f"powershell.exe -NonInteractive -Command \"{backup_cmd}\""
+
+    try:
+        result = subprocess.run(
+            [
+                "schtasks", "/Create",
+                "/TN", task_name,
+                "/TR", ps_action,
+                "/SC", "DAILY",
+                "/ST", "02:00",
+                "/RL", "HIGHEST",   # Yüksek ayrıcalıkla çalış
+                "/F",               # Zaten varsa üzerine yaz
+                "/IT",              # Yalnızca kullanıcı oturum açmışken
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if result.returncode == 0:
+            logger.info(f"[OK] Windows backup görevi oluşturuldu: {task_name} — her gün 02:00")
+        else:
+            logger.info(f"[UYARI] Backup görevi oluşturulamadı: {result.stderr[:300]}")
+    except FileNotFoundError:
+        logger.info("[UYARI] schtasks komutu bulunamadı. Manuel olarak ekleyin.")
+    except Exception as e:
+        logger.info(f"[UYARI] Windows backup görevi hatası: {e}")
+
+
 
 
 # =====================================================

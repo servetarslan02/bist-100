@@ -122,6 +122,13 @@ class FeatureQualityMonitor:
         self.outlier_zscore_threshold = outlier_zscore_threshold
         self._history: list[dict[str, Any]] = []
 
+    def __repr__(self) -> str:
+        """FeatureQualityMonitor kısa temsili."""
+        return (
+            f"FeatureQualityMonitor(null_warn={self.null_warning_threshold:.1%}, "
+            f"null_crit={self.null_critical_threshold:.1%}, history_size={len(self._history)})"
+        )
+
     def check_feature(
         self,
         feature_name: str,
@@ -436,14 +443,6 @@ class FeatureQualityMonitor:
         return self._history
 
 
-
-    def __repr__(self) -> str:
-        """FeatureQualityMonitor kısa temsili.
-
-        Returns:
-            Eşik değerleri ve history boyutu içeren metin.
-        """
-        return f"FeatureQualityMonitor(null_warn={self.null_warning_threshold}, history={len(self._history)})"
 __all__: list[str] = ["FeatureQualityReport", "QualitySummary", "FeatureQualityMonitor", "feature_quality_monitor"]
 
 # Singleton

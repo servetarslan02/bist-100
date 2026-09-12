@@ -136,10 +136,18 @@ class MarketStateMonitor:
     """Market state monitoring — Prometheus + Grafana."""
 
     def __init__(self):
-        """Otomatik eklendi."""
+        """MarketStateMonitor'ü başlatır; dahili metrik nesnesini ve tarihçe tamponunu oluşturur.
+
+        Tarihçe tamponunun maksimum boyutu _max_history (1000) ile sınırlıdır;
+        bu değer aşılınca en eski metrik kaydı silinir (FIFO).
+        """
         self._metrics = MarketStateMetrics()
         self._history: list[MarketStateMetrics] = []
         self._max_history = 1000
+
+    def __repr__(self) -> str:
+        """Sınıfın metinsel temsilini döndürür."""
+        return f"MarketStateMonitor(history_len={len(self._history)}, max_history={self._max_history})"
 
     def update(
         self,
@@ -183,6 +191,10 @@ class MarketStateMonitor:
     def get_prometheus_metrics(self) -> str:
         """Prometheus text format."""
         return self._metrics.to_prometheus()
+
+    def to_prometheus(self) -> str:
+        """Prometheus metrik dizgesini döndürür (get_prometheus_metrics takma adı)."""
+        return self.get_prometheus_metrics()
 
     def get_grafana_dashboard(self) -> dict[str, Any]:
         """Grafana dashboard JSON."""

@@ -34,8 +34,12 @@ class PortfolioService:
     - DB transaction içinde atomik işlemler
     """
 
-    def __init__(self, initial_capital: float = 10000000.0):
-        """Otomatik eklendi."""
+    def __init__(self, initial_capital: float = 10000000.0) -> None:
+        """Portföy yönetim servisini ve eşzamanlılık kilitlerini başlatır.
+
+        Args:
+            initial_capital: Başlangıç portföy büyüklüğü (TL).
+        """
         self._running = False
         self._portfolio_id: int | None = None
         self._pm = PortfolioManager(initial_capital=initial_capital)
@@ -46,6 +50,9 @@ class PortfolioService:
         self._daily_commission: float = 0.0
         self._trade_lock = asyncio.Lock()  # Fallback in-process lock
         self._coordinated_lock: CoordinatedLock | None = None  # Initialized in start()
+
+    def __repr__(self) -> str:
+        return f"PortfolioService(running={self._running}, id={self._portfolio_id})"
 
     # =====================================================
     # LIFECYCLE
@@ -891,7 +898,7 @@ def get_portfolio_enhancements() -> dict[str, Any]:
 
 
 async def main() -> Any:
-    """Otomatik eklendi."""
+    """Portföy servisi ana yürütme döngüsü."""
     try:
         await portfolio_service.start()
         while portfolio_service._running:

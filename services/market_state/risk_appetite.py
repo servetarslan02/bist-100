@@ -46,7 +46,19 @@ class RiskAppetiteEngine:
         sentiment_weight: float = 0.10,
         macro_weight: float = 0.10,
     ):
-        """Otomatik eklendi."""
+        """RiskAppetiteEngine'i verilen faktör ağırlıklarıyla başlatır.
+
+        Ağırlıklar başlatma sırasında normalize edilir; böylece toplamları
+        1.0'a eşit olmayan girdiler de geçerli sonuç üretir.
+
+        Args:
+            breadth_weight: Piyasa genişliği (advancing %) faktörünün ağırlığı.
+            momentum_weight: Ortalama fiyat momentumunun ağırlığı.
+            volatility_weight: Volatilite faktörünün ağırlığı (yüksek vol → düşük iştah).
+            rsi_weight: Ortalama RSI faktörünün ağırlığı.
+            sentiment_weight: Haber/sosyal medya sentiment skorunun ağırlığı.
+            macro_weight: Makroekonomik skor faktörünün ağırlığı.
+        """
         self._weights = {
             "breadth": breadth_weight,
             "momentum": momentum_weight,
@@ -60,6 +72,10 @@ class RiskAppetiteEngine:
         total = sum(self._weights.values())
         if total > 0:
             self._weights = {k: v / total for k, v in self._weights.items()}
+
+    def __repr__(self) -> str:
+        """Sınıfın metinsel temsilini döndürür."""
+        return f"RiskAppetiteEngine(weights={self._weights})"
 
     def compute(
         self,

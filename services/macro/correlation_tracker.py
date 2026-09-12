@@ -34,6 +34,14 @@ class CorrelationResult:
     sample_count: int
     window_days: int
 
+    def __repr__(self) -> str:
+        """Korelasyon sonucunun okunabilir string temsili."""
+        return (
+            f"CorrelationResult({self.var1} vs {self.var2}: "
+            f"corr={self.correlation:.4f}, p={self.p_value:.4f}, "
+            f"significant={self.significant}, n={self.sample_count})"
+        )
+
 
 @dataclass
 class CorrelationBreakdown:
@@ -45,6 +53,14 @@ class CorrelationBreakdown:
     current_corr: float
     breakdown_magnitude: float
     alert: bool
+
+    def __repr__(self) -> str:
+        """Korelasyon bozulma tespiti okunabilir string temsili."""
+        return (
+            f"CorrelationBreakdown({self.var1} vs {self.var2}: "
+            f"hist={self.historical_corr:.2f} -> curr={self.current_corr:.2f}, "
+            f"breakdown={self.breakdown_magnitude:.2f}, alert={self.alert})"
+        )
 
 
 class MacroCorrelationTracker:
@@ -60,13 +76,24 @@ class MacroCorrelationTracker:
         ("cds", "usdtry"),
     ]
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """Makro korelasyon takip motoru başlatıcı.
+
+        Değişken geçmişi, zaman damgaları ve korelasyon serilerini ilklendirir.
+        """
         self._window = macro_config.correlation.window_days
         self._history: dict[str, list[float]] = {}
         self._timestamps: dict[str, list[str]] = {}
         self._correlation_history: dict[str, list[float]] = {}  # pair → [corr1, corr2, ...]
         self._pair_key = lambda v1, v2: f"{v1}_{v2}" if v1 < v2 else f"{v2}_{v1}"
+
+    def __repr__(self) -> str:
+        """Makro korelasyon motoru okunabilir string temsili."""
+        return (
+            f"MacroCorrelationTracker(window={self._window}, "
+            f"variables={len(self._history)}, "
+            f"tracked_corrs={len(self._correlation_history)})"
+        )
 
     def update(self, macro_data: dict[str, float]) -> Any:
         """Günlük veri güncelle.
@@ -277,3 +304,10 @@ class MacroCorrelationTracker:
 
 # Singleton
 macro_correlation_tracker = MacroCorrelationTracker()
+
+__all__ = [
+    "CorrelationResult",
+    "CorrelationBreakdown",
+    "MacroCorrelationTracker",
+    "macro_correlation_tracker",
+]

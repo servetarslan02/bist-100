@@ -29,8 +29,8 @@ class ScanAPI:
     veya doğrudan fonksiyon çağrısı ile.
     """
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """ScanAPI metrik ve yönetim ara yüzünü başlatır."""
         # Singleton referansları
         from services.core.alpha_engine import AlphaEngine
 
@@ -51,18 +51,31 @@ class ScanAPI:
         self._alert_manager = scan_alert_manager
         self._filter_engine = custom_filter_engine
 
+    def __repr__(self) -> str:
+        """ScanAPI okunabilir durum temsili."""
+        return "ScanAPI(connected_services=['scanner', 'dedup', 'scheduler', 'persistence', 'alerts', 'filters'])"
+
     def get_status(self) -> dict[str, Any]:
         """Tarama durumu.
 
         Returns:
             Sistem durumu
         """
+        last_summary = {}
+        if hasattr(self._engine, "get_last_summary"):
+            try:
+                last_summary = self._engine.get_last_summary()
+            except Exception as e:
+                logger.debug("engine_last_summary_hatasi: %s", str(e))
+        elif hasattr(self._scanner, "get_tier_summary"):
+            last_summary = self._scanner.get_tier_summary()
+
         return {
             "timestamp": datetime.now(UTC).isoformat(),
             "scheduler": self._scheduler.get_stats(),
             "deduplicator": self._dedup.get_stats(),
             "scanner": self._scanner.get_tier_summary(),
-            "last_scan": self._engine.get_last_summary(),
+            "last_scan": last_summary,
             "market_open": self._scheduler.is_market_open(),
         }
 
@@ -75,7 +88,14 @@ class ScanAPI:
         Returns:
             Son tarama sonuçları
         """
-        last_results = self._engine.get_last_results()
+        last_results = []
+        if hasattr(self._engine, "get_last_results"):
+            try:
+                last_results = self._engine.get_last_results()
+            except Exception as e:
+                logger.debug("engine_last_results_hatasi: %s", str(e))
+        if not last_results and hasattr(self._scanner, "get_top_opportunities"):
+            last_results = self._scanner.get_top_opportunities(n=limit)
 
         # Limit
         limited = last_results[:limit] if last_results else []

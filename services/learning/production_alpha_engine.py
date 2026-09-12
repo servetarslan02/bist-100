@@ -21,12 +21,15 @@ logger = logging.getLogger("alpha.engine")
 class ProductionAlphaEngine:
     """BIST100 ve Geniş Evren için Doğrulanmış Momentum + PPF Koruma Motoru."""
 
-    def __init__(self, top_n: int = 1, lookback_days: int = 20):
-        """Otomatik eklendi."""
+    def __init__(self, top_n: int = 1, lookback_days: int = 20) -> None:
+        """Üretim alfa motorunu hisse sayısı ve geriye bakış penceresiyle ilklendirir."""
         # top_n = 1: Top 1 Hisseye %100 Odak
         # lookback = 20: 4 Haftalık Momentum
         self.top_n = top_n
         self.lookback_days = lookback_days
+
+    def __repr__(self) -> str:
+        return f"ProductionAlphaEngine(top_n={self.top_n}, lookback_days={self.lookback_days})"
 
     def calculate_signals(self, prices_df: pd.DataFrame, volume_df: pd.DataFrame | None = None) -> dict[str, Any]:
         """

@@ -52,9 +52,13 @@ class ResearchMemory:
     """Araştırma hafızası."""
 
     def __init__(self):
-        """Otomatik eklendi."""
+        """ResearchMemory araştırma hafızasını başlatır; maksimum 10000 kayıt tutar."""
         self._records: deque = deque(maxlen=10000)
         self._ticker_index: dict[str, list[ResearchRecord]] = {}
+
+    def __repr__(self) -> str:
+        """Sınıfın metinsel temsilini döndürür."""
+        return f"ResearchMemory(records_count={len(self._records)}, indexed_tickers={len(self._ticker_index)})"
 
     def add_record(self, record: ResearchRecord) -> Any:
         """Araştırma kaydı ekle."""
@@ -215,10 +219,14 @@ class DataLineage:
     """Veri lineage takibi."""
 
     def __init__(self):
-        """Otomatik eklendi."""
+        """DataLineage veri soy ağacı ve bağımlılık takipçisini başlatır."""
         self._nodes_by_key: dict[str, LineageNode] = {}
         self._children_index: dict[str, list[str]] = {}
         self._keys: deque = deque(maxlen=10000)
+
+    def __repr__(self) -> str:
+        """Sınıfın metinsel temsilini döndürür."""
+        return f"DataLineage(nodes_count={len(self._nodes_by_key)})"
 
     def add_node(self, node: LineageNode) -> Any:
         """Lineage düğümü ekle."""

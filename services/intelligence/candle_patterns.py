@@ -35,8 +35,8 @@ class CandleMetrics:
     is_green: bool = True
     is_doji: bool = False
 
-    def __post_init__(self):
-        """Otomatik eklendi."""
+    def __post_init__(self) -> None:
+        """Mum gövde, gölge, fitil oranları ve doji durumunu otomatik hesaplar."""
         self.body = abs(self.close - self.open)
         self.range = max(self.high - self.low, 1e-9)
         self.is_green = self.close >= self.open
@@ -52,6 +52,10 @@ class CandleMetrics:
         self.upper_wick_ratio = self.upper_wick / self.range
         self.lower_wick_ratio = self.lower_wick / self.range
         self.is_doji = self.body_ratio <= 0.08  # Gövde %8'den küçükse doji
+
+    def __repr__(self) -> str:
+        color = "GREEN" if self.is_green else "RED"
+        return f"CandleMetrics({color}, O={self.open:.2f}, H={self.high:.2f}, L={self.low:.2f}, C={self.close:.2f})"
 
 
 @dataclass
@@ -74,12 +78,18 @@ class CandlePatternResult:
     recommended_target: float = 0.0
     evidence: list[str] = field(default_factory=list)
 
+    def __repr__(self) -> str:
+        return (
+            f"CandlePatternResult(ticker={self.ticker!r}, direction={self.direction!r}, "
+            f"score={self.candle_score:.1f}, pattern={self.primary_pattern!r})"
+        )
+
 
 class CandlePatternEngine:
     """Kurumsal 10/10 Seviye Mum ve Price Action Zeka Motoru."""
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """Mum ve fiyat aksiyonu formasyon analiz motorunu ilklendirir."""
         # Mum formasyonları ve eşikleri
         self.min_body_ratio = 0.6  # Doji için max gövde/arası oran
         self.hammer_shadow_ratio = 2.0  # Çekiç için alt gölge/gövde oranı
@@ -107,6 +117,9 @@ class CandlePatternEngine:
             "spinning_top",
             "marubozu",
         ]
+
+    def __repr__(self) -> str:
+        return f"CandlePatternEngine(patterns={len(self._pattern_registry)})"
 
     def analyze_dataframe(self, df: pl.DataFrame, ticker: str = "ASSET") -> CandlePatternResult:
         """OHLCV DataFrame'ini analiz ederek tüm formasyonları çıkarır."""

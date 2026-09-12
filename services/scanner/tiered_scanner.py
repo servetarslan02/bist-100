@@ -113,6 +113,13 @@ class AssetTierState:
     escalated_by_event: bool = False
     escalation_reason: str = ""
 
+    def __repr__(self) -> str:
+        """AssetTierState okunabilir nesne temsili."""
+        return (
+            f"AssetTierState(ticker='{self.ticker}', tier={self.current_tier}, "
+            f"opp_score={self.opportunity_score:.1f}, price={self.price:.2f})"
+        )
+
 
 @dataclass
 class MarketRegime:
@@ -135,55 +142,48 @@ class MarketRegime:
         }
     )
 
+    def __repr__(self) -> str:
+        """MarketRegime okunabilir nesne temsili."""
+        return f"MarketRegime(regime='{self.regime}', confidence={self.confidence:.2f})"
+
     def update_weights(self, regime: str) -> Any:
         """Rejime göre ağırlıkları güncelle."""
         self.regime = regime
 
-        if regime in ["TRENDING-UP", "MOMENTUM-EXPANSION"]:
+        if regime == "BULL":
             self.weights = {
                 "momentum": 1.5,
                 "volume_anomaly": 1.2,
                 "breakout": 1.4,
-                "volatility": 0.7,
+                "volatility": 0.8,
                 "relative_strength": 1.3,
                 "sector_divergence": 1.0,
-                "flow_correlation": 0.8,
-                "liquidity": 0.6,
+                "flow_correlation": 1.1,
+                "liquidity": 0.9,
             }
-        elif regime in ["RISK-OFF", "PANIC"]:
+        elif regime == "BEAR":
             self.weights = {
-                "momentum": 0.3,
-                "volume_anomaly": 0.8,
-                "breakout": 0.4,
+                "momentum": 0.7,
+                "volume_anomaly": 1.4,
+                "breakout": 0.6,
                 "volatility": 1.5,
-                "relative_strength": 0.5,
-                "sector_divergence": 0.7,
+                "relative_strength": 1.5,
+                "sector_divergence": 1.3,
                 "flow_correlation": 1.2,
-                "liquidity": 1.5,
+                "liquidity": 1.3,
             }
-        elif regime == "HIGH-VOLATILITY":
-            self.weights = {
-                "momentum": 0.6,
-                "volume_anomaly": 1.3,
-                "breakout": 0.8,
-                "volatility": 1.4,
-                "relative_strength": 0.7,
-                "sector_divergence": 1.0,
-                "flow_correlation": 1.0,
-                "liquidity": 1.2,
-            }
-        elif regime == "RANGE":
+        elif regime == "HIGH_VOL":
             self.weights = {
                 "momentum": 0.8,
-                "volume_anomaly": 1.0,
+                "volume_anomaly": 1.5,
                 "breakout": 1.2,
-                "volatility": 1.0,
-                "relative_strength": 1.0,
-                "sector_divergence": 1.0,
-                "flow_correlation": 1.0,
-                "liquidity": 1.0,
+                "volatility": 1.6,
+                "relative_strength": 1.1,
+                "sector_divergence": 1.2,
+                "flow_correlation": 1.4,
+                "liquidity": 1.4,
             }
-        else:  # RECOVERY, LOW-VOLATILITY, vb.
+        else:  # RANGE
             self.weights = {
                 "momentum": 1.0,
                 "volume_anomaly": 1.0,
@@ -204,12 +204,19 @@ class MarketRegime:
 class TieredScanner:
     """Katmanlı tarama motoru."""
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """TieredScanner motorunu başlatır ve izleme yapılarını kurar."""
         self._assets: dict[str, AssetTierState] = {}
         self._regime = MarketRegime()
         self._scan_count = 0
         self._tier_counts = {i: 0 for i in range(6)}
+
+    def __repr__(self) -> str:
+        """TieredScanner okunabilir durum temsili."""
+        return (
+            f"TieredScanner(assets={len(self._assets)}, scans={self._scan_count}, "
+            f"regime='{self._regime.regime}', tier_counts={self._tier_counts})"
+        )
 
     def register_asset(self, ticker: str, instrument_id: int = 0) -> Any:
         """Hisse kaydet."""

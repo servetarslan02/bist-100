@@ -93,8 +93,33 @@ class IncrementalFetcher:
             default_lookback_hours: İlk çekimde geriye dönük bakılacak saat.
         """
         self._states: dict[str, FetchState] = {}
+        self._checkpoints: dict[str, str] = {}
         self._default_lookback_hours = default_lookback_hours
         self._stats = IncrementalStats()
+
+    def __repr__(self) -> str:
+        """IncrementalFetcher string temsili."""
+        return f"IncrementalFetcher(tracked={len(self._states)}, default_lookback_h={self._default_lookback_hours})"
+
+    def set_checkpoint(self, ticker: str, checkpoint: str) -> None:
+        """Belirtilen ticker için checkpoint cursor kaydeder.
+
+        Args:
+            ticker: Hisse kodu.
+            checkpoint: Kontrol noktası zaman damgası veya imleç.
+        """
+        self._checkpoints[ticker] = checkpoint
+
+    def get_checkpoint(self, ticker: str) -> str | None:
+        """Belirtilen ticker için son checkpoint cursor değerini döndürür.
+
+        Args:
+            ticker: Hisse kodu.
+
+        Returns:
+            Checkpoint cursor değeri veya None.
+        """
+        return self._checkpoints.get(ticker)
 
     def should_fetch(
         self,

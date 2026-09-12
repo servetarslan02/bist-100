@@ -42,7 +42,12 @@ class EnsembleResult:
     timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def to_dict(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """EnsembleResult'u JSON serileştirilebilir dict'e dönüştürür.
+
+        Returns:
+            Rejim, güven skoru, konsensüs durumu, yöntem detayları ve
+            HMM olasılıklarını içeren dict.
+        """
         return {
             "regime": self.regime,
             "confidence": round(self.confidence, 4),
@@ -75,7 +80,18 @@ class EnsembleRegimeDetector:
         gmm_weight: float = 0.20,
         rolling_window: int = 63,
     ):
-        """Otomatik eklendi."""
+        """Ensemble Regime Detector'u yapılandırır.
+
+        Args:
+            score_weight: Skor bazlı rejim tespitinin ensemble'daki ağırlığı (0-1).
+            hmm_weight: Gizli Markov Modeli'nin ağırlığı (0-1).
+            gmm_weight: Gauss Karışım Modeli'nin ağırlığı (0-1).
+            rolling_window: HMM/GMM eğitimi için kullanılan pencere büyüklüğü (gün).
+
+        Note:
+            Ağırlıkların toplamı 1.0 olmalıdır; aksi halde normalize edilmez,
+            skor hesaplamaları hatalı sonuç üretir.
+        """
         self._score_weight = score_weight
         self._hmm_weight = hmm_weight
         self._gmm_weight = gmm_weight
@@ -86,6 +102,14 @@ class EnsembleRegimeDetector:
         self._hmm_detector = None
         self._gmm_detector = None
         self._init_failed = False
+
+    def __repr__(self) -> str:
+        """Sınıfın metinsel temsilini döndürür."""
+        return (
+            f"EnsembleRegimeDetector(score_weight={self._score_weight}, "
+            f"hmm_weight={self._hmm_weight}, gmm_weight={self._gmm_weight}, "
+            f"rolling_window={self._rolling_window})"
+        )
 
     def _ensure_engines(self) -> Any:
         """Engine'leri lazy init et."""

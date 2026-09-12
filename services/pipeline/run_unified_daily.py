@@ -1,6 +1,5 @@
-"""
-UNIFIED BIST DAILY PIPELINE: EOD SIGNAL GENERATION & MORNING MICROSTRUCTURE EXECUTION
-=====================================================================================
+"""UNIFIED BIST DAILY PIPELINE: EOD SIGNAL GENERATION & MORNING MICROSTRUCTURE EXECUTION.
+
 Bu modül, Borsa İstanbul (BIST) işlem takvimine ve mikro-yapı gerçekliğine tam uyumlu
 iki aşamalı günlük işlem akışını yönetir:
 
@@ -32,11 +31,24 @@ from services.paper_trading.paper_orchestrator import paper_orchestrator
 logger = structlog.get_logger("unified_daily")
 
 # Backtest ile birebir aynı holding süresi (63 iş günü = ~88 takvim günü)
-HOLDING_PERIOD_DAYS = 63
+HOLDING_PERIOD_DAYS: int = 63
+
+# Portföy ve Risk Eşikleri
+DEFAULT_MAX_POSITION_CAP: float = 0.20  # Bir hisse en fazla %20 (Kullanıcı kuralı)
+DEFAULT_MIN_POSITION_FLOOR: float = 0.00  # En az için taban yok (0.00 serbest)
+DEFAULT_MIN_SCORE_THRESHOLD: float = 50.0
+DEFAULT_MIN_EXIT_SCORE: float = 45.0
+DEFAULT_INVESTABLE_POOL_FLOOR: float = 0.10
+DEFAULT_SCAN_LIMIT: int = 50
+DEFAULT_LOOKBACK_DAYS: int = 60
 
 
 async def get_last_rebalance_date() -> date | None:
-    """Veritabanından son gerçek rebalance tarihini döner."""
+    """Veritabanından en son gerçekleştirilen başarılı rebalance tarihini döner.
+
+    Returns:
+        date | None: Son rebalance tarihi veya henüz kayıt yoksa None.
+    """
     query = """
         SELECT created_at
         FROM paper_trade_portfolio
@@ -49,12 +61,20 @@ async def get_last_rebalance_date() -> date | None:
         if rows:
             return rows[0]["created_at"].date()
     except Exception:
-        logger.warning("Caught Exception in get_last_rebalance_date", exc_info=True)
+        logger.warning("Son rebalance tarihi sorgulanirken hata olustu", exc_info=True)
     return None
 
 
 async def run_eod_signal_cycle(target_date: str | None = None, force_rebalance: bool = False) -> dict[str, Any]:
-    """18:15 EOD: Sinyalleri üretir, kuyruğa alır ve portföy MTM değerlemesini yapar."""
+    """18:15 EOD: Sinyalleri üretir, kuyruğa alır ve portföy MTM değerlemesini yapar.
+
+    Args:
+        target_date: İşlem yapılacak hedef tarih (ISO format: YYYY-MM-DD). Boşsa bugünün tarihi.
+        force_rebalance: Holding periyoduna bakılmaksızın zorla rebalance yapılıp yapılmayacağı.
+
+    Returns:
+        dict[str, Any]: EOD döngü sonuç raporu (durum, sinyal sayısı, mtm özeti vb.).
+    """
     await init_databases()
     today_str = target_date or date.today().strftime("%Y-%m-%d")
     today_dt = date.fromisoformat(today_str)
@@ -73,11 +93,12 @@ async def run_eod_signal_cycle(target_date: str | None = None, force_rebalance: 
 
     from services.ingestion.bist_universe import bist_universe
 
-    current_prices = {}
+    current_prices: dict[str, float] = {}
     if current_positions:
         # 1. PRIMARY: TradingView Scanner API (150ms 0-Gecikmeli Canlı Veri)
         try:
             from services.ingestion.providers.tradingview_provider import tradingview_provider
+
             tv_stocks = await tradingview_provider.fetch_all_bist_stocks()
             if tv_stocks:
                 for ticker in current_positions:
@@ -95,7 +116,7 @@ async def run_eod_signal_cycle(target_date: str | None = None, force_rebalance: 
         if missing_ticks:
             logger.info("yfinance fallback triggered for missing MTM tickers", count=len(missing_ticks))
             engine = AlphaEngine()
-            start_date = (today_dt - timedelta(days=60)).strftime("%Y-%m-%d")
+            start_date = (today_dt - timedelta(days=DEFAULT_LOOKBACK_DAYS)).strftime("%Y-%m-%d")
             pos_data, _, _ = engine.fetch_data(start_date, today_str, tickers=missing_ticks)
             for ticker, df in pos_data.items():
                 if len(df) > 0:
@@ -114,7 +135,7 @@ async def run_eod_signal_cycle(target_date: str | None = None, force_rebalance: 
         from services.scanner.bist_ml_scanner import bist_ml_scanner
 
         logger.info("Generating signals via Champion BistMLScanner (Single Source of Truth)...")
-        preds = bist_ml_scanner.scan_all_opportunities(limit=50)
+        preds = bist_ml_scanner.scan_all_opportunities(limit=DEFAULT_SCAN_LIMIT)
         if preds:
             set_cached("phase18:predictions", preds, ttl=86400)
             valid_preds = preds
@@ -128,6 +149,7 @@ async def run_eod_signal_cycle(target_date: str | None = None, force_rebalance: 
             current_regime_str = "BULL"
             try:
                 from services.market_state.ensemble_regime import EnsembleRegimeDetector
+
                 detector = EnsembleRegimeDetector()
                 det_res = detector.detect()
                 if hasattr(det_res, "regime"):
@@ -146,13 +168,13 @@ async def run_eod_signal_cycle(target_date: str | None = None, force_rebalance: 
                 sc = float(p.get("score", 0.0))
                 exp_ret = float(p.get("expected_return_pct", 15.0))
                 # Kalite eşiği: Pozitif getiri beklentisi ve güçlü model skoru
-                if exp_ret > 0 and sc >= 50.0:
+                if exp_ret > 0 and sc >= DEFAULT_MIN_SCORE_THRESHOLD:
                     qualified_candidates.append(p)
                 if len(qualified_candidates) >= max_slots:
                     break
 
             if not qualified_candidates:
-                qualified_candidates = valid_preds[:min(10, max_slots)]
+                qualified_candidates = valid_preds[: min(10, max_slots)]
 
             top_rank_map = {item["ticker"]: idx + 1 for idx, item in enumerate(qualified_candidates)}
 
@@ -170,7 +192,7 @@ async def run_eod_signal_cycle(target_date: str | None = None, force_rebalance: 
                 else:
                     pos_score = float(pos_pred.get("score", 0.0))
                     pos_rank = top_rank_map.get(ticker, 999)
-                    if pos_score < 45.0 or pos_rank > (max_slots * 1.8):
+                    if pos_score < DEFAULT_MIN_EXIT_SCORE or pos_rank > (max_slots * 1.8):
                         should_exit = True
                         exit_reason = "ALPHA_DECAY"
 
@@ -195,19 +217,19 @@ async def run_eod_signal_cycle(target_date: str | None = None, force_rebalance: 
             entry_signals = []
 
             if new_entries:
-                investable_pool = max(0.10, 1.0 - limits.min_cash_pct)  # Örn: %92
+                investable_pool = max(DEFAULT_INVESTABLE_POOL_FLOOR, 1.0 - limits.min_cash_pct)  # Örn: %92
                 # Güçlü Conviction Skew: En çok yükselmesi beklenen ve güvenilen hisseye %15-20, alt sıralara %0.5-2 verilir
                 raw_weights = []
                 for idx, p in enumerate(new_entries):
                     sc = max(1.0, float(p.get("score", 50.0)))
                     exp_r = max(5.0, float(p.get("expected_return_pct", 15.0))) / 100.0
                     rank_multiplier = max(0.05, (len(new_entries) - idx) / len(new_entries))
-                    factor = ((sc / 50.0) ** 2) * (1.0 + exp_r * 2.0) * (rank_multiplier ** 1.8)
+                    factor = ((sc / 50.0) ** 2) * (1.0 + exp_r * 2.0) * (rank_multiplier**1.8)
                     raw_weights.append(factor)
 
                 tot_factor = sum(raw_weights) if sum(raw_weights) > 0 else len(new_entries)
-                max_pos_cap = min(0.20, limits.max_position_pct)  # KULLANICI KURALI: En fazla %20
-                min_pos_floor = 0.00  # KULLANICI KURALI: En az için kriter yoktur
+                max_pos_cap = min(DEFAULT_MAX_POSITION_CAP, limits.max_position_pct)  # KULLANICI KURALI: En fazla %20
+                min_pos_floor = DEFAULT_MIN_POSITION_FLOOR  # KULLANICI KURALI: En az için kriter yoktur
 
                 for idx, (p, raw_f) in enumerate(zip(new_entries, raw_weights, strict=False)):
                     ideal_weight = (raw_f / tot_factor) * investable_pool
@@ -255,7 +277,14 @@ async def run_eod_signal_cycle(target_date: str | None = None, force_rebalance: 
 
 
 async def run_morning_execution_cycle(target_date: str | None = None) -> dict[str, Any]:
-    """09:55-10:05 Sabah Açılışı: Bekleyen emirleri gerçek açılış ve mikro-yapı defteriyle yürütür."""
+    """09:55-10:05 Sabah Açılışı: Bekleyen emirleri gerçek açılış ve mikro-yapı defteriyle yürütür.
+
+    Args:
+        target_date: İşlem yapılacak hedef tarih (ISO format: YYYY-MM-DD). Boşsa bugünün tarihi.
+
+    Returns:
+        dict[str, Any]: Sabah yürütme döngüsü sonuç raporu.
+    """
     await init_databases()
     today_str = target_date or date.today().strftime("%Y-%m-%d")
     today_dt = date.fromisoformat(today_str)
@@ -270,7 +299,7 @@ async def run_morning_execution_cycle(target_date: str | None = None) -> dict[st
 
     engine = AlphaEngine()
     # Son 60 günü ve sadece bekleyen hisseleri çek (Hızlı ve güvenilir: 1-2 saniye)
-    start_date = (today_dt - timedelta(days=60)).strftime("%Y-%m-%d")
+    start_date = (today_dt - timedelta(days=DEFAULT_LOOKBACK_DAYS)).strftime("%Y-%m-%d")
     target_tickers = list(set([s["ticker"] for s in pending])) if pending else None
     market_data, bm_df, sector_map = engine.fetch_data(start_date, today_str, tickers=target_tickers)
 
@@ -298,7 +327,14 @@ async def run_morning_execution_cycle(target_date: str | None = None) -> dict[st
 
 
 async def run_unified_daily_cycle() -> dict[str, Any]:
-    """API ve zamanlayıcı için ortak orkestrasyon fonksiyonu."""
+    """API ve zamanlayıcı için ortak orkestrasyon fonksiyonu.
+
+    Günün saatine ve bekleyen emir durumuna göre sabah yürütme veya akşam EOD
+    döngüsünü dinamik olarak seçip çalıştırır.
+
+    Returns:
+        dict[str, Any]: Çalıştırılan döngünün sonuç özeti.
+    """
     now_hour = datetime.now(timezone(timedelta(hours=3))).hour
     pending = paper_orchestrator.store.load_pending_signals()
     # Sabah seansinda, portfoy henuz bosken VEYA geceden bekleyen emirler varsa once sabah yurutme dongusu calisir
@@ -306,6 +342,22 @@ async def run_unified_daily_cycle() -> dict[str, Any]:
         return await run_morning_execution_cycle()
     else:
         return await run_eod_signal_cycle()
+
+
+__all__ = [
+    "DEFAULT_INVESTABLE_POOL_FLOOR",
+    "DEFAULT_LOOKBACK_DAYS",
+    "DEFAULT_MAX_POSITION_CAP",
+    "DEFAULT_MIN_EXIT_SCORE",
+    "DEFAULT_MIN_POSITION_FLOOR",
+    "DEFAULT_MIN_SCORE_THRESHOLD",
+    "DEFAULT_SCAN_LIMIT",
+    "HOLDING_PERIOD_DAYS",
+    "get_last_rebalance_date",
+    "run_eod_signal_cycle",
+    "run_morning_execution_cycle",
+    "run_unified_daily_cycle",
+]
 
 
 if __name__ == "__main__":

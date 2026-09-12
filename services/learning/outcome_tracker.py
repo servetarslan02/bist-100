@@ -31,10 +31,13 @@ class OutcomeTracker:
         "6-24M": 120,
     }
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """Sonuç takip motorunu bekleyen tahmin kuyruğu ile ilklendirir."""
         self._pending: deque = deque(maxlen=5000)  # Sonuç bekleyen tahminler
         self._checked_today: set = set()
+
+    def __repr__(self) -> str:
+        return f"OutcomeTracker(pending_predictions={len(self._pending)})"
 
     def add_prediction(self, prediction: dict) -> Any:
         """Yeni tahmin ekle — outcome takibi başlat."""

@@ -24,7 +24,16 @@ logger = structlog.get_logger()
 
 @dataclass
 class LearningJobConfig:
-    """Learning job konfigürasyonu."""
+    """Makine öğrenmesi ve model bakım periyodik görev konfigürasyonu.
+
+    Args:
+        job_type: Görev türü (ör. 'learning_cycle', 'model_drift_detection').
+        interval_hours: Tekrarlama sıklığı (saat cinsinden).
+        enabled: Görevin aktif olup olmadığı bayrağı.
+        last_run: Son çalışma zaman damgası.
+        handler: Çalıştırılacak async fonksiyon.
+        description: Görev açıklaması.
+    """
 
     job_type: str
     interval_hours: int
@@ -32,6 +41,12 @@ class LearningJobConfig:
     last_run: str | None = None
     handler: Callable | None = None
     description: str = ""
+
+    def __repr__(self) -> str:
+        return (
+            f"LearningJobConfig(type={self.job_type!r}, interval={self.interval_hours}h, "
+            f"enabled={self.enabled}, last_run={self.last_run!r})"
+        )
 
 
 class LearningScheduler:
@@ -46,10 +61,14 @@ class LearningScheduler:
     """
 
     def __init__(self):
-        """Otomatik eklendi."""
+        """Öğrenme döngüsü zamanlayıcı motorunu başlatır."""
         self._jobs: dict[str, LearningJobConfig] = {}
         self._running = False
         self._setup_default_jobs()
+
+    def __repr__(self) -> str:
+        active_count = sum(1 for j in self._jobs.values() if j.enabled)
+        return f"LearningScheduler(jobs={len(self._jobs)}, active={active_count}, running={self._running})"
 
     def _setup_default_jobs(self) -> Any:
         """Varsayılan learning job'ları."""
@@ -101,7 +120,7 @@ class LearningScheduler:
             original = handler
 
             async def _async_wrapper() -> Any:
-                """Otomatik eklendi."""
+                """Senkron handler fonksiyonunu asenkron olarak çalıştırır."""
                 return original()
 
             handler = _async_wrapper

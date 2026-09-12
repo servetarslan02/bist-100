@@ -62,12 +62,23 @@ class OpportunityScore:
     evidence: list[str] = field(default_factory=list)
     risks: list[str] = field(default_factory=list)
 
+    def __repr__(self) -> str:
+        """OpportunityScore okunabilir nesne temsili."""
+        return (
+            f"OpportunityScore(ticker='{self.ticker}', score={self.opportunity_score:.1f}, "
+            f"risk_adj={self.risk_adjusted_score:.1f}, rank={self.rank})"
+        )
+
 
 class OpportunityDiscoveryEngine:
     """Fırsat keşif motoru.
 
     800+ hisseyi tarar, fırsatları risk-adjusted şekilde sıralar.
     """
+
+    def __repr__(self) -> str:
+        """OpportunityDiscoveryEngine okunabilir durum temsili."""
+        return f"OpportunityDiscoveryEngine(weights_count={len(self.DEFAULT_WEIGHTS)})"
 
     # Ağırlıklar (rejime göre değişebilir)
     DEFAULT_WEIGHTS = {

@@ -44,6 +44,9 @@ class ModelOutcome:
     return_pct: float
     is_correct: bool
 
+    def __repr__(self) -> str:
+        return f"ModelOutcome(pred={self.predicted:.2f}, act={self.actual:.2f}, ret={self.return_pct:+.2f}%, correct={self.is_correct})"
+
 
 @dataclass
 class DegradationReport:
@@ -66,6 +69,12 @@ class DegradationReport:
     n_outcomes: int
     timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
+    def __repr__(self) -> str:
+        return (
+            f"DegradationReport(model={self.model_id!r}, sev={self.severity!r}, "
+            f"acc_drop={self.accuracy_drop:.2f}, sharpe_drop={self.sharpe_drop:.2f}, remove={self.should_remove})"
+        )
+
 
 @dataclass
 class DegradationAlert:
@@ -76,6 +85,9 @@ class DegradationAlert:
     message: str
     accuracy_drop: float
     timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
+
+    def __repr__(self) -> str:
+        return f"DegradationAlert(model={self.model_id!r}, sev={self.severity!r}, drop={self.accuracy_drop:.2f})"
 
 
 class ModelDegradationMonitor:
@@ -99,8 +111,8 @@ class ModelDegradationMonitor:
         z_score_threshold: float = 2.0,
         alert_cooldown_hours: int = 6,
         auto_remove_threshold: float = 0.30,
-    ):
-        """Otomatik eklendi."""
+    ) -> None:
+        """Model bozulma (degradation) izleme motorunu pencere ve eşik parametreleriyle ilklendirir."""
         self.window_size = window_size
         self.baseline_window = baseline_window
         self.accuracy_drop_threshold = accuracy_drop_threshold
@@ -112,6 +124,9 @@ class ModelDegradationMonitor:
         self._alerts: list[DegradationAlert] = []
         self._last_alert_time: dict[str, datetime] = {}
         self._removed_models: set[str] = set()
+
+    def __repr__(self) -> str:
+        return f"ModelDegradationMonitor(window={self.window_size}, models_tracked={len(self._outcomes)})"
 
     def record_outcome(
         self,
@@ -487,3 +502,4 @@ class ModelDegradationMonitor:
 
 # Singleton
 degradation_monitor = ModelDegradationMonitor()
+model_degradation_monitor = degradation_monitor

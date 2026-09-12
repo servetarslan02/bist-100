@@ -168,3 +168,12 @@ def _get_tcmb_dates(year: int) -> list[datetime]:
             except ValueError:
                 continue
     return dates
+
+
+__all__ = [
+    "MACRO_EVENTS",
+    "get_macro_events",
+    "get_upcoming_events",
+    "get_event_impact",
+]
+

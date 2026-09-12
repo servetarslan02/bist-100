@@ -1,8 +1,8 @@
 # services/pipeline/ — Denetim Raporu
 
-**Tarih:** —  
-**Kapsam:** ? `.py` dosyası  
-**Denetim Sonucu:** — sorun tespit edildi, — düzeltildi
+**Tarih:** 2026-09-13  
+**Kapsam:** 4 `.py` dosyası (`__init__.py`, `main_backtest.py`, `run_daily_inference.py`, `run_unified_daily.py`, `startup_catchup.py`)  
+**Denetim Sonucu:** 14 sorun tespit edildi, 14 düzeltildi. Testler %100 başarılı (9/9 passed).
 
 ---
 
@@ -22,28 +22,58 @@
 
 | # | Dosya | Sorun | Durum |
 |---|-------|-------|-------|
-| — | — | — | ⏳ Bekliyor |
+| 1 | `__init__.py` | Dosya boştu (0 byte), hiçbir sembol ve docstring dışa aktarılmıyordu. | ✅ Düzeltildi |
+| 2 | `main_backtest.py` | `run_final()` metodunda "Otomatik eklendi." placeholder docstring, import sırası karmaşası, magic numbers (`100000.0`, `0.001`, `0.002`, `10`), eksik `__all__`. | ✅ Düzeltildi |
+| 3 | `run_daily_inference.py` | `datetime.timedelta` eksikliği nedeniyle `AttributeError` çalışma zamanı çöküşü, fonksiyon içi importlar, `save_to_db` içinde "Otomatik eklendi." placeholder, eksik `__all__`. | ✅ Düzeltildi |
+| 4 | `run_unified_daily.py` | Eksik modül sabitleri (`DEFAULT_MAX_POSITION_CAP`, `DEFAULT_MIN_SCORE_THRESHOLD`), eksik `__all__`. | ✅ Düzeltildi |
+| 5 | `startup_catchup.py` | `__repr__` yetersizliği (`<MasterStartupCatchup>`), `self.calendar.is_holiday()` çağrısının eksik metot riski, magic numbers (`50`, `6379`), eksik `__all__`. | ✅ Düzeltildi |
 
 ---
 
-## `<dosya_adı>.py`
+## `main_backtest.py`
 
 | # | Sorun | Düzeltme |
 |---|-------|----------|
-| — | — | — |
+| 1 | "Otomatik eklendi." placeholder docstring | `run_final` için kapsamlı Türkçe docstring (Args/Returns/Raises) eklendi. |
+| 2 | Magic number kullanımı (`100000.0`, `0.001`, `0.002`, `10`) | `DEFAULT_INITIAL_CAPITAL`, `DEFAULT_COMMISSION_RATE`, `DEFAULT_SLIPPAGE_PCT`, `DEFAULT_TOP_PICKS` sabitleri tanımlandı. |
+| 3 | f-string loglama yerine structlog | Key-value yapısal loglamaya geçildi. |
+| 4 | Eksik dışa aktarım | `__all__` listesi eklendi. |
 
 ---
 
-## Geliştirme Önerileri
+## `run_daily_inference.py`
 
-| # | Alan | Öneri |
-|---|------|-------|
-| — | — | — |
+| # | Sorun | Düzeltme |
+|---|-------|----------|
+| 1 | `today - datetime.timedelta(...)` AttributeError | `from datetime import UTC, date, datetime, timedelta` import edilerek çalışma zamanı hatası giderildi. |
+| 2 | Fonksiyon içi import dağınıklığı | Bütün importlar PEP 8 uyumlu olarak dosya başına taşındı. |
+| 3 | `save_to_db` "Otomatik eklendi." placeholder | Açıklayıcı Türkçe docstring eklendi. |
+| 4 | Tarih dönüşümü kırılganlığı | `date.fromisoformat(target_date[:10])` ile ISO güvenli ayrıştırma sağlandı. |
+| 5 | Eksik dışa aktarım | `__all__` listesi eklendi. |
 
 ---
 
-## Bilinen Eksikler
+## `run_unified_daily.py`
 
-| # | Eksik | Neden Yapılmadı |
-|---|-------|-----------------|
-| — | — | — |
+| # | Sorun | Düzeltme |
+|---|-------|----------|
+| 1 | Magic number risk eşikleri | `DEFAULT_MAX_POSITION_CAP`, `DEFAULT_MIN_POSITION_FLOOR`, `DEFAULT_MIN_SCORE_THRESHOLD`, `DEFAULT_MIN_EXIT_SCORE` sabitleri tanımlandı. |
+| 2 | Eksik dışa aktarım | `__all__` listesi eklendi. |
+
+---
+
+## `startup_catchup.py`
+
+| # | Sorun | Düzeltme |
+|---|-------|----------|
+| 1 | Basit `__repr__` | `MasterStartupCatchup(calendar=...)` detaylı gösterimi eklendi. |
+| 2 | `calendar.is_holiday` eksikliği | `services.core.market_calendar.MarketCalendar` sınıfına `is_holiday` metodu eklenerek uyumluluk sağlandı. |
+| 3 | Eksik dışa aktarım | `__all__` listesi eklendi. |
+
+---
+
+## Canlı Doğrulama ve Test Sonuçları
+
+- **Ruff Linter:** `uv run ruff check services/pipeline/ tests/test_audit_pipeline.py` -> 0 hata.
+- **Birim & Entegrasyon Testi:** `uv run pytest tests/test_audit_pipeline.py` -> **9/9 passed (100% green)**.
+- **Geriye Dönük Uyumluluk:** `uv run pytest tests/test_api_v1_portfolio_comprehensive.py tests/test_api_v1_backtest_scanner_comprehensive.py` -> **17/17 passed (100% green)**.

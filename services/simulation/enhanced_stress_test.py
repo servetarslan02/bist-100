@@ -27,7 +27,18 @@ logger = structlog.get_logger()
 
 @dataclass
 class StressScenario:
-    """Stres senaryosu."""
+    """Stres senaryosu tanım veri modeli.
+
+    Args:
+        name: Senaryo başlığı/adı.
+        description: Senaryonun detaylı açıklaması.
+        market_shock: Genel piyasa şoku oranı (ör. -0.20 = -%20).
+        vol_spike: Volatilite sıçrama çarpanı.
+        usd_shock: USD/TRY kurundaki şok oranı.
+        rate_shock: Faiz şoku (baz puan, bp).
+        sector_impacts: Sektör bazlı spesifik etki oranları.
+        probability: Senaryonun yıllık gerçekleşme olasılığı (0.0-1.0).
+    """
 
     name: str
     description: str
@@ -38,10 +49,26 @@ class StressScenario:
     sector_impacts: dict[str, float]  # Sektör bazlı etki
     probability: float  # Olasılık (yıllık)
 
+    def __repr__(self) -> str:
+        return (
+            f"StressScenario(name={self.name!r}, mkt_shock={self.market_shock:+.1%}, "
+            f"usd_shock={self.usd_shock:+.1%}, rate_shock={self.rate_shock}bp)"
+        )
+
 
 @dataclass
 class StressResult:
-    """Stres testi sonucu."""
+    """Tek bir stres senaryosunun portföy üzerindeki simülasyon sonucu.
+
+    Args:
+        scenario: Senaryo adı.
+        portfolio_impact_pct: Portföy değerindeki yüzdesel değişim (%).
+        portfolio_impact_amount: Nominal kayıp/kazanç tutarı (TL).
+        worst_position: En fazla değer kaybeden hisse senedi sembolü.
+        best_position: En az değer kaybeden veya en çok kazanan hisse.
+        position_impacts: Pozisyon bazlı ayrıntılı etki ve kayıp dökümü.
+        recovery_estimate_days: Tahmini toparlanma süresi (gün).
+    """
 
     scenario: str
     portfolio_impact_pct: float
@@ -50,6 +77,12 @@ class StressResult:
     best_position: str
     position_impacts: list[dict[str, Any]]
     recovery_estimate_days: int | None = None
+
+    def __repr__(self) -> str:
+        return (
+            f"StressResult(scenario={self.scenario!r}, impact_pct={self.portfolio_impact_pct:.2f}%, "
+            f"impact_amt={self.portfolio_impact_amount:,.2f} TL, worst={self.worst_position!r})"
+        )
 
 
 class EnhancedStressTestEngine:
@@ -213,6 +246,17 @@ class EnhancedStressTestEngine:
         ),
     ]
 
+    def __init__(self, scenarios: list[StressScenario] | None = None):
+        """Gelişmiş stres testi motorunu başlatır.
+
+        Args:
+            scenarios: Opsiyonel özel senaryo listesi (None ise varsayılan senaryolar kullanılır).
+        """
+        self.scenarios = list(scenarios) if scenarios is not None else list(self.SCENARIOS)
+
+    def __repr__(self) -> str:
+        return f"EnhancedStressTestEngine(scenarios={len(self.scenarios)})"
+
     def run_stress_test(
         self,
         portfolio_value: float,
@@ -229,7 +273,7 @@ class EnhancedStressTestEngine:
         """
         results = []
 
-        for scenario in self.SCENARIOS:
+        for scenario in self.scenarios:
             result = self._run_scenario(portfolio_value, positions, scenario)
             results.append(result)
 
@@ -395,7 +439,9 @@ class EnhancedStressTestEngine:
             sector_impacts=sector_impacts,
             probability=probability,
         )
-        self.SCENARIOS.append(scenario)
+        self.scenarios.append(scenario)
+        if scenario not in self.SCENARIOS:
+            self.SCENARIOS.append(scenario)
         logger.info("Custom stress scenario added", name=name)
 
 

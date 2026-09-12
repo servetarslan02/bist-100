@@ -50,7 +50,12 @@ class TransitionStats:
     confidence_trend: str = "STABLE"  # INCREASING / DECREASING / STABLE
 
     def to_dict(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """TransitionStats nesnesini serileştirilebilir sözlük formatına dönüştürür.
+
+        Returns:
+            dict[str, Any]: Gözlem, geçiş sayıları, dağılım, ortalama süre,
+                kararlılık skoru ve geçiş matrisi gibi özet istatistikler.
+        """
         return {
             "total_observations": self.total_observations,
             "total_transitions": self.total_transitions,
@@ -74,7 +79,12 @@ class RegimeTransitionTracker:
     """
 
     def __init__(self, max_history: int = 1000, stability_window: int = 20):
-        """Otomatik eklendi."""
+        """RegimeTransitionTracker sınıfını başlatır.
+
+        Args:
+            max_history: Saklanacak maksimum rejim gözlem geçmişi boyutu.
+            stability_window: Kararlılık skoru hesaplamasında kullanılan geriye dönük pencere boyutu.
+        """
         self._max_history = max_history
         self._stability_window = stability_window
 
@@ -89,6 +99,13 @@ class RegimeTransitionTracker:
         self._current_regime: str | None = None
         self._current_start: datetime | None = None
         self._current_confidence: float = 0.0
+
+    def __repr__(self) -> str:
+        """Sınıfın metinsel temsilini döndürür."""
+        return (
+            f"RegimeTransitionTracker(current_regime={self._current_regime!r}, "
+            f"transitions_count={len(self._transitions)}, max_history={self._max_history})"
+        )
 
     def record(
         self,

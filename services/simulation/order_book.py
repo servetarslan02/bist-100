@@ -21,49 +21,71 @@ logger = structlog.get_logger()
 
 @dataclass
 class OrderBookLevel:
-    """Tek bir order book seviyesi."""
+    """Emir defterindeki tek bir fiyat kademesi (Price Level).
+
+    Args:
+        price: Kademe fiyat seviyesi.
+        quantity: Bu fiyatta bekleyen toplam lot adedi.
+        side: Emir yönü ('bid' veya 'ask').
+    """
 
     price: float
     quantity: int
     side: str  # "bid" / "ask"
 
+    def __repr__(self) -> str:
+        return f"OrderBookLevel(price={self.price:.2f}, qty={self.quantity}, side={self.side!r})"
+
 
 @dataclass
 class OrderBookSnapshot:
-    """Order book anlık görüntüsü."""
+    """Belirli bir andaki derinlikli emir defteri anlık görüntüsü (Depth Snapshot).
+
+    Args:
+        ticker: Hisse senedi sembolü.
+        timestamp: Anlık görüntünün zaman damgası.
+        bids: Alış kademeleri (en yüksekten en düşüğe).
+        asks: Satış kademeleri (en düşükten en yükseğe).
+    """
 
     ticker: str
     timestamp: float
     bids: list[OrderBookLevel]  # En yüksekten en düşüğe
     asks: list[OrderBookLevel]  # En düşükten en yükseğe
 
+    def __repr__(self) -> str:
+        return (
+            f"OrderBookSnapshot(ticker={self.ticker!r}, bid={self.best_bid:.2f} ({self.bid_depth}), "
+            f"ask={self.best_ask:.2f} ({self.ask_depth}), spread={self.spread_pct:.2f}%)"
+        )
+
     @property
     def best_bid(self) -> float:
-        """Otomatik eklendi."""
+        """En iyi bekleyen alış fiyatı (Highest Bid Price)."""
         return self.bids[0].price if self.bids else 0.0
 
     @property
     def best_ask(self) -> float:
-        """Otomatik eklendi."""
+        """En iyi bekleyen satış fiyatı (Lowest Ask Price)."""
         return self.asks[0].price if self.asks else 0.0
 
     @property
     def mid_price(self) -> float:
-        """Otomatik eklendi."""
+        """En iyi alış ve satış kademelerinin orta noktası (Midpoint Price)."""
         if self.best_bid > 0 and self.best_ask > 0:
             return (self.best_bid + self.best_ask) / 2
         return 0.0
 
     @property
     def spread(self) -> float:
-        """Otomatik eklendi."""
+        """En iyi alış ve satış kademeleri arasındaki nominal fark (Nominal Spread)."""
         if self.best_bid > 0 and self.best_ask > 0:
             return self.best_ask - self.best_bid
         return 0.0
 
     @property
     def spread_pct(self) -> float:
-        """Otomatik eklendi."""
+        """Orta fiyata oranla yüzdesel alış-satış makası (Spread Percentage)."""
         mid = self.mid_price
         if mid > 0:
             return self.spread / mid * 100
@@ -81,7 +103,7 @@ class OrderBookSnapshot:
 
     @property
     def total_depth(self) -> int:
-        """Otomatik eklendi."""
+        """Defterde bekleyen toplam alım ve satım derinliği (Total Depth Volume)."""
         return self.bid_depth + self.ask_depth
 
     @property
@@ -105,10 +127,22 @@ class OrderBookSimulator:
         base_spread_pct: float = 0.1,
         depth_levels: int = 5,
     ):
-        """Otomatik eklendi."""
+        """Emir defteri simülasyon motorunu başlatır.
+
+        Args:
+            tick_size: Fiyat adımı büyüklüğü (varsayılan 0.01).
+            base_spread_pct: Temel alış-satış makası yüzdesi (%0.1).
+            depth_levels: Üretilecek derinlik kademe adedi.
+        """
         self.tick_size = tick_size
         self.base_spread_pct = base_spread_pct
         self.depth_levels = depth_levels
+
+    def __repr__(self) -> str:
+        return (
+            f"OrderBookSimulator(tick_size={self.tick_size}, base_spread={self.base_spread_pct}%, "
+            f"levels={self.depth_levels})"
+        )
 
     def generate_book(
         self,

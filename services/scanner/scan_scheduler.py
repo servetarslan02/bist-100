@@ -84,8 +84,13 @@ class AdaptiveScanScheduler:
         self,
         base_interval: int = 60,
         timezone_offset: int = 3,  # UTC+3 (Türkiye)
-    ):
-        """Otomatik eklendi."""
+    ) -> None:
+        """AdaptiveScanScheduler motorunu başlatır.
+
+        Args:
+            base_interval: Standart tarama aralığı (saniye cinsinden, varsayılan 60 sn).
+            timezone_offset: Türkiye saati için saat farkı (varsayılan UTC+3).
+        """
         self._base_interval = base_interval
         self._tz_offset = timezone_offset
         self._running = False
@@ -106,6 +111,13 @@ class AdaptiveScanScheduler:
         self._total_events_triggered = 0
         self._last_scan_time: float = 0
         self._interval_history: list = []
+
+    def __repr__(self) -> str:
+        """AdaptiveScanScheduler okunabilir durum temsili."""
+        return (
+            f"AdaptiveScanScheduler(mode={self._current_mode.value}, interval={self._current_interval}s, "
+            f"running={self._running}, total_scans={self._total_scans})"
+        )
 
     def set_scan_callback(self, callback: Callable[[], Awaitable[None]]) -> Any:
         """Tarama callback'i ata.

@@ -115,10 +115,14 @@ class MarketStateFormatter:
             component_states,
             ensemble_result,
             transition_stats,
-            risk_appetite_score,
+            risk_appetite,
             multi_tf_result,
         )
     """
+
+    def __repr__(self) -> str:
+        """Sınıfın metinsel temsilini döndürür."""
+        return "MarketStateFormatter()"
 
     def format(
         self,

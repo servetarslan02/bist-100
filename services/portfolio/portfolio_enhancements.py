@@ -32,6 +32,12 @@ class RebalanceDecision:
     turnover: float
     timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
+    def __repr__(self) -> str:
+        return (
+            f"RebalanceDecision(should_rebalance={self.should_rebalance}, "
+            f"net_benefit={self.net_benefit:,.2f} TL, turnover={self.turnover:.2%})"
+        )
+
 
 @dataclass
 class PortfolioConstraints:
@@ -46,14 +52,27 @@ class PortfolioConstraints:
     hysteresis_threshold: float = 0.02
     transaction_cost_pct: float = 0.0015
 
+    def __repr__(self) -> str:
+        return (
+            f"PortfolioConstraints(max_pos={self.max_position_pct:.1%}, "
+            f"max_exp={self.max_total_exposure:.1%}, cost={self.transaction_cost_pct:.2%})"
+        )
+
 
 class PortfolioEnhancements:
     """Portföy yönetimi geliştirmeleri."""
 
-    def __init__(self, constraints: PortfolioConstraints | None = None):
-        """Otomatik eklendi."""
+    def __init__(self, constraints: PortfolioConstraints | None = None) -> None:
+        """Portföy geliştirme ve turnover optimizasyon motorunu başlatır.
+
+        Args:
+            constraints: Portföy kısıtları ve işlem maliyeti parametreleri.
+        """
         self.constraints = constraints or PortfolioConstraints()
         self._rebalance_history: list[RebalanceDecision] = []
+
+    def __repr__(self) -> str:
+        return f"PortfolioEnhancements(constraints={self.constraints!r}, history={len(self._rebalance_history)})"
 
     def apply_turnover_penalty(
         self,

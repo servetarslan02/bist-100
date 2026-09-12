@@ -25,7 +25,8 @@ logger = structlog.get_logger()
 
 
 class JobStatus(StrEnum):
-    """Otomatik eklendi."""
+    """Zamanlanmış görev çalışma durumları."""
+
     SUCCESS = "SUCCESS"
     FAILED = "FAILED"
     TIMEOUT = "TIMEOUT"
@@ -36,7 +37,18 @@ class JobStatus(StrEnum):
 
 @dataclass
 class JobRecord:
-    """Job kayıt kaydı."""
+    """Tekil bir görev çalıştırma geçmişi kaydı.
+
+    Args:
+        job_type: Görevin türü/adı (ör. 'daily_report', 'eod_scan').
+        status: Görevin nihai çalışma durumu (JobStatus).
+        duration_ms: Görevin toplam çalışma süresi (milisaniye).
+        timestamp: Çalışma zaman damgası (ISO formatında).
+        error: Varsa oluşan hata mesajı.
+        retry_count: Yapılan deneme sayısı.
+        phase: İlgili seans evresi (ör. 'PRE_MARKET', 'POST_MARKET').
+        triggered_by: Görevi tetikleyen kaynak ('scheduler', 'manual', 'api').
+    """
 
     job_type: str
     status: JobStatus
@@ -47,16 +59,33 @@ class JobRecord:
     phase: str = ""
     triggered_by: str = "scheduler"
 
+    def __repr__(self) -> str:
+        return (
+            f"JobRecord(job={self.job_type!r}, status={self.status.value!r}, "
+            f"duration={self.duration_ms:.1f}ms, error={self.error!r})"
+        )
+
 
 @dataclass
 class JobAlert:
-    """Job alert."""
+    """Görev izleme alarm kaydı (SLA aşımı, ardışık hata vb.).
+
+    Args:
+        alert_type: Alarm tipi ('FAILURE', 'SLOW', 'HIGH_FAILURE_RATE', 'CONSECUTIVE_FAILURE').
+        job_type: İlgili görev türü.
+        message: Alarm detay mesajı.
+        severity: Önem seviyesi ('INFO', 'WARNING', 'CRITICAL').
+        timestamp: Alarmın üretildiği zaman damgası.
+    """
 
     alert_type: str  # FAILURE, SLOW, HIGH_FAILURE_RATE, CONSECUTIVE_FAILURE
     job_type: str
     message: str
     severity: str  # INFO, WARNING, CRITICAL
     timestamp: str
+
+    def __repr__(self) -> str:
+        return f"JobAlert(type={self.alert_type!r}, job={self.job_type!r}, severity={self.severity!r})"
 
 
 class JobMonitor:
@@ -72,7 +101,12 @@ class JobMonitor:
     """
 
     def __init__(self, max_history: int = 1000, slow_threshold_ms: float = 30000):
-        """Otomatik eklendi."""
+        """Görev izleme ve alarm yöneticisini başlatır.
+
+        Args:
+            max_history: Saklanacak maksimum geçmiş kayıt sayısı.
+            slow_threshold_ms: Yavaş görev kabul edilecek eşik süre (ms).
+        """
         self._max_history = max_history
         self._slow_threshold = slow_threshold_ms
         self._records: list[JobRecord] = []
@@ -81,6 +115,12 @@ class JobMonitor:
 
         # Consecutive failure tracking
         self._consecutive_failures: dict[str, int] = {}
+
+    def __repr__(self) -> str:
+        return (
+            f"JobMonitor(records={len(self._records)}, alerts={len(self._alerts)}, "
+            f"slow_threshold={self._slow_threshold}ms)"
+        )
 
     def record_job(
         self,

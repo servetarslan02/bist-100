@@ -279,6 +279,22 @@ class MarketCalendar:
                 return False
             return self._hm.is_trading_day(target_date)
 
+    @otel_trace("market_calendar.is_holiday")
+    def is_holiday(self, d: date | None = None) -> bool:
+        """Belirtilen günün BIST resmi tatili olup olmadığını doğrular.
+
+        Args:
+            d: Kontrol edilecek tarih (varsayılan: bugün).
+
+        Returns:
+            bool: Resmi tatil ise True, açık iş günü ise False.
+        """
+        target_date = d if d is not None else date.today()
+        with self._lock:
+            if target_date in self._holidays:
+                return True
+            return not self._hm.is_trading_day(target_date)
+
     @otel_trace("market_calendar.is_market_open")
     def is_market_open(self, dt: datetime | None = None) -> bool:
         """Belirtilen anda piyasanın emir girişine ve işlemlere açık olup olmadığını denetler.
@@ -767,6 +783,11 @@ def is_market_open(dt: datetime | None = None) -> bool:
 def is_trading_day(d: date | None = None) -> bool:
     """Günün BIST işlem günü olup olmadığını doğrular."""
     return market_calendar.is_trading_day(d)
+
+
+def is_holiday(d: date | None = None) -> bool:
+    """Günün BIST resmi tatili olup olmadığını doğrular."""
+    return market_calendar.is_holiday(d)
 
 
 def is_half_day(d: date | None = None) -> bool:

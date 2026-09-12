@@ -52,6 +52,28 @@ class PointInTimeValidator:
     verinin o anda bilinip bilinmediğini kontrol eder.
     """
 
+    def __repr__(self) -> str:
+        """PointInTimeValidator string temsili."""
+        return f"PointInTimeValidator(data_types={len(self.DATA_DELAYS)})"
+
+    def is_valid(
+        self,
+        event_timestamp: datetime,
+        as_of: datetime,
+        data_type: str = "market_price",
+    ) -> bool:
+        """Verilen olayın as_of tarihi itibarıyla geçerli/bilinir olup olmadığını denetler.
+
+        Args:
+            event_timestamp: Olayın oluşma zamanı.
+            as_of: Sorgu/karar anı zamanı.
+            data_type: Veri tipi (varsayılan: 'market_price').
+
+        Returns:
+            Veri as_of zamanında biliniyorsa True, geleceğe aitse False.
+        """
+        return self.is_available_at(data_type, event_timestamp, as_of)
+
     # Veri tipleri için gecikme süreleri
     DATA_DELAYS: dict[str, PITConfig] = {
         "market_price": PITConfig(

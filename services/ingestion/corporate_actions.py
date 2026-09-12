@@ -125,6 +125,18 @@ class CorporateActionsHandler:
         self._actions: dict[str, list[CorporateAction]] = {}
         self._applied: set[str] = set()
 
+    def __repr__(self) -> str:
+        """CorporateActionsHandler string temsili."""
+        return f"CorporateActionsHandler(tickers={len(self._actions)})"
+
+    def register_action(self, action: CorporateAction) -> None:
+        """add_action için alternatif metot.
+
+        Args:
+            action: Eklenecek CorporateAction örneği.
+        """
+        self.add_action(action)
+
     def add_action(self, action: CorporateAction) -> None:
         """Şirket olayı ekler.
 

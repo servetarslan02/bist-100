@@ -56,6 +56,12 @@ class PerformanceMetrics:
     horizon_breakdown: dict[str, dict[str, float]] = field(default_factory=dict)
     updated_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
+    def __repr__(self) -> str:
+        return (
+            f"PerformanceMetrics(model={self.model_id!r}, ver={self.model_version!r}, "
+            f"acc={self.direction_accuracy:.2%}, sharpe={self.annualized_sharpe:.2f}, n={self.evaluated_samples})"
+        )
+
 
 class ModelPerformanceEngine:
     """Tahmin ve gerçekleşen sonuçları eşleştirerek performans metriklerini hesaplar."""

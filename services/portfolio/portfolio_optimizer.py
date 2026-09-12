@@ -1,4 +1,3 @@
-from typing import Any
 
 """
 ALPHA BIST — Quantitative Portfolio Optimizer Engine v2.0
@@ -36,7 +35,7 @@ logger = structlog.get_logger()
 
 
 class OptimizationMethod(StrEnum):
-    """Otomatik eklendi."""
+    """Portföy optimizasyon algoritmaları ve yöntemleri."""
     RISK_PARITY = "RISK_PARITY"
     HIERARCHICAL_RISK_PARITY = "HRP"
     MAX_SHARPE = "MAX_SHARPE"
@@ -60,6 +59,12 @@ class PortfolioOptimizerConstraints:
     hysteresis_threshold: float = 0.02  # %2 altındaki küçük sapmalarda işlem yapmama
     l2_regularization: float = 0.002  # Aşırı yoğunlaşmayı engelleyen L2 ceza
 
+    def __repr__(self) -> str:
+        return (
+            f"PortfolioOptimizerConstraints(max_pos={self.max_position_pct:.1%}, "
+            f"max_exp={self.max_total_exposure:.1%}, cash_buffer={self.min_cash_buffer_pct:.1%})"
+        )
+
 
 @dataclass
 class OptimizationResult:
@@ -80,6 +85,13 @@ class OptimizationResult:
     warnings: list[str] = field(default_factory=list)
     timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
+    def __repr__(self) -> str:
+        return (
+            f"OptimizationResult({self.method.value}: optimal={self.is_optimal}, "
+            f"sharpe={self.sharpe_ratio:.2f}, vol={self.portfolio_volatility:.2%}, "
+            f"positions={len(self.weights)})"
+        )
+
 
 class PortfolioOptimizer:
     """BIST Portföy Optimizasyon Motoru."""
@@ -88,10 +100,18 @@ class PortfolioOptimizer:
         self,
         cov_est: CovarianceEstimator = covariance_estimator,
         liq_engine: LiquidityRiskEngine = liquidity_risk_engine,
-    ):
-        """Otomatik eklendi."""
+    ) -> None:
+        """Portföy optimizasyon motorunu başlatır.
+
+        Args:
+            cov_est: Kovaryans matrisi tahmincisi.
+            liq_engine: Likidite ve işlem maliyeti hesaplama motoru.
+        """
         self.cov_estimator = cov_est
         self.liquidity_engine = liq_engine
+
+    def __repr__(self) -> str:
+        return "PortfolioOptimizer(methods=['RISK_PARITY', 'HRP', 'MAX_SHARPE', 'MIN_VARIANCE', 'BLACK_LITTERMAN'])"
 
     def optimize(
         self,
@@ -292,15 +312,15 @@ class PortfolioOptimizer:
         init_w = 1.0 / np.sqrt(np.diag(cov_matrix))
         init_w = init_w / np.sum(init_w)
 
-        def objective(w) -> Any:
-            """Otomatik eklendi."""
+        def objective(w: np.ndarray) -> float:
+            """Eşit risk katkısı sapmaları kareler toplamı amaç fonksiyonu."""
             w = np.maximum(w, 1e-8)
             port_var = w.T @ cov_matrix @ w
             marginal_contrib = cov_matrix @ w
             risk_contrib = w * marginal_contrib
             # Target equal risk contribution: 1/N of total variance
             target = port_var / n
-            return np.sum((risk_contrib - target) ** 2)
+            return float(np.sum((risk_contrib - target) ** 2))
 
         bounds = [(1e-5, 1.0) for _ in range(n)]
         cons = [{"type": "eq", "fun": lambda w: np.sum(w) - 1.0}]
@@ -382,9 +402,9 @@ class PortfolioOptimizer:
         n = cov_matrix.shape[0]
         init_w = np.ones(n) / n
 
-        def objective(w) -> Any:
-            """Otomatik eklendi."""
-            return w.T @ cov_matrix @ w + constraints.l2_regularization * np.sum(w**2)
+        def objective(w: np.ndarray) -> float:
+            """Minimum varyans ve L2 düzenlileştirme amaç fonksiyonu."""
+            return float(w.T @ cov_matrix @ w + constraints.l2_regularization * np.sum(w**2))
 
         bounds = [(0.0, constraints.max_position_pct) for _ in range(n)]
         cons = [{"type": "eq", "fun": lambda w: np.sum(w) - 1.0}]
@@ -412,8 +432,8 @@ class PortfolioOptimizer:
 
         rf_daily = 0.40 / 252.0  # %40 yıllık risksiz faiz bazlı
 
-        def objective(w) -> Any:
-            """Otomatik eklendi."""
+        def objective(w: np.ndarray) -> float:
+            """Negatif Sharpe oranı ve turnover cezası amaç fonksiyonu."""
             port_ret = np.dot(w, expected_returns)
             port_var = w.T @ cov_matrix @ w
             port_vol = np.sqrt(max(port_var, 1e-8))
@@ -555,7 +575,7 @@ class PortfolioOptimizer:
         return clean_weights, cash_weight
 
     def _empty_result(self, method: OptimizationMethod, warnings: list[str]) -> OptimizationResult:
-        """Otomatik eklendi."""
+        """Yetersiz veri veya tekil varlık durumunda boş/varsayılan sonuç üretir."""
         return OptimizationResult(
             weights={},
             method=method,

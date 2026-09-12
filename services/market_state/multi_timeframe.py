@@ -35,7 +35,12 @@ class TimeframeState:
     timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def to_dict(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """TimeframeState'i JSON serileştirilebilir dict'e dönüştürür.
+
+        Returns:
+            Timeframe adı, rejim, güven, breadth, momentum, volatilite,
+            risk iştahı ve timestamp bilgilerini içeren dict.
+        """
         return {
             "timeframe": self.timeframe,
             "regime": self.regime,
@@ -58,7 +63,12 @@ class MultiTimeframeResult:
     dominant_timeframe: str = "daily"  # En güvenilir timeframe
 
     def to_dict(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """MultiTimeframeResult'u JSON serileştirilebilir dict'e dönüştürür.
+
+        Returns:
+            Tüm timeframe state'lerini, hizalama skorunu, sapmaları ve
+            baskın timeframe bilgisini içeren dict.
+        """
         return {
             "states": {tf: s.to_dict() for tf, s in self.states.items()},
             "alignment_score": round(self.alignment_score, 4),
@@ -79,6 +89,10 @@ class MultiTimeframeEngine:
     """
 
     TIMEFRAMES = ["intraday", "daily", "weekly", "monthly"]
+
+    def __repr__(self) -> str:
+        """Sınıfın metinsel temsilini döndürür."""
+        return f"MultiTimeframeEngine(timeframes={self.TIMEFRAMES})"
 
     def compute_all_timeframes(
         self,

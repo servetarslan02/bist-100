@@ -37,6 +37,9 @@ class TaxModel:
     # Holding period eşikleri
     SHORT_TERM_DAYS = 365  # Kısa vadeli < 1 yıl
 
+    def __repr__(self) -> str:
+        return f"TaxModel(dividend_tax={self.STOCK_DIVIDEND_TAX:.1%}, bsmv={self.BSMV_RATE:.1%})"
+
     def compute_dividend_tax(self, gross_dividend: float) -> dict[str, float]:
         """Temettü vergisi hesapla."""
         stopaj = gross_dividend * self.STOCK_DIVIDEND_TAX
@@ -189,6 +192,9 @@ class TaxModel:
 class DividendHandler:
     """Temettü işleme."""
 
+    def __repr__(self) -> str:
+        return "DividendHandler()"
+
     def process_dividend(
         self,
         ticker: str,
@@ -217,6 +223,9 @@ class DividendHandler:
 
 class BenchmarkEngine:
     """Benchmark karşılaştırma."""
+
+    def __repr__(self) -> str:
+        return "BenchmarkEngine()"
 
     def compare(
         self,
@@ -270,6 +279,9 @@ class BenchmarkEngine:
 
 class PerformanceAttribution:
     """Performans ayrıştırması — Brinson + Factor."""
+
+    def __repr__(self) -> str:
+        return "PerformanceAttribution()"
 
     def decompose(
         self,
@@ -420,12 +432,15 @@ class PerformanceAttribution:
 class MultiCurrencyHandler:
     """Çoklu para birimi desteği."""
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """Çoklu para birimi yöneticisini başlatır."""
         # Başlangıç kurları — update_rate() ile güncellenmeli
         # Gerçek değerler TCMB API veya config'den yüklenmeli
         self._rates: dict[str, float] = {"TRY": 1.0, "USD": 47.88, "EUR": 55.38}
         self._rates_stale = True  # Kurların güncel olup olmadığını takip et
+
+    def __repr__(self) -> str:
+        return f"MultiCurrencyHandler(currencies={list(self._rates.keys())}, stale={self._rates_stale})"
 
     def update_rate(self, currency: str, rate_to_try: float) -> Any:
         """Döviz kuru güncelle."""

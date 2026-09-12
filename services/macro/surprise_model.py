@@ -40,6 +40,15 @@ class SurpriseResult:
     source: str  # Beklenti kaynağı
     timestamp: str
 
+    def __repr__(self) -> str:
+        """Sürpriz sonucunun okunabilir string temsili."""
+        return (
+            f"SurpriseResult(indicator='{self.indicator}', "
+            f"actual={self.actual}, expected={self.expected}, "
+            f"surprise_pct={self.surprise_pct:.2f}%, magnitude='{self.magnitude}', "
+            f"direction='{self.direction}')"
+        )
+
 
 @dataclass
 class SurpriseImpact:
@@ -51,6 +60,14 @@ class SurpriseImpact:
     company_impacts: dict[str, float]  # ticker → impact
     decay_days: int
     remaining_impact: float  # Decay sonrası kalan etki
+
+    def __repr__(self) -> str:
+        """Sürpriz etkisinin okunabilir string temsili."""
+        return (
+            f"SurpriseImpact(indicator='{self.indicator}', "
+            f"surprise_pct={self.surprise_pct:.2f}%, "
+            f"remaining_impact={self.remaining_impact:.4f}, decay_days={self.decay_days})"
+        )
 
 
 class MacroSurpriseModel:
@@ -94,11 +111,21 @@ class MacroSurpriseModel:
         "OTHER": {"TCMB_RATE": -0.4, "CPI": -0.4, "GDP": 0.4},
     }
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """Makro sürpriz hesaplama motoru başlatıcı.
+
+        İç beklenti havuzunu, aktif sürpriz durumunu ve geçmiş sürpriz kayıtlarını ilklendirir.
+        """
         self._expectations: dict[str, dict] = {}  # indicator → {value, source, timestamp}
         self._surprise_history: list[SurpriseResult] = []
         self._active_surprises: dict[str, SurpriseResult] = {}
+
+    def __repr__(self) -> str:
+        """Makro sürpriz motoru okunabilir string temsili."""
+        return (
+            f"MacroSurpriseModel(active_surprises={len(self._active_surprises)}, "
+            f"expectations={len(self._expectations)}, history={len(self._surprise_history)})"
+        )
 
     def set_expectation(
         self,
@@ -319,3 +346,10 @@ class MacroSurpriseModel:
 
 # Singleton
 macro_surprise_model = MacroSurpriseModel()
+
+__all__ = [
+    "SurpriseResult",
+    "SurpriseImpact",
+    "MacroSurpriseModel",
+    "macro_surprise_model",
+]

@@ -36,6 +36,9 @@ class CalibrationBin:
     count: int  # Gözlem sayısı
     miscalibration: float  # |tahmin - gerçek|
 
+    def __repr__(self) -> str:
+        return f"CalibrationBin({self.bin_range}, pred={self.mean_prediction:.2f}, act={self.mean_actual:.2f}, n={self.count})"
+
 
 @dataclass
 class CalibrationReport:
@@ -50,6 +53,12 @@ class CalibrationReport:
     regime: str = "ALL"
     timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
+    def __repr__(self) -> str:
+        return (
+            f"CalibrationReport(brier={self.brier_score:.4f}, n={self.n_samples}, "
+            f"overconf={self.overconfident}, adj={self.recommended_adjustment:.2f})"
+        )
+
 
 @dataclass
 class Observation:
@@ -61,6 +70,9 @@ class Observation:
     ticker: str = ""
     timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
+    def __repr__(self) -> str:
+        return f"Observation(ticker={self.ticker!r}, pred={self.predicted_confidence:.2f}, outcome={self.actual_outcome})"
+
 
 class ConfidenceCalibrator:
     """
@@ -70,11 +82,14 @@ class ConfidenceCalibrator:
     Eğer gerçek %60 ise → overconfident.
     """
 
-    def __init__(self, n_bins: int = 10, min_samples: int = 30):
-        """Otomatik eklendi."""
+    def __init__(self, n_bins: int = 10, min_samples: int = 30) -> None:
+        """Güven kalibratörü motorunu sepet (bin) ve minimum örneklem eşikleriyle ilklendirir."""
         self._observations: deque = deque(maxlen=10000)
         self._n_bins = n_bins
         self._min_samples = min_samples
+
+    def __repr__(self) -> str:
+        return f"ConfidenceCalibrator(bins={self._n_bins}, min_samples={self._min_samples}, obs={len(self._observations)})"
 
     def add_observation(
         self,

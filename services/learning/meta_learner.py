@@ -34,15 +34,24 @@ class ModelPerformance:
     ic: float
     timestamp: str
 
+    def __repr__(self) -> str:
+        return (
+            f"ModelPerformance(id={self.model_id!r}, regime={self.regime!r}, "
+            f"sharpe={self.sharpe:.2f}, win_rate={self.win_rate:.1f}%, ic={self.ic:.3f})"
+        )
+
 
 class MetaLearner:
     """Rejim-specific model selection ve ensemble optimization."""
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """Meta öğreniciyi rejim bazlı performans ve model geçmiş havuzlarıyla ilklendirir."""
         self._regime_performance: dict[str, dict[str, list[float]]] = defaultdict(lambda: defaultdict(list))
         self._model_history: deque = deque(maxlen=5000)
         self._current_regime: str = "UNKNOWN"
+
+    def __repr__(self) -> str:
+        return f"MetaLearner(regimes={len(self._regime_performance)}, history={len(self._model_history)})"
 
     def record_performance(
         self,

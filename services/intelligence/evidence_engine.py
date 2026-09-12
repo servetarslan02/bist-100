@@ -25,7 +25,7 @@ logger = structlog.get_logger()
 
 
 class ClaimType(StrEnum):
-    """Otomatik eklendi."""
+    """İddia ve bilgi türü sınıflandırması (olgu, çıkarım, tahmin, görüş)."""
     FACT = "FACT"  # Kaynakta doğrudan yazan
     INFERENCE = "INFERENCE"  # Veriden çıkarılan
     PREDICTION = "PREDICTION"  # Gelecek tahmini
@@ -33,7 +33,7 @@ class ClaimType(StrEnum):
 
 
 class VerificationResult(StrEnum):
-    """Otomatik eklendi."""
+    """Delil doğrulama sonucu durum sınıflandırması."""
     VERIFIED = "VERIFIED"  # Doğrulandı
     UNVERIFIED = "UNVERIFIED"  # Doğrulanamadı
     REJECTED = "REJECTED"  # Reddedildi (yanlış)
@@ -41,7 +41,7 @@ class VerificationResult(StrEnum):
 
 
 class SourceReliability(StrEnum):
-    """Otomatik eklendi."""
+    """Bilgi kaynağı güvenilirlik düzeyi derecelendirmesi."""
     PRIMARY = "PRIMARY"  # Resmi kaynak (KAP, TCMB)
     FINANCIAL = "FINANCIAL"  # Güvenilir finansal veri
     NEWS = "NEWS"  # Güvenilir haber
@@ -61,6 +61,9 @@ class Claim:
     timestamp: str | None = None
     ticker: str | None = None
 
+    def __repr__(self) -> str:
+        return f"Claim(id={self.claim_id!r}, ticker={self.ticker!r}, src={self.source_type.value!r}, text={self.text[:30]!r})"
+
 
 @dataclass
 class VerifiedClaim:
@@ -77,9 +80,18 @@ class VerifiedClaim:
     supporting_evidence: list[str]
     explanation: str
 
+    def __repr__(self) -> str:
+        return (
+            f"VerifiedClaim(id={self.claim.claim_id!r}, res={self.result.value!r}, "
+            f"score={self.evidence_score:.1f}, rel={self.source_reliability.value!r})"
+        )
+
 
 class EvidenceVerificationEngine:
     """Kanıt doğrulama motoru."""
+
+    def __repr__(self) -> str:
+        return f"EvidenceVerificationEngine(sources={len(self.SOURCE_PRIORITY)})"
 
     # Kaynak güvenilirlik sıralaması
     SOURCE_PRIORITY = {

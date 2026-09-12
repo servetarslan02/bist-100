@@ -33,6 +33,9 @@ class ShadowPrediction:
     challenger_prediction: dict
     timestamp: str
 
+    def __repr__(self) -> str:
+        return f"ShadowPrediction(ticker={self.ticker!r}, timestamp={self.timestamp!r})"
+
 
 @dataclass
 class ShadowResult:
@@ -49,12 +52,18 @@ class ShadowResult:
     days_elapsed: int
     prediction_count: int
 
+    def __repr__(self) -> str:
+        return (
+            f"ShadowResult(champ_sharpe={self.champion_sharpe:.2f}, chal_sharpe={self.challenger_sharpe:.2f}, "
+            f"imp={self.improvement_pct:+.1f}%, rec={self.recommendation!r}, sig={self.significant})"
+        )
+
 
 class ShadowModeManager:
     """Shadow mode yöneticisi."""
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """Gölge model (shadow mode) yöneticisini tahmin ve getiri depolarıyla ilklendirir."""
         self._shadow_active: bool = False
         self._champion_id: str | None = None
         self._challenger_id: str | None = None
@@ -62,6 +71,9 @@ class ShadowModeManager:
         self._predictions: deque = deque(maxlen=5000)
         self._champion_returns: deque = deque(maxlen=5000)
         self._challenger_returns: deque = deque(maxlen=5000)
+
+    def __repr__(self) -> str:
+        return f"ShadowModeManager(active={self._shadow_active}, champ={self._champion_id!r}, chal={self._challenger_id!r})"
 
     def start_shadow(self, champion_id: str, challenger_id: str) -> Any:
         """Shadow mode başlat."""

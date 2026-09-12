@@ -17,15 +17,19 @@ logger = structlog.get_logger()
 
 
 class EventScanner:
-    """
-    Event-driven scanner.
+    """Event-driven tarayıcı.
+
     Haber/KAP/makro geldiğinde etkilenen hisseleri anında yeniden analiz eder.
     """
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """EventScanner olay güdümlü tarayıcıyı başlatır."""
         self._pending_rescans: dict[str, dict] = {}  # ticker -> event data
         self._last_rescan: dict[str, datetime] = {}
+
+    def __repr__(self) -> str:
+        """EventScanner okunabilir durum temsili."""
+        return f"EventScanner(pending_rescans={len(self._pending_rescans)}, rescanned_count={len(self._last_rescan)})"
 
     def on_event(self, event_type: str, event_data: dict) -> list[str]:
         """

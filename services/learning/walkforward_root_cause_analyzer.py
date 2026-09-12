@@ -25,7 +25,11 @@ from services.learning.institutional_walkforward_engine import (
 
 
 def run_root_cause_analysis() -> Any:
-    """Otomatik eklendi."""
+    """Walk-forward kök neden ve portföy turnover/churn analizini yürüt.
+
+    Returns:
+        Kök neden analizi metrikleri ve simülasyon sonuçları.
+    """
     logger.info("=================================================================")
     logger.info("ALPHA BIST — ROOT CAUSE & TURNOVER CHURN ANALYZER")
     logger.info("=================================================================")

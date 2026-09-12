@@ -151,7 +151,7 @@ class _MockConf(dict):
     """Celery yüklü olmadığında konfigürasyonu simüle eden nesne."""
 
     def __init__(self):
-        """Otomatik eklendi."""
+        """Yedek konfigürasyon parametrelerini başlatır."""
         super().__init__()
         self.task_acks_late = True
         self.worker_prefetch_multiplier = 1
@@ -160,32 +160,42 @@ class _MockConf(dict):
         self.beat_schedule = DEFAULT_BEAT_SCHEDULE
 
     def update(self, *args, **kwargs) -> Any:
-        """Otomatik eklendi."""
+        """Konfigürasyon sözlüğünü günceller."""
         super().update(*args, **kwargs)
         for k, v in kwargs.items():
             setattr(self, k, v)
+
+    def __repr__(self) -> str:
+        return f"_MockConf(routes={len(self.task_routes)}, schedule={len(self.beat_schedule)})"
 
 
 class _MockCeleryApp:
     """Celery kütüphanesi yokken kullanılan hafif yedek sınıf."""
 
     def __init__(self):
-        """Otomatik eklendi."""
+        """Hafif yedek görev yöneticisini başlatır."""
         self.conf = _MockConf()
 
+    def __repr__(self) -> str:
+        return "_MockCeleryApp(status='STANDALONE_FALLBACK')"
+
     def task(self, *args, **kwargs) -> Any:
-        """Otomatik eklendi."""
+        """Görev dekoratörü (Fallback)."""
         def decorator(fn) -> Any:
-            """Otomatik eklendi."""
+            """Fonksiyonu sarmalayan dekoratör."""
             class TaskWrapper:
-                """Otomatik eklendi."""
+                """Senkron yürütme sarmalayıcısı."""
+
                 def __init__(self, func):
-                    """Otomatik eklendi."""
+                    """Görev sarmalayıcısını başlatır."""
                     self.func = func
                     self.name = kwargs.get("name", func.__name__)
 
+                def __repr__(self) -> str:
+                    return f"TaskWrapper(name={self.name!r})"
+
                 def delay(self, *a, **kw) -> Any:
-                    """Otomatik eklendi."""
+                    """Görevi anında senkron olarak çalıştırıp asenkron sonuç nesnesi döner."""
                     sig = _generate_task_signature(self.name, a, kw)
                     mock_id = f"task-{sig}"
                     try:
@@ -195,11 +205,11 @@ class _MockCeleryApp:
                         return _MockAsyncResult(mock_id, status="FAILURE", result=e)
 
                 def __call__(self, *a, **kw) -> Any:
-                    """Otomatik eklendi."""
+                    """Görevi doğrudan çağırır."""
                     return self.func(self, *a, **kw)
 
                 def update_state(self, state=None, meta=None) -> Any:
-                    """Otomatik eklendi."""
+                    """Görev ilerleme durumunu günceller."""
                     pass
 
             return TaskWrapper(fn)
@@ -207,26 +217,30 @@ class _MockCeleryApp:
         return decorator
 
     def AsyncResult(self, task_id: str) -> Any:
-        """Otomatik eklendi."""
+        """Verilen görev kimliği için sonuç nesnesi oluşturur."""
         return _MockAsyncResult(task_id, status="SUCCESS", result={"message": "Executed successfully"})
 
 
 class _MockAsyncResult:
-    """Otomatik eklendi."""
+    """Celery AsyncResult nesnesini taklit eden hafif durum tutucu."""
+
     def __init__(self, task_id: str, status: str = "SUCCESS", result: Any = None):
-        """Otomatik eklendi."""
+        """Görev sonucu nesnesini başlatır."""
         self.id = task_id
         self.status = status
         self.result = result
         self.traceback = None
         self.info = None
 
+    def __repr__(self) -> str:
+        return f"_MockAsyncResult(id={self.id!r}, status={self.status!r})"
+
     def ready(self) -> bool:
-        """Otomatik eklendi."""
+        """Görevin tamamlanıp tamamlanmadığını bildirir."""
         return True
 
     def successful(self) -> bool:
-        """Otomatik eklendi."""
+        """Görevin başarılı olup olmadığını bildirir."""
         return self.status == "SUCCESS"
 
 
@@ -247,8 +261,9 @@ if HAS_CELERY:
         task_acks_late=True,
         worker_prefetch_multiplier=1,
         task_default_retry_delay=15,
-        task_max_retries=3,
-        broker_connection_retry_on_startup=True,
+        broker_connection_retry_on_startup=False,
+        broker_connection_timeout=1.0,
+        broker_connection_max_retries=1,
         task_routes=DEFAULT_TASK_ROUTES,
         beat_schedule=DEFAULT_BEAT_SCHEDULE,
     )
@@ -490,8 +505,12 @@ def submit_task(
             }
 
     task_fn = task_map[task_name]
-    async_res = task_fn.delay(*args, **kwargs)
-    task_id = getattr(async_res, "id", f"task-{sig}")
+    try:
+        async_res = task_fn.delay(*args, **kwargs)
+        task_id = getattr(async_res, "id", f"task-{sig}")
+    except Exception as exc:
+        logger.warning("celery_submit_fallback", task_name=task_name, error=str(exc))
+        task_id = f"task-{sig}"
 
     _active_task_signatures[sig] = {
         "task_id": task_id,

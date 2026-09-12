@@ -21,7 +21,7 @@ logger = structlog.get_logger()
 
 @dataclass
 class PositionSize:
-    """Otomatik eklendi."""
+    """Hesaplanan pozisyon boyutu ve risk parametreleri."""
     ticker: str
     weight: float
     shares: int
@@ -34,6 +34,12 @@ class PositionSize:
     vol_adjusted: float
     max_position_pct: float
 
+    def __repr__(self) -> str:
+        return (
+            f"PositionSize({self.ticker}: shares={self.shares}, "
+            f"weight={self.weight:.2%}, notional={self.notional:,.0f} TL)"
+        )
+
 
 class PositionSizer:
     """Kalibre edilmis Kelly + Historical OOS + Vol Targeting."""
@@ -44,17 +50,33 @@ class PositionSizer:
         max_position_pct: float = 0.10,
         max_total_exposure: float = 1.0,
         kelly_fraction: float = 0.5,  # Yarim Kelly
-    ):
-        """Otomatik eklendi."""
+    ) -> None:
+        """Pozisyon boyutlandırıcıyı başlatır.
+
+        Args:
+            target_volatility: Hedeflenen yıllık portföy volatilitesi.
+            max_position_pct: Tek pozisyon için azami portföy oranı.
+            max_total_exposure: Toplam piyasa riski maruziyeti tavanı.
+            kelly_fraction: Kelly kriteri çarpanı (varsayılan 0.5 = yarım Kelly).
+        """
         self.target_volatility = target_volatility
         self.max_position_pct = max_position_pct
         self.max_total_exposure = max_total_exposure
         self.kelly_fraction = kelly_fraction
 
+    def __repr__(self) -> str:
+        return (
+            f"PositionSizer(target_vol={self.target_volatility}, "
+            f"max_pos={self.max_position_pct:.1%}, kelly={self.kelly_fraction})"
+        )
+
     def calculate_position_size(self, ticker: str, risk_check: dict, portfolio_value: float) -> float:
-        """B18 uyumluluğu için eklenmiş arayüz metodu."""
-        # Basit bir örnekleme veya delegate
-        return 0.0
+        """Tekil enstrüman için pozisyon büyüklüğü hesaplar (TL)."""
+        if portfolio_value <= 0:
+            return 0.0
+        max_notional = portfolio_value * self.max_position_pct
+        multiplier = float(risk_check.get("sizing_multiplier", 1.0)) if isinstance(risk_check, dict) else 1.0
+        return max_notional * max(0.0, min(1.0, multiplier))
 
     def calculate_position_sizes(
         self,

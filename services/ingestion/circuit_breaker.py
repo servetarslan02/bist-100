@@ -115,6 +115,7 @@ class CircuitBreaker:
         recovery_timeout_s: float = 60.0,
         half_open_max_calls: int = 3,
         success_threshold: int = 2,
+        recovery_timeout: float | None = None,
     ) -> None:
         """CircuitBreaker örneği oluşturur.
 
@@ -124,10 +125,11 @@ class CircuitBreaker:
             recovery_timeout_s: OPEN → HALF_OPEN geçiş süresi (saniye).
             half_open_max_calls: HALF_OPEN'da izin verilen test istek sayısı.
             success_threshold: HALF_OPEN → CLOSED için ardışık başarı sayısı.
+            recovery_timeout: recovery_timeout_s için alternatif parametre.
         """
         self.name = name
         self.failure_threshold = failure_threshold
-        self.recovery_timeout_s = recovery_timeout_s
+        self.recovery_timeout_s = recovery_timeout if recovery_timeout is not None else recovery_timeout_s
         self.half_open_max_calls = half_open_max_calls
         self.success_threshold = success_threshold
 
@@ -135,6 +137,14 @@ class CircuitBreaker:
         self._stats = CircuitStats()
         self._half_open_calls = 0
         self._lock = asyncio.Lock()
+
+    def __repr__(self) -> str:
+        """CircuitBreaker string temsili."""
+        return (
+            f"CircuitBreaker(name={self.name!r}, "
+            f"state={self.state.value!r}, "
+            f"failures={self._stats.consecutive_failures}/{self.failure_threshold})"
+        )
 
     @property
     def state(self) -> CircuitState:
@@ -373,6 +383,21 @@ class CircuitBreakerManager:
     def __init__(self) -> None:
         """CircuitBreakerManager örneği oluşturur."""
         self._breakers: dict[str, CircuitBreaker] = {}
+
+    def __repr__(self) -> str:
+        """CircuitBreakerManager string temsili."""
+        return f"CircuitBreakerManager(breakers={len(self._breakers)})"
+
+    def get_breaker(self, name: str) -> CircuitBreaker:
+        """Belirtilen provider breaker'ını döndürür veya oluşturur.
+
+        Args:
+            name: Provider adı.
+
+        Returns:
+            CircuitBreaker örneği.
+        """
+        return self.get_or_create(name)
 
     def get_or_create(
         self,

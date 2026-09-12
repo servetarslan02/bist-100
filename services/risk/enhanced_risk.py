@@ -27,7 +27,7 @@ logger = structlog.get_logger()
 
 @dataclass
 class PortfolioWeights:
-    """Portföy ağırlıkları."""
+    """Portföy ağırlıkları ve konsantrasyon sınırları."""
 
     weights: dict[str, float]  # ticker → weight (0-1)
     total_weight: float
@@ -35,10 +35,17 @@ class PortfolioWeights:
     max_weight: float
     min_weight: float
 
+    def __repr__(self) -> str:
+        return (
+            f"PortfolioWeights(n_positions={self.n_positions}, "
+            f"total_weight={self.total_weight:.2f}, "
+            f"max_weight={self.max_weight:.2f})"
+        )
+
 
 @dataclass
 class RiskMetrics:
-    """Risk metrikleri."""
+    """Kapsamlı risk ve konsantrasyon metrikleri."""
 
     portfolio_volatility: float
     concentration_hhi: float
@@ -51,6 +58,14 @@ class RiskMetrics:
     cvar_99: float = 0.0
     component_var: dict[str, float] | None = None
     risk_score: float = 0.0  # 0-100
+
+    def __repr__(self) -> str:
+        return (
+            f"RiskMetrics(vol={self.portfolio_volatility:.2f}, "
+            f"hhi={self.concentration_hhi:.4f}, "
+            f"var95={self.var_95:.2f}, "
+            f"risk_score={self.risk_score:.1f})"
+        )
 
 
 class LedoitWolfCovariance:
@@ -102,6 +117,9 @@ class LedoitWolfCovariance:
         shrinkage = min(0.9, max(0.1, 1 - n / 252))
         return shrinkage
 
+    def __repr__(self) -> str:
+        return "LedoitWolfCovariance(method='shrinkage_psd')"
+
 
 class VolatilityTargeter:
     """Volatility targeting — portföy volatilitesini hedefle.
@@ -109,6 +127,9 @@ class VolatilityTargeter:
     Düşük volatilite → kaldıraç artır
     Yüksek volatilite → pozisyon küçült
     """
+
+    def __repr__(self) -> str:
+        return "VolatilityTargeter(strategy='vol_target')"
 
     def compute_leverage(
         self,
@@ -148,6 +169,9 @@ class VolatilityTargeter:
 
 class PositionSizer:
     """Pozisyon büyüklüğü hesaplama (Kelly criterion benzeri)."""
+
+    def __repr__(self) -> str:
+        return "PositionSizer(method='fractional_kelly')"
 
     def kelly_criterion(
         self,
@@ -207,10 +231,18 @@ class PositionSizer:
 class RebalanceEngine:
     """Portföy rebalance motoru."""
 
-    def __init__(self, turnover_limit: float = 0.3, threshold_pct: float = 5.0):
-        """Otomatik eklendi."""
-        self.turnover_limit = turnover_limit  # Maksimum turnover (0-1)
-        self.threshold_pct = threshold_pct  # Sapma eşiği (%)
+    def __init__(self, turnover_limit: float = 0.3, threshold_pct: float = 5.0) -> None:
+        """Portföy rebalance motorunu başlatır.
+
+        Args:
+            turnover_limit: Maksimum turnover oranı (0.0-1.0).
+            threshold_pct: Sapma eşik yüzdesi.
+        """
+        self.turnover_limit = turnover_limit
+        self.threshold_pct = threshold_pct
+
+    def __repr__(self) -> str:
+        return f"RebalanceEngine(turnover_limit={self.turnover_limit}, threshold_pct={self.threshold_pct})"
 
     def compute_rebalance(
         self,
@@ -267,6 +299,9 @@ class RebalanceEngine:
 
 class ConcentrationRisk:
     """Konsantrasyon riski hesaplama."""
+
+    def __repr__(self) -> str:
+        return "ConcentrationRisk(metrics=['HHI', 'sector', 'max_weight'])"
 
     def compute_hhi(self, weights: dict[str, float]) -> float:
         """Herfindahl-Hirschman Index (HHI).
@@ -412,6 +447,7 @@ def check_options_strategy(
             return create_covered_call(spot_price, strike, premium, 100)
         elif strategy_type == "protective_put":
             return create_protective_put(spot_price, strike, premium, 100)
+        return {"error": f"Desteklenmeyen opsiyon stratejisi: {strategy_type}"}
     except Exception as e:
         logger.warning("VIOP strategies failed", error=str(e))
         return {"error": "VIOP strategies not available"}

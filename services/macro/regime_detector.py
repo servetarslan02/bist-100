@@ -37,6 +37,14 @@ class RegimeResult:
     recommended_strategy: str
     timestamp: str
 
+    def __repr__(self) -> str:
+        """Rejim tespit sonucunun okunabilir string temsili."""
+        return (
+            f"RegimeResult(regime='{self.regime}', "
+            f"confidence={self.confidence:.2f}, "
+            f"strategy='{self.recommended_strategy[:30]}...')"
+        )
+
 
 @dataclass
 class RegimeTransition:
@@ -46,6 +54,13 @@ class RegimeTransition:
     to_regime: str
     timestamp: str
     confidence: float
+
+    def __repr__(self) -> str:
+        """Rejim geçiş kaydının okunabilir string temsili."""
+        return (
+            f"RegimeTransition(from='{self.from_regime}' -> to='{self.to_regime}', "
+            f"confidence={self.confidence:.2f}, timestamp='{self.timestamp}')"
+        )
 
 
 class MacroRegimeDetector:
@@ -84,12 +99,23 @@ class MacroRegimeDetector:
         },
     }
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """Makro rejim tespit motoru başlatıcı.
+
+        Mevcut rejim durumunu, rejim geçmişini ve rejim geçiş kayıtlarını ilklendirir.
+        """
         self._current_regime: str | None = None
         self._regime_history: list[RegimeResult] = []
         self._transitions: list[RegimeTransition] = []
         self._regime_duration: int = 0
+
+    def __repr__(self) -> str:
+        """Makro rejim motoru okunabilir string temsili."""
+        return (
+            f"MacroRegimeDetector(current_regime='{self._current_regime}', "
+            f"duration={self._regime_duration}d, history={len(self._regime_history)}, "
+            f"transitions={len(self._transitions)})"
+        )
 
     def detect_regime(self, macro_features: dict[str, float]) -> RegimeResult:
         """Makro rejim tespit et.
@@ -354,3 +380,10 @@ class MacroRegimeDetector:
 
 # Singleton
 macro_regime_detector = MacroRegimeDetector()
+
+__all__ = [
+    "RegimeResult",
+    "RegimeTransition",
+    "MacroRegimeDetector",
+    "macro_regime_detector",
+]

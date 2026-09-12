@@ -42,15 +42,24 @@ class ModelRecord:
     retired_at: str | None = None
     retired_reason: str | None = None
 
+    def __repr__(self) -> str:
+        return (
+            f"ModelRecord(id={self.model_id!r}, ver={self.version!r}, "
+            f"status={self.status!r}, role={self.role!r}, regime={self.regime!r})"
+        )
+
 
 class ModelRegistry:
     """Model versiyon kayıt defteri."""
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """Model kayıt defterini başlatır ve diskteki eğitilmiş modelleri dinamik olarak kaydeder."""
         self._records: deque = deque(maxlen=500)
         self._active_versions: dict[str, str] = {}  # regime → version
         self._init_default_models()
+
+    def __repr__(self) -> str:
+        return f"ModelRegistry(total_records={len(self._records)}, active_regimes={len(self._active_versions)})"
 
     def _init_default_models(self) -> None:
         """Diskteki eğitilmiş gerçek modelleri dinamik olarak yükle ve metriklerini çıkar."""

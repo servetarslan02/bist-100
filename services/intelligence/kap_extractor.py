@@ -16,6 +16,8 @@ from typing import Any
 
 import structlog
 
+from services.intelligence.llm_agent import llm_agent
+
 logger = structlog.get_logger()
 
 
@@ -36,6 +38,12 @@ class KAPExtractedEvent:
     description: str
     raw_title: str
     raw_summary: str
+
+    def __repr__(self) -> str:
+        return (
+            f"KAPExtractedEvent(ticker={self.ticker!r}, type={self.event_type!r}, "
+            f"impact={self.financial_impact:+.2f}, magnitude={self.impact_magnitude:.2f})"
+        )
 
 
 # Olay türü → finansal etki haritası
@@ -97,11 +105,11 @@ KEYWORD_MAP = {
 }
 
 
-from services.intelligence.llm_agent import llm_agent
-
-
 class KAPExtractor:
     """KAP bildirimlerinden yapılandırılmış veri çıkarma (LLM Agent & RAG Tabanlı)."""
+
+    def __repr__(self) -> str:
+        return "KAPExtractor(rag_enabled=True)"
 
     def extract(
         self,
@@ -157,7 +165,7 @@ class KAPExtractor:
         )
 
     def _build_empty(self, ticker: str, kap_id: str) -> KAPExtractedEvent:
-        """Otomatik eklendi."""
+        """Ayrıştırma yapılamadığında nötr boş KAP olay nesnesi oluşturur."""
         return KAPExtractedEvent(
             ticker=ticker,
             kap_id=kap_id,

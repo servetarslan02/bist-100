@@ -17,22 +17,26 @@ import structlog
 
 logger = structlog.get_logger()
 
+# Kur momentum rejimi eşik sabitleri (%)
+DEFAULT_FX_REGIME_STRONG_WEAKENING: float = 5.0
+DEFAULT_FX_REGIME_MILD_WEAKENING: float = 2.0
+DEFAULT_FX_REGIME_STRONG_STRENGTHENING: float = -5.0
+DEFAULT_FX_REGIME_MILD_STRENGTHENING: float = -2.0
+
 
 def compute_fx_features(fx_data: dict[str, Any]) -> dict[str, float]:
-    """Döviz kuru feature'ları.
+    """Döviz kuru seviye, momentum, volatilite ve rejim feature'larını hesaplar.
 
     Args:
-        fx_data: {
-            "usdtry": float,
-            "eurtry": float,
-            "usdtry_previous": float,
-            "usdtry_history": List[float],  # Son 20+ gün
-        }
+        fx_data: USD/TRY, EUR/TRY, önceki USD/TRY ve tarihsel fiyat serisini içeren sözlük.
 
     Returns:
-        Feature dictionary
+        dict[str, float]: Hesaplanmış döviz feature sözlüğü.
+
+    Raises:
+        ValueError: Sayısal dönüştürme hatası oluştuğunda (yakalanıp loglanır).
     """
-    features = {}
+    features: dict[str, float] = {}
 
     try:
         usdtry = fx_data.get("usdtry")
@@ -57,8 +61,8 @@ def compute_fx_features(fx_data: dict[str, Any]) -> dict[str, float]:
 
                 if len(hist) >= 20:
                     # Z-score
-                    mean = np.mean(hist[-60:])
-                    std = np.std(hist[-60:])
+                    mean = float(np.mean(hist[-60:]))
+                    std = float(np.std(hist[-60:]))
                     if std > 0:
                         features["fx_usdtry_zscore"] = round((usdtry - mean) / std, 4)
 
@@ -75,13 +79,13 @@ def compute_fx_features(fx_data: dict[str, Any]) -> dict[str, float]:
 
                     # Regime
                     momentum = features["fx_usdtry_momentum_20d"]
-                    if momentum > 5:
+                    if momentum > DEFAULT_FX_REGIME_STRONG_WEAKENING:
                         features["fx_usdtry_regime"] = 3.0  # TRY zayıflıyor (kuvvetli)
-                    elif momentum > 2:
+                    elif momentum > DEFAULT_FX_REGIME_MILD_WEAKENING:
                         features["fx_usdtry_regime"] = 2.0  # TRY zayıflıyor (hafif)
-                    elif momentum < -5:
+                    elif momentum < DEFAULT_FX_REGIME_STRONG_STRENGTHENING:
                         features["fx_usdtry_regime"] = 0.0  # TRY güçleniyor (kuvvetli)
-                    elif momentum < -2:
+                    elif momentum < DEFAULT_FX_REGIME_MILD_STRENGTHENING:
                         features["fx_usdtry_regime"] = 1.0  # TRY güçleniyor (hafif)
                     else:
                         features["fx_usdtry_regime"] = 1.5  # STABIL
@@ -97,6 +101,16 @@ def compute_fx_features(fx_data: dict[str, Any]) -> dict[str, float]:
                 features["fx_eurtry_usdtry_ratio"] = round(float(eurtry) / usdtry, 4)
 
     except Exception as e:
-        logger.error("FX feature computation failed", error=str(e))
+        logger.error("Döviz feature hesaplaması başarısız oldu", error=str(e))
 
     return features
+
+
+__all__ = [
+    "DEFAULT_FX_REGIME_STRONG_WEAKENING",
+    "DEFAULT_FX_REGIME_MILD_WEAKENING",
+    "DEFAULT_FX_REGIME_STRONG_STRENGTHENING",
+    "DEFAULT_FX_REGIME_MILD_STRENGTHENING",
+    "compute_fx_features",
+]
+

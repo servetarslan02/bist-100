@@ -35,6 +35,9 @@ class LearningService:
         self._running = False
         self._consumer: EventConsumer = None
 
+    def __repr__(self) -> str:
+        return f"LearningService(running={self._running}, consumer={'attached' if self._consumer else 'none'})"
+
     async def start(self) -> Any:
         """Start the learning service."""
         setup_logging()

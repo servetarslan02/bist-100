@@ -20,7 +20,8 @@ logger = structlog.get_logger()
 
 
 class ScanAlertSeverity(StrEnum):
-    """Otomatik eklendi."""
+    """Tarama alarm önem dereceleri."""
+
     INFO = "INFO"
     WARNING = "WARNING"
     BLOCK = "BLOCK"
@@ -28,7 +29,8 @@ class ScanAlertSeverity(StrEnum):
 
 
 class ScanAlertType(StrEnum):
-    """Otomatik eklendi."""
+    """Tarama alarm türleri."""
+
     HIGH_SCORE = "HIGH_SCORE"
     NEW_SIGNAL = "NEW_SIGNAL"
     TIER_CHANGE = "TIER_CHANGE"
@@ -40,7 +42,7 @@ class ScanAlertType(StrEnum):
 
 @dataclass
 class ScanAlert:
-    """Tarama alert'i."""
+    """Tarama alarm kaydı."""
 
     alert_id: str
     alert_type: ScanAlertType
@@ -55,6 +57,13 @@ class ScanAlert:
     price: float
     timestamp: str
     acknowledged: bool = False
+
+    def __repr__(self) -> str:
+        """ScanAlert okunabilir nesne temsili."""
+        return (
+            f"ScanAlert(id='{self.alert_id}', ticker='{self.ticker}', type={self.alert_type.value}, "
+            f"severity={self.severity.value}, score={self.score:.1f})"
+        )
 
 
 @dataclass
@@ -72,6 +81,10 @@ class ScanAlertRule:
     last_fired: float = 0.0
     description: str = ""
 
+    def __repr__(self) -> str:
+        """ScanAlertRule okunabilir nesne temsili."""
+        return f"ScanAlertRule(id='{self.rule_id}', name='{self.name}', enabled={self.enabled})"
+
 
 class ScanAlertManager:
     """Tarama alert yöneticisi.
@@ -84,13 +97,20 @@ class ScanAlertManager:
     - Yeni sinyal (önceki taramada yoktu) → INFO
     """
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """ScanAlertManager alarm yöneticisini başlatır."""
         self._alerts: list[ScanAlert] = []
         self._rules: list[ScanAlertRule] = []
         self._callbacks: list[Callable] = []
         self._previous_signals: dict[str, str] = {}  # ticker → signal
         self._setup_default_rules()
+
+    def __repr__(self) -> str:
+        """ScanAlertManager okunabilir durum temsili."""
+        return (
+            f"ScanAlertManager(rules={len(self._rules)}, alerts={len(self._alerts)}, "
+            f"callbacks={len(self._callbacks)})"
+        )
 
     def _setup_default_rules(self) -> Any:
         """Varsayılan alert kuralları."""

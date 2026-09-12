@@ -8,35 +8,26 @@ import numpy as np
 import orjson
 import structlog
 
-from ..core.database import (
-    ch_execute,
-    close_databases,
-    init_databases,
-    pg_execute,
-    pg_fetch,
-)
-from ..core.event_bus import (
-    EventConsumer,
-    EventType,
-    ensure_topics,
-    publish_event,
-)
-from ..core.event_schema import CanonicalEvent
-from ..core.logging import setup_logging
-
 logger = structlog.get_logger()
 
 
 class SimulationEngine:
-    """Monte Carlo simulation, scenario analysis, and backtest engine."""
+    """Monte Carlo simülasyonu, senaryo analizi ve stres testi ana orkestrasyon motoru."""
 
     def __init__(self):
-        """Otomatik eklendi."""
+        """Simülasyon motorunu başlatır."""
         self._running = False
-        self._consumer: EventConsumer = None
+        self._consumer: Any | None = None
+
+    def __repr__(self) -> str:
+        return f"SimulationEngine(running={self._running})"
 
     async def start(self) -> Any:
         """Start the simulation engine."""
+        from ..core.database import init_databases
+        from ..core.event_bus import EventConsumer, EventType, ensure_topics
+        from ..core.logging import setup_logging
+
         setup_logging()
         logger.info("Starting Simulation Engine")
 
@@ -58,14 +49,20 @@ class SimulationEngine:
 
     async def stop(self) -> Any:
         """Stop the simulation engine."""
+        from ..core.database import close_databases
+
         self._running = False
         if self._consumer:
             self._consumer.stop()
         await close_databases()
         logger.info("Simulation Engine stopped")
 
-    async def _on_simulation_request(self, event: CanonicalEvent) -> Any:
+    async def _on_simulation_request(self, event: Any) -> Any:
         """Handle simulation requests."""
+        from ..core.database import pg_execute
+        from ..core.event_bus import EventType, publish_event
+        from ..core.event_schema import CanonicalEvent
+
         try:
             sim_type = event.data.get("simulation_type", "monte_carlo")
             ticker = event.data.get("ticker")
@@ -260,6 +257,8 @@ class SimulationEngine:
             },
         ]
 
+        from ..core.database import pg_fetch
+
         results = []
         for scenario in scenarios:
             positions = await pg_fetch(
@@ -397,6 +396,8 @@ class SimulationEngine:
     async def _get_historical_volatility(self, ticker: str) -> dict[str, Any] | None:
         """Get historical volatility from ClickHouse."""
         try:
+            from ..core.database import ch_execute
+
             result = ch_execute(
                 """
                 SELECT
@@ -436,7 +437,7 @@ async def _health_server(port: int = 8080) -> Any:
     from aiohttp import web
 
     async def health_handler(request) -> Any:
-        """Otomatik eklendi."""
+        """Docker sağlık denetimi (Healthcheck) sorgularını yanıtlar."""
         return web.json_response({"status": "healthy", "service": "simulation"})
 
     app = web.Application()

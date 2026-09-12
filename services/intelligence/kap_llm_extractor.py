@@ -35,6 +35,9 @@ class KAPDocument:
     entities: list[str] = field(default_factory=list)
     key_metrics: dict[str, float] = field(default_factory=dict)
 
+    def __repr__(self) -> str:
+        return f"KAPDocument(id={self.doc_id!r}, ticker={self.ticker!r}, cat={self.category!r}, imp={self.importance:.2f})"
+
 
 @dataclass
 class LLMInsight:
@@ -48,6 +51,9 @@ class LLMInsight:
     opportunity_factors: list[str]
     sector_impact: dict[str, float]
     summary: str
+
+    def __repr__(self) -> str:
+        return f"LLMInsight(ticker={self.ticker!r}, sent={self.overall_sentiment:+.2f}, conf={self.confidence:.2f})"
 
 
 class KAPLLMExtractor:
@@ -69,11 +75,14 @@ class KAPLLMExtractor:
         "OTHER": {"importance": 0.3, "fields": []},
     }
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """KAP ve LLM entegre analiz motorunu başlatır, bilgi grafiği ve sektör önbelleğini ilklendirir."""
         self._knowledge_graph: dict[str, dict] = defaultdict(lambda: {"relations": [], "events": []})
         self._sector_impact_cache: dict[str, dict] = {}
         logger.info("KAPLLMExtractor v3.0 initialized")
+
+    def __repr__(self) -> str:
+        return f"KAPLLMExtractor(graph_nodes={len(self._knowledge_graph)}, cache_size={len(self._sector_impact_cache)})"
 
     def extract_structured_kap(
         self,

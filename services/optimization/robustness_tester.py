@@ -36,15 +36,37 @@ class RobustnessReport:
     cost_stress_results: dict[str, dict[str, float]]
     cost_resilience_passed: bool
 
+    def __repr__(self) -> str:
+        return (
+            f"RobustnessReport(base_return={self.base_return:+.1f}%, "
+            f"base_sharpe={self.base_sharpe:.2f}, base_max_dd={self.base_max_dd:.1f}%, "
+            f"is_plateau_stable={self.is_plateau_stable}, "
+            f"plateau_stability_score={self.plateau_stability_score:.2f}, "
+            f"cost_resilience_passed={self.cost_resilience_passed})"
+        )
+
 
 class RobustnessTester:
     """Parametre platosu ve maliyet stres testlerini icra eden motor."""
 
-    def __init__(self, optimizer: BayesianMetricOptimizer):
-        """Otomatik eklendi."""
+    def __init__(self, optimizer: BayesianMetricOptimizer) -> None:
+        """
+        Sağlamlık ve stres testi motorunu ilklendirir.
+
+        Args:
+            optimizer: Hızlı simülasyon ve değerlendirme yapabilen Bayesian metrik optimize edici.
+        """
         self.optimizer = optimizer
 
-    def test_parameter_perturbations(self, base_params: StrategyParameters) -> tuple[list[dict[str, Any]], bool, float]:
+    def __repr__(self) -> str:
+        return f"RobustnessTester(optimizer={self.optimizer.__class__.__name__})"
+
+    def test_parameter_perturbations(
+        self,
+        base_params: StrategyParameters,
+        start_year: int = 1997,
+        end_year: int = 2023,
+    ) -> tuple[list[dict[str, Any]], bool, float]:
         """Parametreleri ±%10 ve ±%20 oranında kaydırarak plato stabilitesini ölçer."""
         perturbation_deltas = [-0.20, -0.10, 0.0, 0.10, 0.20]
         results = []
@@ -66,7 +88,7 @@ class RobustnessTester:
                 position_alloc_bull=base_params.position_alloc_bull,
             )
 
-            res = self.optimizer.simulate_fast(p_perturbed, start_year=1997, end_year=2023)
+            res = self.optimizer.simulate_fast(p_perturbed, start_year=start_year, end_year=end_year)
             sharpe_list.append(res.sharpe_ratio)
             results.append(
                 {
@@ -90,7 +112,12 @@ class RobustnessTester:
 
         return results, is_stable, stability_score
 
-    def test_cost_stress(self, base_params: StrategyParameters) -> tuple[dict[str, dict[str, float]], bool]:
+    def test_cost_stress(
+        self,
+        base_params: StrategyParameters,
+        start_year: int = 1997,
+        end_year: int = 2023,
+    ) -> tuple[dict[str, dict[str, float]], bool]:
         """
         %0.25, %0.50, %1.00 ve %1.50 round-trip işlem maliyeti altında dayanıklılığı test eder.
         Her maliyet seviyesi için simülasyonu gerçekten çalıştırır.
@@ -107,8 +134,8 @@ class RobustnessTester:
             # Her maliyet seviyesi için gerçek simülasyon çalıştır
             res = self.optimizer.simulate_fast(
                 base_params,
-                start_year=1997,
-                end_year=2023,
+                start_year=start_year,
+                end_year=end_year,
                 commission_rate=comm,
                 slippage_rate=slip,
             )
@@ -126,11 +153,20 @@ class RobustnessTester:
 
         return stress_results, passed
 
-    def run_full_robustness_audit(self, base_params: StrategyParameters) -> RobustnessReport:
+    def run_full_robustness_audit(
+        self,
+        base_params: StrategyParameters,
+        start_year: int = 1997,
+        end_year: int = 2023,
+    ) -> RobustnessReport:
         """Tüm sağlamlık testlerini çalıştırıp raporlar."""
-        base_res = self.optimizer.simulate_fast(base_params, start_year=1997, end_year=2023)
-        perturb_results, is_stable, stab_score = self.test_parameter_perturbations(base_params)
-        cost_results, cost_passed = self.test_cost_stress(base_params)
+        base_res = self.optimizer.simulate_fast(base_params, start_year=start_year, end_year=end_year)
+        perturb_results, is_stable, stab_score = self.test_parameter_perturbations(
+            base_params, start_year=start_year, end_year=end_year
+        )
+        cost_results, cost_passed = self.test_cost_stress(
+            base_params, start_year=start_year, end_year=end_year
+        )
 
         return RobustnessReport(
             base_params=base_params,
@@ -144,3 +180,9 @@ class RobustnessTester:
             cost_stress_results=cost_results,
             cost_resilience_passed=cost_passed,
         )
+
+
+__all__ = [
+    "RobustnessReport",
+    "RobustnessTester",
+]

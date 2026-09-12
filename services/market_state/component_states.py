@@ -11,7 +11,7 @@ Piyasa bileşenlerinin ayrı ayrı state hesaplaması:
 8. Anomaly State: count, severity, sector clustering
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
@@ -25,7 +25,7 @@ logger = structlog.get_logger()
 class ComponentStates:
     """Tüm bileşen state'lerinin birleşimi."""
 
-    timestamp: datetime
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     momentum_state: str = "NEUTRAL"
     volatility_state: str = "NORMAL"
     volume_state: str = "AVERAGE"
@@ -46,7 +46,12 @@ class ComponentStates:
     macro_score: float = 0.5
 
     def to_dict(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """ComponentState'i JSON uyumlu dict'e serileştirir.
+
+        Returns:
+            Tüm bileşen state alanlarını içeren dict. Ondalık değerler
+            4 basamağa yuvarlanır; timestamp ISO-8601 formatındadır.
+        """
         return {
             "timestamp": self.timestamp.isoformat(),
             "momentum_state": self.momentum_state,
@@ -73,6 +78,10 @@ class ComponentStateEngine:
 
     Her bileşen kendi içinde normalize edilir ve state atanır.
     """
+
+    def __repr__(self) -> str:
+        """Sınıfın metinsel temsilini döndürür."""
+        return "ComponentStateEngine(components=[momentum, volatility, volume, rsi, liquidity, sentiment, macro])"
 
     def compute_all(
         self,

@@ -31,15 +31,19 @@ from .llm_client import (
 )
 from .prompts import PROMPT_VERSION, PromptFactory
 from .schemas import (
+    BacktestOutputSchema,
     DebateArgumentSchema,
     Direction,
     FundamentalOutputSchema,
     MacroOutputSchema,
     NewsOutputSchema,
+    PortfolioOutputSchema,
     RiskAssessmentSchema,
     RiskLevel,
+    ScenarioOutputSchema,
     SynthesisResultSchema,
     TechnicalOutputSchema,
+    ValuationOutputSchema,
     validate_agent_output,
 )
 
@@ -67,6 +71,7 @@ class AgentRole(StrEnum):
     NEWS = "NEWS"
     MACRO = "MACRO"
     FUNDAMENTAL = "FUNDAMENTAL"
+    VALUATION = "VALUATION"
     TECHNICAL = "TECHNICAL"
     RISK = "RISK"
     PORTFOLIO = "PORTFOLIO"
@@ -91,9 +96,27 @@ class AgentTask:
     template_name: str | None = None
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
+    def to_dict(self) -> dict[str, Any]:
+        """Görevi sözlük formatına çevirir."""
+        return {
+            "task_id": self.task_id,
+            "agent_role": getattr(self.agent_role, "value", str(self.agent_role)),
+            "ticker": self.ticker,
+            "prompt": self.prompt,
+            "context": self.context,
+            "max_steps": self.max_steps,
+            "timeout_seconds": self.timeout_seconds,
+            "template_name": self.template_name,
+            "created_at": self.created_at.isoformat(),
+        }
+
+    def to_json(self) -> str:
+        """orjson ile JSON serileştirme."""
+        return orjson.dumps(self.to_dict()).decode("utf-8")
+
     def __repr__(self) -> str:
         return (
-            f"AgentTask(id={self.task_id!r}, role={self.agent_role.value!r}, "
+            f"AgentTask(id={self.task_id!r}, role={getattr(self.agent_role, 'value', str(self.agent_role))!r}, "
             f"ticker={self.ticker!r}, template={self.template_name!r})"
         )
 
@@ -123,10 +146,35 @@ class AgentResult:
         """Nihai yön kararı (LONG/SHORT/NEUTRAL/NO_TRADE)."""
         return self.output.get("direction", "NEUTRAL")
 
+    def to_dict(self) -> dict[str, Any]:
+        """Sonucu sözlük formatına çevirir."""
+        return {
+            "task_id": self.task_id,
+            "agent_role": getattr(self.agent_role, "value", str(self.agent_role)),
+            "ticker": self.ticker,
+            "success": self.success,
+            "output": self.output,
+            "confidence": self.confidence,
+            "direction": self.direction,
+            "evidence": self.evidence,
+            "reasoning": self.reasoning,
+            "model_version": self.model_version,
+            "prompt_version": self.prompt_version,
+            "input_hash": self.input_hash,
+            "duration_ms": self.duration_ms,
+            "error": self.error,
+            "tokens_in": self.tokens_in,
+            "tokens_out": self.tokens_out,
+        }
+
+    def to_json(self) -> str:
+        """orjson ile yüksek hızlı serileştirme."""
+        return orjson.dumps(self.to_dict()).decode("utf-8")
+
     def __repr__(self) -> str:
         return (
-            f"AgentResult(role={self.agent_role.value!r}, ticker={self.ticker!r}, "
-            f"direction={self.direction!r}, conf={self.confidence:.2f}, "
+            f"AgentResult(role={getattr(self.agent_role, 'value', str(self.agent_role))!r}, "
+            f"ticker={self.ticker!r}, direction={self.direction!r}, conf={self.confidence:.2f}, "
             f"success={self.success}, duration={self.duration_ms:.0f}ms)"
         )
 
@@ -155,6 +203,12 @@ class AgentToolRegistry:
             "read_fundamentals",
             "read_financials",
             "run_valuation",
+        ],
+        AgentRole.VALUATION: [
+            "read_fundamentals",
+            "read_financials",
+            "run_valuation",
+            "read_market_data",
         ],
         AgentRole.TECHNICAL: [
             "read_market_data",
@@ -239,6 +293,10 @@ class AIOutputValidator:
             "debate": DebateArgumentSchema,
             "risk": RiskAssessmentSchema,
             "synthesis": SynthesisResultSchema,
+            "valuation": ValuationOutputSchema,
+            "portfolio": PortfolioOutputSchema,
+            "scenario": ScenarioOutputSchema,
+            "backtest": BacktestOutputSchema,
         }
 
         if expected_schema and expected_schema in schema_map:
@@ -319,9 +377,9 @@ class AIOutputValidator:
 
 
 class AIFallback:
-    """LLM çalışmadığında rule-based fallback.
+    """LLM çalışmadığında kural tabanlı ve deterministik analiz fallback motoru.
 
-    7 temel gösterge kullanarak kural tabanlı analiz yapar:
+    Rol bazlı akıllı analizler ve 7 temel teknik gösterge:
     1. Momentum (ROC 5d)
     2. Volume (z-score)
     3. RSI (14)
@@ -330,6 +388,72 @@ class AIFallback:
     6. MACD sinyali
     7. Bollinger Band pozisyonu
     """
+
+    @classmethod
+    def role_based_fallback(cls, role: AgentRole, features: dict[str, float], ticker: str) -> dict[str, Any]:
+        """Ajan rolüne özgü kurumsal fallback çıktısı üretir."""
+        if role == AgentRole.FUNDAMENTAL:
+            pe = features.get("pe_ratio", 10.0)
+            pb = features.get("pb_ratio", 1.5)
+            roe = features.get("roe", 0.15)
+            score = 50.0
+            reasons = []
+            risks = []
+            if pe > 0 and pe < 10.0:
+                score += 15.0
+                reasons.append(f"Düşük F/K çarpanı: {pe:.1f}")
+            elif pe > 25.0:
+                score -= 15.0
+                risks.append(f"Yüksek F/K çarpanı: {pe:.1f}")
+
+            if pb > 0 and pb < 1.2:
+                score += 10.0
+                reasons.append(f"Düşük PD/DD çarpanı: {pb:.1f}")
+            elif pb > 4.5:
+                score -= 10.0
+                risks.append(f"Yüksek PD/DD çarpanı: {pb:.1f}")
+
+            if roe > 0.25:
+                score += 15.0
+                reasons.append(f"Yüksek Özkaynak Karlılığı: %{roe*100:.1f}")
+            direction = "LONG" if score >= 60 else ("SHORT" if score <= 40 else "NEUTRAL")
+            confidence = min(0.75, abs(score - 50.0) / 50.0)
+            return {
+                "direction": direction,
+                "confidence": round(confidence, 4),
+                "score": round(score, 2),
+                "valuation": "UNDERVALUED" if score >= 60 else ("OVERVALUED" if score <= 40 else "FAIR"),
+                "reasons": reasons or ["Temel çarpanlar sektör ortalamasında"],
+                "risks": risks,
+                "source": "fundamental_rule_fallback",
+            }
+        elif role == AgentRole.VALUATION:
+            upside = features.get("analyst_upside", 0.0)
+            target = features.get("target_price", 0.0)
+            return {
+                "fair_value": target,
+                "upside_potential": upside,
+                "confidence": 0.6,
+                "method": "dcf_multiple_blend",
+                "direction": "LONG" if upside > 15.0 else ("SHORT" if upside < -10.0 else "NEUTRAL"),
+                "reasons": [f"Hedef fiyat potansiyeli: %{upside:.1f}"],
+                "risks": ["Makro iskonto oranı riski"],
+                "source": "valuation_rule_fallback",
+            }
+        elif role == AgentRole.RISK:
+            atr = features.get("atr_pct", 3.0)
+            return {
+                "approved": atr < 9.0,
+                "risk_level": "LOW" if atr < 4.0 else ("HIGH" if atr > 7.0 else "MEDIUM"),
+                "risk_score": min(100.0, atr * 10.0),
+                "max_position_pct": 5.0 if atr < 5.0 else 2.5,
+                "stop_loss_pct": min(9.5, max(3.0, atr * 1.5)),
+                "risk_factors": [f"Volatilite ATR %{atr:.1f}"],
+                "veto_reason": "Yüksek günlük volatilite" if atr >= 9.0 else None,
+                "source": "risk_rule_fallback",
+            }
+        # Varsayılan teknik analiz fallback'i
+        return cls.rule_based_analysis(features, ticker)
 
     @staticmethod
     def rule_based_analysis(features: dict[str, float], ticker: str) -> dict[str, Any]:
@@ -431,11 +555,7 @@ class BaseAgent:
     """Base AI Agent v2.0 — LLM client + structured output.
 
     Her agent bir role'e sahiptir ve o rolün izin verdiği tool'ları kullanabilir.
-    LLM yoksa otomatik olarak rule-based fallback kullanır.
-
-    Kullanım:
-        agent = BaseAgent(AgentRole.TECHNICAL, llm_client=client)
-        result = await agent.execute(task)
+    LLM yoksa otomatik olarak role-based fallback kullanır.
     """
 
     def __init__(
@@ -445,19 +565,10 @@ class BaseAgent:
         model_version: str = "auto",
         prompt_version: str = PROMPT_VERSION,
     ):
-        """Base agent oluştur.
-
-        Args:
-            role: Agent rolü (TECHNICAL, FUNDAMENTAL, vb.)
-            llm_client: LLM client (opsiyonel, yoksa rule-based fallback)
-            model_version: Model versiyonu
-            prompt_version: Prompt versiyonu
-        """
         self.role = role
         self.llm_client = llm_client
         self.model_version = model_version
         self.prompt_version = prompt_version
-        # Metrics
         self._execution_count = 0
         self._total_duration_ms = 0.0
         self._success_count = 0
@@ -472,7 +583,7 @@ class BaseAgent:
 
         Args:
             task: Çalıştırılacak görev
-            llm_client: LLM client (opsiyonel, instance'daki kullanılır)
+            llm_client: LLM client (opsiyonel)
 
         Returns:
             AgentResult — çıktı, confidence, evidence, reasoning
@@ -480,10 +591,8 @@ class BaseAgent:
         start = time.monotonic()
         self._execution_count += 1
 
-        # LLM client önceliği: parametre > instance > fallback
         client = llm_client or self.llm_client
 
-        # Input hash — aynı input aynı sonuç üretmeli (deterministic check)
         input_str = orjson.dumps(
             {
                 "ticker": task.ticker,
@@ -498,9 +607,8 @@ class BaseAgent:
             if client:
                 output = await self._call_llm(task, client)
             else:
-                output = AIFallback.rule_based_analysis(task.context.get("features", {}), task.ticker)
+                output = AIFallback.role_based_fallback(self.role, task.context.get("features", {}), task.ticker)
 
-            # Validate — rol -> şema eşlemesi ile
             _role_schema_map = {
                 AgentRole.TECHNICAL: "technical",
                 AgentRole.FUNDAMENTAL: "fundamental",
@@ -510,6 +618,10 @@ class BaseAgent:
                 AgentRole.BEAR: "debate",
                 AgentRole.RISK: "risk",
                 AgentRole.SYNTHESIS: "synthesis",
+                AgentRole.VALUATION: "valuation",
+                AgentRole.PORTFOLIO: "portfolio",
+                AgentRole.SCENARIO: "scenario",
+                AgentRole.BACKTEST: "backtest",
             }
             validation = AIOutputValidator.validate(
                 orjson.dumps(output).decode(), expected_schema=_role_schema_map.get(self.role)
@@ -517,9 +629,10 @@ class BaseAgent:
             if not validation["valid"]:
                 logger.warning(
                     "AI output validation failed, using fallback",
+                    agent=self.role.value,
                     errors=validation["errors"],
                 )
-                output = AIFallback.rule_based_analysis(task.context.get("features", {}), task.ticker)
+                output = AIFallback.role_based_fallback(self.role, task.context.get("features", {}), task.ticker)
 
             duration = (time.monotonic() - start) * 1000
             self._total_duration_ms += duration
@@ -715,10 +828,18 @@ def run_agent_analysis(ticker: str, features: dict, news: list | None = None) ->
 
 
 class AgentSystem:
-    """Tüm ajanları ve orkestrasyonu yöneten arayüz sınıfı."""
+    """Tüm ajanları ve orkestrasyonu yöneten üst düzey kurumsal sistem sınıfı."""
 
-    def __init__(self) -> None:
+    def __init__(self, llm_client: BaseLLMClient | None = None) -> None:
+        self.llm_client = llm_client
         self._orchestrator: Any = None
+        self._agents: dict[AgentRole, BaseAgent] = {}
+
+    def get_agent(self, role: AgentRole) -> BaseAgent:
+        """Belirtilen role ait BaseAgent örneğini getirir veya oluşturur."""
+        if role not in self._agents:
+            self._agents[role] = BaseAgent(role=role, llm_client=self.llm_client)
+        return self._agents[role]
 
     def get_status(self) -> list[dict[str, Any]]:
         """Ajanların çalışma ve kullanılabilirlik durumunu döndürür."""
@@ -728,18 +849,36 @@ class AgentSystem:
                 "role": role.value,
                 "status": "ready",
                 "active": True,
+                "has_agent_cached": role in self._agents,
             })
         return status_list
+
+    async def run_single_agent(self, role: AgentRole, task: AgentTask) -> AgentResult:
+        """Belirli bir ajanı bağımsız olarak yürütür."""
+        agent = self.get_agent(role)
+        return await agent.execute(task)
 
     async def run(self, agent_name: str, ticker: str = "THYAO", **kwargs: Any) -> dict[str, Any]:
         """Belirtilen ajanı veya tüm analiz pipeline'ını çalıştırır."""
         from .agent_pipeline import AgentPipelineOrchestrator
 
         if self._orchestrator is None:
-            self._orchestrator = AgentPipelineOrchestrator()
+            self._orchestrator = AgentPipelineOrchestrator(llm_client=self.llm_client)
 
-        res = await self._orchestrator.run(ticker=ticker, features=kwargs.get("features", {}))
+        res = await self._orchestrator.run(
+            ticker=ticker,
+            features=kwargs.get("features", {}),
+            context=kwargs.get("context"),
+            sector=kwargs.get("sector"),
+            regime=kwargs.get("regime"),
+            price=kwargs.get("price"),
+            portfolio_info=kwargs.get("portfolio_info"),
+            active_roles=kwargs.get("active_roles"),
+        )
         return res.to_dict()
+
+    def __repr__(self) -> str:
+        return f"AgentSystem(cached_agents={len(self._agents)}, llm={'set' if self.llm_client else 'none'})"
 
 
 # Singleton

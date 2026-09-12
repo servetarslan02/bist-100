@@ -30,6 +30,14 @@ class RiskParityResult:
     optimization_success: bool
     iterations: int
 
+    def __repr__(self) -> str:
+        return (
+            f"RiskParityResult(success={self.optimization_success}, "
+            f"vol={self.portfolio_volatility:.2%}, "
+            f"div_ratio={self.diversification_ratio:.2f}, "
+            f"n_assets={len(self.weights)})"
+        )
+
 
 class RiskParityOptimizer:
     """Risk Parity optimizasyonu.
@@ -38,10 +46,18 @@ class RiskParityOptimizer:
     Bu, konsantrasyon riskini azaltır ve çeşitlendirmeyi maksimize eder.
     """
 
-    def __init__(self, tolerance: float = 1e-8, max_iterations: int = 1000):
-        """Otomatik eklendi."""
+    def __init__(self, tolerance: float = 1e-8, max_iterations: int = 1000) -> None:
+        """Risk Parity optimize edicisini başlatır.
+
+        Args:
+            tolerance: Optimizasyon yakinsama toleransi.
+            max_iterations: Azami optimizasyon yineleme sayisi.
+        """
         self.tolerance = tolerance
         self.max_iterations = max_iterations
+
+    def __repr__(self) -> str:
+        return f"RiskParityOptimizer(tolerance={self.tolerance}, max_iterations={self.max_iterations})"
 
     def optimize(
         self,
@@ -130,10 +146,10 @@ class RiskParityOptimizer:
         bounds = [(0.001, 1.0) for _ in range(n)]
 
         # Amaç fonksiyonu: risk katkılarının hedeften sapması
-        def objective(w) -> Any:
-            """Otomatik eklendi."""
+        def objective(w: np.ndarray) -> float:
+            """Hedef risk katkısından sapmaların kareler toplamı amaç fonksiyonu."""
             rc = self._risk_contributions(w, cov_matrix)
-            return np.sum((rc - target_rc) ** 2)
+            return float(np.sum((rc - target_rc) ** 2))
 
         # Optimizasyon
         result = minimize(

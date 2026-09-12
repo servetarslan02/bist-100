@@ -7,10 +7,9 @@ Redis (hot state) + ClickHouse (historical) depolar.
 
 from __future__ import annotations
 
-from typing import Any
-
 import asyncio
 from datetime import UTC, datetime
+from typing import Any
 
 import polars as pl
 import structlog

@@ -23,12 +23,18 @@ Mevcut modüller:
 - calendar: Takvim olayları
 """
 
+from .calendar import get_event_impact, get_macro_events, get_upcoming_events
 from .calendar_engine import MacroCalendarEngine, macro_calendar_engine
+from .cds import compute_cds_features
 from .config.macro_config import MacroConfig, macro_config
 from .correlation_tracker import MacroCorrelationTracker, macro_correlation_tracker
+from .credit import compute_credit_features
+from .current_account import compute_ca_features
 from .factor_decomposition import MacroFactorDecomposition, macro_factor_decomposition
+from .fx import compute_fx_features
 from .historical_store import MacroHistoricalStore, macro_historical_store
 from .impact_analyzer import MacroImpactAnalyzer, macro_impact_analyzer
+from .inflation import compute_inflation_features
 from .regime_detector import MacroRegimeDetector, macro_regime_detector
 from .sensitivity_engine import (
     CompanySensitivity,
@@ -38,12 +44,13 @@ from .sensitivity_engine import (
 )
 from .stress_test import MacroStressTest, macro_stress_test
 from .surprise_model import MacroSurpriseModel, macro_surprise_model
+from .tcmb import compute_tcmb_features
 
 __all__ = [
     # Config
     "MacroConfig",
     "macro_config",
-    # New modules
+    # Engines & Models
     "MacroSurpriseModel",
     "macro_surprise_model",
     "MacroRegimeDetector",
@@ -64,4 +71,16 @@ __all__ = [
     "SensitivityResult",
     "CompanySensitivity",
     "macro_sensitivity_engine",
+    # Feature functions
+    "compute_tcmb_features",
+    "compute_inflation_features",
+    "compute_fx_features",
+    "compute_cds_features",
+    "compute_credit_features",
+    "compute_ca_features",
+    # Calendar functions
+    "get_macro_events",
+    "get_upcoming_events",
+    "get_event_impact",
 ]
+

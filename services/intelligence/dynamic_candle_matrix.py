@@ -27,14 +27,23 @@ class DynamicPatternMetrics:
     dynamic_weight: float = 1.0
     is_favorable: bool = False
 
+    def __repr__(self) -> str:
+        return (
+            f"DynamicPatternMetrics({self.pattern_name!r}, win_rate={self.rolling_win_rate:.1f}%, "
+            f"expectancy={self.rolling_expectancy:.2f}%, weight={self.dynamic_weight:.2f})"
+        )
+
 
 class DynamicCandleMatrix:
     """Yüksek hızlı dinamik kayan mum zekası motoru."""
 
-    def __init__(self, lookback_window: int = 252):
-        """Otomatik eklendi."""
+    def __init__(self, lookback_window: int = 252) -> None:
+        """Dinamik kayan mum matrisi motorunu belirtilen geriye bakış penceresiyle ilklendirir."""
         self.lookback_window = lookback_window
         self._cache_events: dict[str, list[dict[str, Any]]] = {}
+
+    def __repr__(self) -> str:
+        return f"DynamicCandleMatrix(lookback_window={self.lookback_window}, cached_tickers={len(self._cache_events)})"
 
     def precompute_stock_patterns(self, ticker: str, df: pl.DataFrame, forward_days: int = 5) -> Any:
         """Hisse verisindeki tüm formasyon olaylarını bir kez hesaplayıp önbelleğe alır."""

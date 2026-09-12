@@ -19,6 +19,9 @@ logger = structlog.get_logger()
 class NewsImpactEngine:
     """Haber etki motoru."""
 
+    def __repr__(self) -> str:
+        return "NewsImpactEngine()"
+
     def compute_impact(self, news_event: dict) -> dict[str, Any]:
         """Her haber için etki hesapla."""
         sentiment = news_event.get("sentiment", 0)
@@ -60,9 +63,12 @@ class NewsImpactEngine:
 class NewsDuplicationEngine:
     """Haber tekrarı tespiti."""
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """Haber tekilleştirme motorunu başlatır ve hash önbelleğini oluşturur."""
         self._seen_hashes: dict[str, deque] = {}  # hash → deque of sources
+
+    def __repr__(self) -> str:
+        return f"NewsDuplicationEngine(seen_hashes={len(self._seen_hashes)})"
 
     def is_duplicate(self, title: str, source: str) -> bool:
         """Aynı haber farklı kaynaktan mı geldi?"""
@@ -86,9 +92,12 @@ class NewsDuplicationEngine:
 class EventTimelineEngine:
     """Olay zaman çizelgesi."""
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """Olay zaman çizelgesi motorunu başlatır ve zaman serisi havuzunu oluşturur."""
         self._timelines: dict[str, deque] = {}  # ticker → deque of events
+
+    def __repr__(self) -> str:
+        return f"EventTimelineEngine(tracked_tickers={len(self._timelines)})"
 
     def add_event(self, ticker: str, event_type: str, data: dict, timestamp: str) -> Any:
         """Olay ekle."""

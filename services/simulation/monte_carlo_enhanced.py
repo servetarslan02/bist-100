@@ -22,7 +22,30 @@ logger = structlog.get_logger()
 
 @dataclass
 class MonteCarloResult:
-    """Monte Carlo simülasyon sonucu."""
+    """Monte Carlo fiyat ve getiri simülasyonu analiz sonucu.
+
+    Args:
+        ticker: Hisse senedi sembolü.
+        current_price: Başlangıç fiyatı.
+        horizon_days: Simülasyon projeksiyon vadesi (gün).
+        num_simulations: Koşturulan rastgele patika adedi.
+        model: Kullanılan simülasyon modeli adı.
+        expected_return_pct: Beklenen ortalama getiri (%).
+        median_return_pct: Medyan getiri (%).
+        std_return_pct: Getirilerin standart sapması (%).
+        var_95: %95 Güven aralığında Riske Maruz Değer (VaR).
+        var_99: %99 Güven aralığında Riske Maruz Değer (VaR).
+        cvar_95: %95 Koşullu Riske Maruz Değer (CVaR/Expected Shortfall).
+        cvar_99: %99 Koşullu Riske Maruz Değer (CVaR).
+        prob_positive: Pozitif getiri olasılığı (0.0-100.0).
+        prob_up_5pct: %5 veya daha fazla prim yapma olasılığı.
+        prob_down_5pct: %5 veya daha fazla düşme riski.
+        prob_down_10pct: %10 veya daha fazla düşme riski.
+        percentiles: Çeşitli yüzdelik dilimlerdeki beklenen fiyatlar.
+        max_return_pct: Simülasyonda gözlenen maksimum getiri.
+        min_return_pct: Simülasyonda gözlenen minimum getiri.
+        avg_max_drawdown_pct: Patikalardaki ortalama maksimum düşüş (drawdown).
+    """
 
     ticker: str
     current_price: float
@@ -54,6 +77,13 @@ class MonteCarloResult:
     max_return_pct: float
     min_return_pct: float
     avg_max_drawdown_pct: float
+
+    def __repr__(self) -> str:
+        return (
+            f"MonteCarloResult(ticker={self.ticker!r}, model={self.model!r}, "
+            f"exp_ret={self.expected_return_pct:+.2f}%, var95={self.var_95:.2f}%, "
+            f"prob_pos={self.prob_positive:.1f}%, paths={self.num_simulations})"
+        )
 
 
 class JumpDiffusionMonteCarlo:
@@ -191,6 +221,9 @@ class JumpDiffusionMonteCarlo:
             avg_max_drawdown_pct=round(float(np.mean(max_drawdowns)), 2),
         )
 
+    def __repr__(self) -> str:
+        return "JumpDiffusionMonteCarlo(model='Merton Jump-Diffusion')"
+
 
 class CorrelatedMonteCarlo:
     """Korelli Monte Carlo simülasyonu (portföy bazlı).
@@ -198,6 +231,9 @@ class CorrelatedMonteCarlo:
     Cholesky decomposition ile korelli random returns üretir.
     Portföy bazlı risk analizi için kullanılır.
     """
+
+    def __repr__(self) -> str:
+        return "CorrelatedMonteCarlo(decomposition='Cholesky')"
 
     def simulate_portfolio(
         self,
@@ -366,6 +402,9 @@ class RegimeConditionedMonteCarlo:
 
         result.model = f"Regime-Conditioned ({regime})"
         return result
+
+    def __repr__(self) -> str:
+        return f"RegimeConditionedMonteCarlo(regimes={len(self.REGIME_PARAMS)})"
 
 
 # Singleton

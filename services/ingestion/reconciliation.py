@@ -61,6 +61,16 @@ class ReconciliationResult:
     warnings: list[str] = field(default_factory=list)
     timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
+    @property
+    def is_valid(self) -> bool:
+        """Fiyat uzlaştırmasının geçerli olup olmadığını döndürür."""
+        return not self.conflict and self.canonical_price > 0
+
+    @property
+    def consensus_price(self) -> float:
+        """canonical_price için alternatif özellik."""
+        return self.canonical_price
+
     def __repr__(self) -> str:
         return (
             f"ReconciliationResult(ticker={self.ticker!r}, "
@@ -98,6 +108,40 @@ class SourceReconciler:
 
     DEFAULT_MAX_DEVIATION_PCT: float = 0.5
     """Varsayılan maksimum kabul edilebilir sapma (%)."""
+
+    def __init__(self, max_deviation_pct: float | None = None) -> None:
+        """SourceReconciler örneği oluşturur.
+
+        Args:
+            max_deviation_pct: Varsayılan maksimum kabul edilebilir sapma (%).
+        """
+        self.default_max_deviation_pct = max_deviation_pct or self.DEFAULT_MAX_DEVIATION_PCT
+
+    def __repr__(self) -> str:
+        """SourceReconciler string temsili."""
+        return f"SourceReconciler(sources={len(self.SOURCE_WEIGHTS)}, max_dev_pct={self.default_max_deviation_pct})"
+
+    def reconcile(
+        self,
+        ticker: str,
+        source_prices: dict[str, float] | None = None,
+        prices: dict[str, float] | None = None,
+        max_deviation_pct: float | None = None,
+    ) -> ReconciliationResult:
+        """reconcile_price için alternatif metot.
+
+        Args:
+            ticker: Hisse kodu.
+            source_prices: {kaynak: fiyat} sözlüğü.
+            prices: Alternatif {kaynak: fiyat} sözlüğü.
+            max_deviation_pct: Maksimum sapma yüzdesi.
+
+        Returns:
+            ReconciliationResult: Uzlaştırma sonucu.
+        """
+        effective_prices = source_prices if source_prices is not None else (prices or {})
+        max_dev = max_deviation_pct or self.default_max_deviation_pct
+        return self.reconcile_price(ticker, effective_prices, max_deviation_pct=max_dev)
 
     def reconcile_price(
         self,

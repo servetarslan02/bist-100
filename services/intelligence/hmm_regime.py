@@ -50,6 +50,9 @@ class HMMRegimeResult:
     transition_matrix: np.ndarray | None = None
     timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
+    def __repr__(self) -> str:
+        return f"HMMRegimeResult(regime={self.regime!r}, conf={self.confidence:.2f}, idx={self.regime_index})"
+
 
 class HMMRegimeDetector:
     """
@@ -68,8 +71,8 @@ class HMMRegimeDetector:
         n_regimes: int = 4,
         rolling_window: int = 63,
         retrain_interval: int = 63,
-    ):
-        """Otomatik eklendi."""
+    ) -> None:
+        """Gizli Markov Modeli tabanlı piyasa rejimi tespit motorunu başlatır."""
         self.n_regimes = n_regimes
         self.rolling_window = rolling_window
         self.retrain_interval = retrain_interval
@@ -80,6 +83,9 @@ class HMMRegimeDetector:
         self._last_retrain_index: int = 0
         self._regime_history: deque = deque(maxlen=500)
         self._transition_matrix: np.ndarray | None = None
+
+    def __repr__(self) -> str:
+        return f"HMMRegimeDetector(n_regimes={self.n_regimes}, window={self.rolling_window}, fitted={self._is_fitted})"
 
     def fit(self, returns: np.ndarray, volatility: np.ndarray) -> bool:
         """

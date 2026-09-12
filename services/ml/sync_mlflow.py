@@ -8,7 +8,7 @@ Temel Yetenekler:
 - Şampiyon (Champion) ve Challenger Model Deneylerini Kayıt Defterine İşleme
 - DuckDB SSD Korumalı WAL ile Senkronizasyon Denetim İzi (Audit Trail)
 - İş Parçacığı Güvenliği (`threading.RLock`) ve Kesin Tip Belirteçleri
-- Otomatik eklendi docstring ve import-time ağ bağlantısı hatalarının tamamen giderilmesi
+- Eksiksiz kurumsal Türkçe docstring ve import-time ağ bağlantısı güvenliği
 """
 
 from __future__ import annotations

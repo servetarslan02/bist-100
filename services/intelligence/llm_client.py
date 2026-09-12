@@ -43,8 +43,8 @@ class LLMClient:
     google-genai ve legacy SDK destekli.
     """
 
-    def __init__(self, model_name: str = "gemini-2.5-flash"):
-        """Otomatik eklendi."""
+    def __init__(self, model_name: str = "gemini-2.5-flash") -> None:
+        """Gemini API istemcisini belirtilen model adı ve API anahtarıyla ilklendirir."""
         self.model_name = model_name or "gemini-2.5-flash"
         self.api_key = self._load_api_key()
         self._new_client = None
@@ -53,6 +53,9 @@ class LLMClient:
 
         if self.api_key:
             self._initialize_gemini()
+
+    def __repr__(self) -> str:
+        return f"LLMClient(model={self.model_name!r}, initialized={self._initialized})"
 
     def _load_api_key(self) -> str | None:
         """API anahtarını env, .env dosyası veya config'den yükle."""

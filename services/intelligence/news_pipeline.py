@@ -50,9 +50,18 @@ class ProcessedNews:
     tool_calls_made: list[str] = field(default_factory=list)
     is_llm_analyzed: bool = False
 
+    def __repr__(self) -> str:
+        return (
+            f"ProcessedNews(id={self.news_id!r}, src={self.source!r}, "
+            f"sent={self.sentiment:+.2f}, imp={self.importance:.2f}, llm={self.is_llm_analyzed})"
+        )
+
 
 class NewsPipeline:
     """Haber işleme pipeline'ı (LLM Agent tabanlı — RAG + WorldState + KnowledgeGraph)."""
+
+    def __repr__(self) -> str:
+        return "NewsPipeline(agent_enabled=True)"
 
     def process(self, raw_news: dict) -> ProcessedNews:
         """
@@ -113,7 +122,7 @@ class NewsPipeline:
         )
 
     def _build_empty(self, raw_news: dict) -> ProcessedNews:
-        """Otomatik eklendi."""
+        """Metin içermeyen veya geçersiz ham haberler için boş ProcessedNews nesnesi döner."""
         return ProcessedNews(
             news_id=raw_news.get("id", ""),
             timestamp=datetime.now(UTC),

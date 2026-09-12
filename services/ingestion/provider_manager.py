@@ -71,15 +71,27 @@ class ProviderResult:
         quality: Kalite puanı (0.0-1.0).
         source: Kaynak adı.
         metadata: Ek meta bilgiler.
+        success: İstek başarılı mı.
+        ticker: Hisse sembolü.
+        provider_name: provider için alternatif ad.
     """
 
-    provider: str
-    data: Any
-    timestamp: datetime
-    latency_ms: float
+    provider: str = ""
+    data: Any = None
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
+    latency_ms: float = 0.0
     quality: float = 1.0
     source: str = ""
     metadata: dict[str, Any] = field(default_factory=dict)
+    success: bool = True
+    ticker: str = ""
+    provider_name: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.provider and self.provider_name:
+            self.provider = self.provider_name
+        elif not self.provider_name and self.provider:
+            self.provider_name = self.provider
 
     def __repr__(self) -> str:
         return (
@@ -150,6 +162,10 @@ class ProviderManager:
         self._rate_limiter = rate_limiter_instance or rate_limiter
         self._cb_manager = circuit_breaker_manager or CircuitBreakerManager()
         self._retry_policies: dict[str, RetryPolicy] = {}
+
+    def __repr__(self) -> str:
+        """ProviderManager string temsili."""
+        return f"ProviderManager(data_types={len(self._providers)}, health_monitors={len(self._health)})"
 
     def register(
         self,

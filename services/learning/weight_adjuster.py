@@ -21,14 +21,17 @@ class WeightAdjuster:
         max_weight: float = 0.60,
         decay_factor: float = 0.95,
         min_samples: int = 10,
-    ):
-        """Otomatik eklendi."""
+    ) -> None:
+        """Ensemble model ağırlık ayarlayıcısını min/max ağırlık ve sönümleme katsayısıyla başlatır."""
         self.min_weight = min_weight
         self.max_weight = max_weight
         self.decay_factor = decay_factor
         self.min_samples = min_samples
         self._weights: dict[str, float] = {}
         self._history: list[dict[str, Any]] = []
+
+    def __repr__(self) -> str:
+        return f"WeightAdjuster(min_w={self.min_weight}, max_w={self.max_weight}, decay={self.decay_factor})"
 
     def adjust_weights(
         self,

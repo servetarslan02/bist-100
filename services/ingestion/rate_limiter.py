@@ -86,6 +86,10 @@ class RateLimiter:
         self._stats: dict[str, RateLimitStats] = {}
         self._locks: dict[str, asyncio.Lock] = {}
 
+    def __repr__(self) -> str:
+        """RateLimiter string temsili."""
+        return f"RateLimiter(providers={len(self._limits)})"
+
     def set_limit(
         self,
         provider: str,

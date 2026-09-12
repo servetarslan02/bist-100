@@ -22,7 +22,6 @@ Kullanım:
 
 from __future__ import annotations
 
-import json
 import math
 import time
 from dataclasses import dataclass, field
@@ -30,6 +29,7 @@ from datetime import UTC, datetime
 from typing import Any, Callable
 
 import numpy as np
+import orjson
 import structlog
 
 try:
@@ -463,7 +463,7 @@ class FeatureTestSuite:
                 for r in summary.feature_results
             ],
         }
-        return json.dumps(report, ensure_ascii=False, indent=2)
+        return orjson.dumps(report, option=orjson.OPT_INDENT_2).decode("utf-8")
 
     # ------------------------------------------------------------------
     # Test Implementasyonları
@@ -660,7 +660,7 @@ class FeatureTestSuite:
             # --- Test 2: İlk satır kaldırma (lookahead kontrolü) ---
             trimmed_head = data.tail(n - 1)
             trimmed_head_result = compute_fn(trimmed_head)
-            trimmed_head_value = trimmed_head_result.get(feature_name)
+            _ = trimmed_head_result.get(feature_name)
 
             # İlk satırı kaldırınca, 2. satırdan sonraki değerler değişmemeli
             # Ancak ilk satırın kendisi etkilenebilir — bu normal

@@ -30,11 +30,17 @@ from .health_monitor import LearningHealthMonitor, learning_health_monitor
 from .integrated_learning import IntegratedLearningSystem, learning_system
 from .learning_loop import LearningLoop, learning_loop
 from .meta_learner import MetaLearner, meta_learner
+from .model_degradation_monitor import ModelDegradationMonitor, model_degradation_monitor
+from .model_memory_store import ModelMemoryStore, model_memory_store
 from .model_registry import ModelRegistry, model_registry
+from .model_trust_engine import ModelTrustEngine, model_trust_engine
 from .outcome_tracker import OutcomeTracker, outcome_tracker
+from .production_alpha_engine import ProductionAlphaEngine, production_alpha_engine
 from .retrain_engine import RetrainEngine, retrain_engine
 from .shadow_manager import ShadowModeManager, shadow_manager
 from .super_intelligence import SuperIntelligenceEngine, super_intelligence
+from .walkforward_ensemble import WalkForwardEnsemble, walkforward_ensemble
+from .weight_adjuster import WeightAdjuster, weight_adjuster
 
 __all__ = [
     # Config
@@ -59,6 +65,18 @@ __all__ = [
     "meta_learner",
     "LearningHealthMonitor",
     "learning_health_monitor",
+    "ModelDegradationMonitor",
+    "model_degradation_monitor",
+    "ModelMemoryStore",
+    "model_memory_store",
+    "ModelTrustEngine",
+    "model_trust_engine",
+    "ProductionAlphaEngine",
+    "production_alpha_engine",
+    "WalkForwardEnsemble",
+    "walkforward_ensemble",
+    "WeightAdjuster",
+    "weight_adjuster",
     # Existing modules
     "ContinuousLearningPipeline",
     "continuous_learning",

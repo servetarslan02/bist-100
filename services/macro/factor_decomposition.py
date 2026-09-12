@@ -29,6 +29,14 @@ class FactorContribution:
     direction: str  # POSITIVE, NEGATIVE, NEUTRAL
     significance: str  # HIGH, MEDIUM, LOW
 
+    def __repr__(self) -> str:
+        """Faktör katkısının okunabilir string temsili."""
+        return (
+            f"FactorContribution(factor='{self.factor}', "
+            f"contrib={self.contribution:+.2f} ({self.contribution_pct:+.1f}%), "
+            f"dir='{self.direction}', sig='{self.significance}')"
+        )
+
 
 @dataclass
 class DecompositionResult:
@@ -43,6 +51,14 @@ class DecompositionResult:
     explained_pct: float
     top_factor: str
     timestamp: str
+
+    def __repr__(self) -> str:
+        """Ayrıştırma sonucunun okunabilir string temsili."""
+        return (
+            f"DecompositionResult(ticker='{self.ticker}', "
+            f"return={self.total_return:+.2f}%, explained={self.explained_pct:.1f}%, "
+            f"top='{self.top_factor}')"
+        )
 
 
 class MacroFactorDecomposition:
@@ -152,6 +168,14 @@ class MacroFactorDecomposition:
             "vix": -0.3,
         },
     }
+
+    def __init__(self) -> None:
+        """Makro faktör ayrıştırma motoru başlatıcı."""
+        self._factors = list(self.FACTORS)
+
+    def __repr__(self) -> str:
+        """Makro faktör ayrıştırma motoru okunabilir string temsili."""
+        return f"MacroFactorDecomposition(factors={len(self._factors)})"
 
     def decompose(
         self,
@@ -306,3 +330,10 @@ class MacroFactorDecomposition:
 
 # Singleton
 macro_factor_decomposition = MacroFactorDecomposition()
+
+__all__ = [
+    "FactorContribution",
+    "DecompositionResult",
+    "MacroFactorDecomposition",
+    "macro_factor_decomposition",
+]

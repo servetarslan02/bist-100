@@ -17,25 +17,28 @@ import structlog
 
 logger = structlog.get_logger()
 
+# Enflasyon rejimi eşik sabitleri (Yıllık TÜFE %)
+DEFAULT_INF_REGIME_VERY_HIGH: float = 50.0
+DEFAULT_INF_REGIME_HIGH: float = 25.0
+DEFAULT_INF_REGIME_MID_HIGH: float = 10.0
+DEFAULT_INF_REGIME_MODERATE: float = 5.0
+DEFAULT_INF_SURPRISE_THRESHOLD: float = 0.5
+DEFAULT_INF_TREND_THRESHOLD: float = 0.5
+
 
 def compute_inflation_features(inflation_data: dict[str, Any]) -> dict[str, float]:
-    """Enflasyon feature'ları.
+    """Enflasyon (TÜFE, ÜFE, çekirdek), spread ve rejim feature'larını hesaplar.
 
     Args:
-        inflation_data: {
-            "cpi_yoy": float,           # CPI yıllık değişim (%)
-            "ppi_yoy": float,           # PPI yıllık değişim (%)
-            "core_cpi": float,          # Çekirdek enflasyon (%)
-            "cpi_monthly": float,       # CPI aylık değişim (%)
-            "ppi_monthly": float,       # PPI aylık değişim (%)
-            "cpi_expected": float,      # CPI beklenti
-            "cpi_previous": float,      # Önceki CPI
-        }
+        inflation_data: Yıllık TÜFE/ÜFE, çekirdek TÜFE, aylık veriler, beklenti ve önceki verileri içeren sözlük.
 
     Returns:
-        Feature dictionary
+        dict[str, float]: Hesaplanmış enflasyon feature sözlüğü.
+
+    Raises:
+        ValueError: Sayısal dönüştürme hatası oluştuğunda (yakalanıp loglanır).
     """
-    features = {}
+    features: dict[str, float] = {}
 
     try:
         # CPI seviyesi
@@ -44,13 +47,14 @@ def compute_inflation_features(inflation_data: dict[str, Any]) -> dict[str, floa
             features["inf_cpi_level"] = round(float(cpi_yoy), 2)
 
             # Enflasyon rejimi
-            if float(cpi_yoy) > 50:
+            cpi_val = float(cpi_yoy)
+            if cpi_val > DEFAULT_INF_REGIME_VERY_HIGH:
                 features["inf_regime"] = 4.0  # ÇOK YÜKSEK
-            elif float(cpi_yoy) > 25:
+            elif cpi_val > DEFAULT_INF_REGIME_HIGH:
                 features["inf_regime"] = 3.0  # YÜKSEK
-            elif float(cpi_yoy) > 10:
+            elif cpi_val > DEFAULT_INF_REGIME_MID_HIGH:
                 features["inf_regime"] = 2.0  # ORTA-YÜKSEK
-            elif float(cpi_yoy) > 5:
+            elif cpi_val > DEFAULT_INF_REGIME_MODERATE:
                 features["inf_regime"] = 1.0  # ORTA
             else:
                 features["inf_regime"] = 0.0  # DÜŞÜK
@@ -75,8 +79,7 @@ def compute_inflation_features(inflation_data: dict[str, Any]) -> dict[str, floa
         cpi_monthly = inflation_data.get("cpi_monthly")
         if cpi_monthly is not None:
             features["inf_cpi_monthly"] = round(float(cpi_monthly), 2)
-            # Yıllıklandırılmış aylık
-            # Bileşik formül: (1 + aylık_oran)^12 - 1
+            # Yıllıklandırılmış aylık (Bileşik formül: (1 + aylık_oran)^12 - 1)
             monthly_rate = float(cpi_monthly) / 100
             features["inf_cpi_annualized"] = round(((1 + monthly_rate) ** 12 - 1) * 100, 2)
 
@@ -86,16 +89,34 @@ def compute_inflation_features(inflation_data: dict[str, Any]) -> dict[str, floa
             surprise = float(cpi_yoy) - float(cpi_expected)
             features["inf_surprise"] = round(surprise, 4)
             features["inf_surprise_pct"] = round(surprise / max(abs(float(cpi_expected)), 0.01), 4)
-            features["inf_surprise_direction"] = 1.0 if surprise > 0.5 else (-1.0 if surprise < -0.5 else 0.0)
+            features["inf_surprise_direction"] = (
+                1.0 if surprise > DEFAULT_INF_SURPRISE_THRESHOLD
+                else (-1.0 if surprise < -DEFAULT_INF_SURPRISE_THRESHOLD else 0.0)
+            )
 
         # Enflasyon trendi
         cpi_previous = inflation_data.get("cpi_previous")
         if cpi_yoy is not None and cpi_previous is not None:
             trend = float(cpi_yoy) - float(cpi_previous)
             features["inf_trend"] = round(trend, 4)
-            features["inf_trend_direction"] = 1.0 if trend > 0.5 else (-1.0 if trend < -0.5 else 0.0)
+            features["inf_trend_direction"] = (
+                1.0 if trend > DEFAULT_INF_TREND_THRESHOLD
+                else (-1.0 if trend < -DEFAULT_INF_TREND_THRESHOLD else 0.0)
+            )
 
     except Exception as e:
-        logger.error("Inflation feature computation failed", error=str(e))
+        logger.error("Enflasyon feature hesaplaması başarısız oldu", error=str(e))
 
     return features
+
+
+__all__ = [
+    "DEFAULT_INF_REGIME_VERY_HIGH",
+    "DEFAULT_INF_REGIME_HIGH",
+    "DEFAULT_INF_REGIME_MID_HIGH",
+    "DEFAULT_INF_REGIME_MODERATE",
+    "DEFAULT_INF_SURPRISE_THRESHOLD",
+    "DEFAULT_INF_TREND_THRESHOLD",
+    "compute_inflation_features",
+]
+

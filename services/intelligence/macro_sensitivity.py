@@ -108,13 +108,16 @@ SECTOR_MACRO_SENSITIVITY = {
 class MacroSensitivityEngine:
     """Şirket bazlı makro hassasiyet hesaplama — dinamik güncelleme destekli."""
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """Makro hassasiyet motorunu başlatır, dinamik sektör ve makro değer depolarını hazırlar."""
         self._company_sensitivity: dict[str, dict[str, float]] = {}
         self._dynamic_sensitivity: dict[str, dict[str, float]] = {}  # sector → dynamic values
         self._sector_returns: dict[str, list[float]] = {}  # sector → returns history
         self._macro_values: dict[str, list[float]] = {}  # macro_var → values history
         self._window = 60  # Rolling window
+
+    def __repr__(self) -> str:
+        return f"MacroSensitivityEngine(companies={len(self._company_sensitivity)}, window={self._window})"
 
     def get_sector_sensitivity(self, sector: str) -> dict[str, float]:
         """Sektör bazlı makro hassasiyet."""

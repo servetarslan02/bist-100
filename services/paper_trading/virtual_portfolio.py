@@ -29,7 +29,13 @@ class VirtualPortfolio:
         state_store=None,
         strict_t2: bool = True,
     ):
-        """Otomatik eklendi."""
+        """VirtualPortfolio sanal portföy motorunu başlatır.
+
+        Args:
+            initial_capital: Portföy başlangıç nakit sermayesi (TL).
+            state_store: Portföy durumunu kalıcı olarak saklayan durum deposu (DuckDB/PG).
+            strict_t2: T+2 Takas kurallarının sıkı işletilip işletilmeyeceği (True ise serbest nakit kısıtlanır).
+        """
         self.initial_capital = initial_capital
         self.strict_t2 = strict_t2
         # T+2 Takas & Valörlü Bakiye Modeli
@@ -52,6 +58,13 @@ class VirtualPortfolio:
 
         logger.info(
             "VirtualPortfolio initialized with T+2 Settlement", initial_capital=initial_capital, strict_t2=strict_t2
+        )
+
+    def __repr__(self) -> str:
+        """Sınıfın metinsel temsilini döndürür."""
+        return (
+            f"VirtualPortfolio(initial_capital={self.initial_capital}, total_cash={self.total_cash:.2f}, "
+            f"purchasing_power={self.purchasing_power:.2f}, positions_count={len(self._positions)})"
         )
 
     @property
@@ -456,7 +469,7 @@ class VirtualPortfolio:
                 if loop.is_running():
                     # Async ortamda — background task olarak çalıştır
                     async def _fetch_missing() -> Any:
-                        """Otomatik eklendi."""
+                        """Eksik fiyat verisi olan sembollerin son kapanışlarını veritabanından çeker."""
                         for ticker in missing:
                             rows = await pg_fetch(
                                 "SELECT close FROM market_data WHERE ticker=$1 ORDER BY date DESC LIMIT 1", ticker
@@ -501,12 +514,20 @@ class VirtualPortfolio:
         return self.total_cash + invested
 
     def get_invested_value(self) -> float:
-        """Otomatik eklendi."""
+        """Portföydeki açık hisse pozisyonlarının toplam güncel piyasa değerini hesaplar.
+
+        Returns:
+            float: Açık pozisyonların güncel piyasa değeri (TL).
+        """
         self._sync_live_prices()
         return sum(p.get("market_value", 0.0) for p in self._positions.values())
 
     def get_unrealized_pnl(self) -> float:
-        """Otomatik eklendi."""
+        """Açık pozisyonlar üzerinden gerçekleşmemiş toplam kâr/zararı hesaplar.
+
+        Returns:
+            float: Gerçekleşmemiş kâr/zarar toplamı (TL).
+        """
         self._sync_live_prices()
         total = 0.0
         for pos in self._positions.values():
@@ -518,7 +539,14 @@ class VirtualPortfolio:
         return total
 
     def get_position(self, ticker: str) -> dict[str, Any] | None:
-        """Otomatik eklendi."""
+        """Belirtilen hisse senedine ait açık pozisyon detaylarını döndürür.
+
+        Args:
+            ticker: Hisse senedi sembolü (ör. THYAO).
+
+        Returns:
+            dict[str, Any] | None: Pozisyon sözlüğü veya pozisyon yoksa None.
+        """
         self._sync_live_prices()
         return self._positions.get(ticker)
 
@@ -614,7 +642,14 @@ class VirtualPortfolio:
         return {t: round(p["market_value"] / total, 4) for t, p in self._positions.items()}
 
     def get_trades(self, limit: int | None = None) -> list[dict[str, Any]]:
-        """Otomatik eklendi."""
+        """Portföyde gerçekleştirilen işlem geçmişini döndürür.
+
+        Args:
+            limit: Döndürülecek maksimum işlem sayısı (None ise tüm işlemler).
+
+        Returns:
+            list[dict[str, Any]]: Gerçekleştirilen işlem kayıtları listesi.
+        """
         if self._trades:
             trades = self._trades
         elif self._state_store:
@@ -630,7 +665,11 @@ class VirtualPortfolio:
         return trades
 
     def get_equity_curve(self) -> list[dict[str, Any]]:
-        """Otomatik eklendi."""
+        """Portföyün zaman serisi özvarlık (equity) eğrisi verilerini döndürür.
+
+        Returns:
+            list[dict[str, Any]]: Tarih ve portföy değerini içeren zaman serisi kayıtları.
+        """
         if self._equity_curve:
             return self._equity_curve
         if self._state_store:

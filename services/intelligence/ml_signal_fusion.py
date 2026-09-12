@@ -55,6 +55,12 @@ class MLFusedSignal:
     n_models_used: int = 0
     timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
+    def __repr__(self) -> str:
+        return (
+            f"MLFusedSignal(ticker={self.ticker!r}, regime={self.regime!r}, "
+            f"dir={self.fused_direction!r}, score={self.fused_score:.1f}, conf={self.fused_confidence:.2f})"
+        )
+
 
 class MLSignalFusion:
     """
@@ -92,10 +98,13 @@ class MLSignalFusion:
         "MOMENTUM_CONTRACTION": {"fundamental": 0.25, "valuation": 0.25, "macro": 0.15},
     }
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """Makine öğrenimi tabanlı sinyal füzyon motorunu optimize ağırlık ve geçmiş depolarıyla ilklendirir."""
         self._optimized_weights: dict[str, dict[str, float]] = {}  # regime → weights
         self._weight_history: list[dict] = []
+
+    def __repr__(self) -> str:
+        return f"MLSignalFusion(regime_overrides={len(self.REGIME_OVERRIDES)})"
 
     def fuse(
         self,

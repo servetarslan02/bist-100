@@ -57,13 +57,21 @@ tracer = trace.get_tracer("alpha-bist.nats_client")
 
 
 def otel_trace(span_name: str) -> Any:
-    """Decorator to wrap a method in an OTel span."""
+    """
+    Belirtilen span adıyla OpenTelemetry izleme (tracing) dekoratörü oluşturur.
 
-    def decorator(func) -> Any:
-        """Otomatik eklendi."""
+    Args:
+        span_name: OpenTelemetry span adı.
+
+    Returns:
+        Any: Sarmalayıcı fonksiyon dekoratörü.
+    """
+
+    def decorator(func: Callable[..., Any]) -> Any:
+        """Hedef fonksiyonu OTel span bağlamı ile sarmalar."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs) -> Any:
-            """Otomatik eklendi."""
+        def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
+            """Span bağlamını başlatır ve hedef fonksiyonu çalıştırır."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
 
@@ -75,8 +83,8 @@ def otel_trace(span_name: str) -> Any:
 class NatsClient:
     """NATS & JetStream istemcisi — kurumsal event bus."""
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """NATS istemcisi iç durumunu ve metrik sayaçlarını ilklendirir."""
         self._nc: NATS | None = None
         self._js = None  # JetStream context
         self._subscriptions: dict[str, Any] = {}
@@ -86,6 +94,16 @@ class NatsClient:
         self._total_received = 0
         self._total_errors = 0
         self._total_dlq_routed = 0
+
+    def __repr__(self) -> str:
+        return (
+            f"NatsClient(connected={self._connected}, "
+            f"subscriptions={len(self._subscriptions)}, "
+            f"published={self._total_published}, "
+            f"received={self._total_received}, "
+            f"errors={self._total_errors}, "
+            f"dlq_routed={self._total_dlq_routed})"
+        )
 
     @otel_trace("nats.connect")
     async def connect(self, servers: str = None) -> bool:
@@ -100,18 +118,18 @@ class NatsClient:
         try:
             url = servers or os.environ.get("NATS_URL", "nats://localhost:4222")
 
-            async def _disconnected_cb() -> Any:
-                """Otomatik eklendi."""
+            async def _disconnected_cb() -> None:
+                """NATS bağlantısı koptuğunda tetiklenen geri çağırım."""
                 logger.warning("NATS disconnected, will reconnect")
                 self._connected = False
 
-            async def _reconnected_cb() -> Any:
-                """Otomatik eklendi."""
+            async def _reconnected_cb() -> None:
+                """NATS yeniden bağlandığında tetiklenen geri çağırım."""
                 logger.info("NATS reconnected")
                 self._connected = True
 
-            async def _error_cb(e) -> Any:
-                """Otomatik eklendi."""
+            async def _error_cb(e: Exception) -> None:
+                """NATS soket veya protokol hatasında sayacı artıran geri çağırım."""
                 self._total_errors += 1
                 logger.warning("NATS error", error=str(e))
 
@@ -152,7 +170,7 @@ class NatsClient:
 
     @property
     def is_connected(self) -> bool:
-        """Otomatik eklendi."""
+        """NATS soketinin aktif ve bağlı olup olmadığını doğrular."""
         return self._connected and self._nc is not None
 
     @otel_trace("nats.publish")
@@ -216,8 +234,8 @@ class NatsClient:
         try:
             if handler:
 
-                async def _msg_handler(msg) -> Any:
-                    """Otomatik eklendi."""
+                async def _msg_handler(msg: Any) -> None:
+                    """Gelen NATS mesajını ayrıştırır ve kullanıcı handler fonksiyonuna iletir."""
                     self._total_received += 1
                     try:
                         raw_data = msg.data
@@ -292,8 +310,8 @@ class NatsClient:
 
             if handler:
 
-                async def _msg_handler(msg) -> Any:
-                    """Otomatik eklendi."""
+                async def _msg_handler(msg: Any) -> None:
+                    """Gelen JetStream mesajını ayrıştırır, işler ve acknowledge (ack) döner."""
                     self._total_received += 1
                     try:
                         data = (
@@ -411,7 +429,7 @@ class NatsClient:
                     if cid:
                         data = {**data, "_correlation_id": cid}
                 except (ImportError, LookupError):
-                    logger.error("Exception caught", exc_info=True)
+                    logger.debug("correlation_id_context_not_available")
             raw = orjson.dumps(data, default=str)
         elif isinstance(data, bytes):
             raw = data
@@ -435,7 +453,7 @@ class NatsClient:
 
                 correlation_id_var.set(cid)
             except (ImportError, LookupError):
-                logger.error("Exception caught", exc_info=True)
+                logger.debug("correlation_id_propagate_skipped")
 
     async def _route_to_dlq(self, subject: str, raw_payload: str, error_str: str) -> None:
         """İşlenemeyen hatalı mesajları Dead Letter Queue'ya yönlendirir."""
@@ -483,6 +501,17 @@ class Subjects:
     STREAM_ORDERS = "ALPHA_ORDERS"
     STREAM_DLQ = "ALPHA_DLQ"
 
+    def __repr__(self) -> str:
+        return "Subjects(TICKS, OHLCV, SIGNALS, PORTFOLIO, RISK, EVENTS, ALERTS, REGIME, ORDERS, DLQ)"
+
 
 # Singleton
 nats_client = NatsClient()
+
+__all__ = [
+    "HAS_NATS",
+    "NatsClient",
+    "Subjects",
+    "nats_client",
+    "otel_trace",
+]

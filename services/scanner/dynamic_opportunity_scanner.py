@@ -21,9 +21,10 @@ logger = logging.getLogger("alpha.scanner")
 
 
 class DynamicOpportunityScanner:
-    """Otomatik eklendi."""
-    def __init__(self):
-        """Otomatik eklendi."""
+    """BIST hisselerinde teknik ve hacimsel fırsatları dinamik olarak tarayan motor."""
+
+    def __init__(self) -> None:
+        """DynamicOpportunityScanner tarayıcısını varsayılan eşik değerleriyle başlatır."""
         # Tarama parametreleri
         self.min_volume = 1_000_000  # Min günlük hacim (TL)
         self.min_market_cap = 500_000_000  # Min piyasa değeri (TL)
@@ -48,8 +49,19 @@ class DynamicOpportunityScanner:
             "breakout": 0.15,
         }
 
+    def __repr__(self) -> str:
+        """DynamicOpportunityScanner okunabilir durum temsili."""
+        return f"DynamicOpportunityScanner(max_results={self.max_results}, min_volume={self.min_volume})"
+
     def scan_opportunities(self, limit: int = 50) -> list[dict[str, Any]]:
-        """Otomatik eklendi."""
+        """Evrendeki hisseleri tarayarak fırsat skorlarına göre sıralanmış sonuçları döndürür.
+
+        Args:
+            limit: Döndürülecek maksimum fırsat sayısı.
+
+        Returns:
+            list[dict[str, Any]]: Sıralı fırsat listesi.
+        """
         from ..ingestion.bist_universe import bist_universe
 
         tickers = bist_universe.get_tickers()

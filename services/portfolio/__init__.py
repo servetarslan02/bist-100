@@ -7,6 +7,14 @@
 # - main: PortfolioService (DB-backed, atomic operations, lock)
 # - enhancements: Tax, dividend, benchmark, attribution, multi-currency, TCA
 
+from .autonomous_conviction_engine import (
+    AllocationPlan,
+    AutonomousConvictionEngine,
+    CandidateAsset,
+    ExitAction,
+    ExitDecision,
+    OpenPositionState,
+)
 from .enhancements import (
     BenchmarkEngine,
     DividendHandler,
@@ -27,7 +35,16 @@ from .portfolio_enhancements import (
     RebalanceDecision,
     portfolio_enhancements,
 )
-from .portfolio_manager import PortfolioManager, Position, Trade, portfolio_manager
+from .portfolio_manager import (
+    CashLedgerEntry,
+    CommissionModel,
+    EquitySnapshot,
+    PortfolioManager,
+    Position,
+    PositionHistoryEntry,
+    Trade,
+    portfolio_manager,
+)
 from .portfolio_optimizer import (
     OptimizationMethod,
     OptimizationResult,
@@ -42,6 +59,10 @@ __all__ = [
     "portfolio_manager",
     "Position",
     "Trade",
+    "CashLedgerEntry",
+    "EquitySnapshot",
+    "PositionHistoryEntry",
+    "CommissionModel",
     # Portfolio Optimizer
     "PortfolioOptimizer",
     "portfolio_optimizer",
@@ -65,4 +86,11 @@ __all__ = [
     "multi_currency",
     "TransactionCostAnalyzer",
     "tca",
+    # Autonomous Conviction
+    "AutonomousConvictionEngine",
+    "CandidateAsset",
+    "OpenPositionState",
+    "AllocationPlan",
+    "ExitDecision",
+    "ExitAction",
 ]

@@ -12,8 +12,6 @@ Kullanım:
     sector = bist_universe.get_ticker_sector("THYAO")
 """
 
-from typing import Any
-
 import structlog
 
 from .providers.universe_provider import universe_updater

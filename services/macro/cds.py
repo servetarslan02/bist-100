@@ -15,21 +15,25 @@ import structlog
 
 logger = structlog.get_logger()
 
+# Risk seviyesi eşik sabitleri (baz puan)
+DEFAULT_CDS_RISK_LOW: float = 150.0
+DEFAULT_CDS_RISK_MEDIUM: float = 250.0
+DEFAULT_CDS_RISK_HIGH: float = 400.0
+
 
 def compute_cds_features(cds_data: dict[str, Any]) -> dict[str, float]:
-    """CDS spread feature'ları.
+    """CDS spread göstergelerini ve risk seviyesini hesaplar.
 
     Args:
-        cds_data: {
-            "cds_5y": float,           # 5 yıllık CDS
-            "cds_previous": float,     # Önceki CDS
-            "cds_history": List[float], # Son 20+ gün
-        }
+        cds_data: 5 yıllık CDS, önceki CDS ve tarihsel CDS listesini içeren sözlük.
 
     Returns:
-        Feature dictionary
+        dict[str, float]: Hesaplanmış CDS feature sözlüğü (z-score, momentum, risk level vb.).
+
+    Raises:
+        ValueError: Girdi verisi sayısal formata dönüştürülemediğinde (hata yakalanıp loglanır).
     """
-    features = {}
+    features: dict[str, float] = {}
 
     try:
         cds_5y = cds_data.get("cds_5y")
@@ -54,8 +58,8 @@ def compute_cds_features(cds_data: dict[str, Any]) -> dict[str, float]:
 
             if len(hist) >= 10:
                 # Z-score
-                mean = np.mean(hist[-60:])
-                std = np.std(hist[-60:])
+                mean = float(np.mean(hist[-60:]))
+                std = float(np.std(hist[-60:]))
                 if std > 0:
                     features["cds_zscore"] = round((cds_5y - mean) / std, 4)
 
@@ -68,16 +72,25 @@ def compute_cds_features(cds_data: dict[str, Any]) -> dict[str, float]:
                 features["cds_percentile"] = round(percentile, 4)
 
         # Risk seviyesi
-        if cds_5y < 150:
+        if cds_5y < DEFAULT_CDS_RISK_LOW:
             features["cds_risk_level"] = 0.0  # DÜŞÜK
-        elif cds_5y < 250:
+        elif cds_5y < DEFAULT_CDS_RISK_MEDIUM:
             features["cds_risk_level"] = 1.0  # ORTA
-        elif cds_5y < 400:
+        elif cds_5y < DEFAULT_CDS_RISK_HIGH:
             features["cds_risk_level"] = 2.0  # YÜKSEK
         else:
             features["cds_risk_level"] = 3.0  # ÇOK YÜKSEK
 
     except Exception as e:
-        logger.error("CDS feature computation failed", error=str(e))
+        logger.error("CDS feature hesaplaması başarısız oldu", error=str(e))
 
     return features
+
+
+__all__ = [
+    "DEFAULT_CDS_RISK_LOW",
+    "DEFAULT_CDS_RISK_MEDIUM",
+    "DEFAULT_CDS_RISK_HIGH",
+    "compute_cds_features",
+]
+

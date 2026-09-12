@@ -31,15 +31,33 @@ class MacroDataPoint:
     source: str
     timestamp: str
 
+    def __repr__(self) -> str:
+        """Makro veri noktasının okunabilir string temsili."""
+        return (
+            f"MacroDataPoint(indicator='{self.indicator}', date='{self.date}', "
+            f"value={self.value}, source='{self.source}')"
+        )
+
 
 class MacroHistoricalStore:
     """Tarihsel makro veri deposu."""
 
-    def __init__(self, storage_path: str = "data/macro_historical.json"):
-        """Otomatik eklendi."""
+    def __init__(self, storage_path: str = "data/macro_historical.json") -> None:
+        """Tarihsel makro veri deposu başlatıcı.
+
+        Args:
+            storage_path: Veri dosyası saklama yolu (varsayılan: "data/macro_historical.json").
+        """
         self._storage_path = storage_path
         self._data: dict[str, dict[str, list[dict]]] = {}  # indicator → {date → [values]}
         self._load()
+
+    def __repr__(self) -> str:
+        """Tarihsel makro veri deposu okunabilir string temsili."""
+        return (
+            f"MacroHistoricalStore(storage_path='{self._storage_path}', "
+            f"indicators={len(self._data)})"
+        )
 
     def save(
         self,
@@ -242,3 +260,9 @@ class MacroHistoricalStore:
 
 # Singleton
 macro_historical_store = MacroHistoricalStore()
+
+__all__ = [
+    "MacroDataPoint",
+    "MacroHistoricalStore",
+    "macro_historical_store",
+]

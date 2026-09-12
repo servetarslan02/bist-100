@@ -32,22 +32,40 @@ class EventTask:
         """Tie-breaker for PriorityQueue ordering."""
         return self.timestamp < other.timestamp
 
+    def __repr__(self) -> str:
+        """EventTask okunabilir nesne temsili."""
+        return (
+            f"EventTask(ticker='{self.ticker}', type='{self.event_type}', "
+            f"prio={self.priority}, imp={self.importance:.2f})"
+        )
+
 
 class EventPriorityQueue:
-    """
-    Event'leri öncelik sırasıyla işler.
+    """Event'leri öncelik sırasıyla işler.
+
     Yüksek önem → önce işlenir.
     Paralel worker ile bloklama olmaz.
     """
 
-    def __init__(self, max_workers: int = 5):
-        """Otomatik eklendi."""
+    def __init__(self, max_workers: int = 5) -> None:
+        """EventPriorityQueue öncelikli kuyruk sistemini başlatır.
+
+        Args:
+            max_workers: Eşzamanlı çalışacak arka plan worker sayısı (varsayılan 5).
+        """
         self._queue: asyncio.PriorityQueue = asyncio.PriorityQueue()
         self._max_workers = max_workers
         self._workers: list[asyncio.Task] = []
         self._running = False
         self._handler: Callable | None = None
         self._processed_count = 0
+
+    def __repr__(self) -> str:
+        """EventPriorityQueue okunabilir durum temsili."""
+        return (
+            f"EventPriorityQueue(workers={self._max_workers}, running={self._running}, "
+            f"processed={self._processed_count}, qsize={self._queue.qsize()})"
+        )
 
     def set_handler(self, handler: Callable) -> Any:
         """Event handler ata."""

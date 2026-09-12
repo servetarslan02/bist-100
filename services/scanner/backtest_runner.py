@@ -34,7 +34,8 @@ logger = structlog.get_logger()
 
 @dataclass
 class BacktestTrade:
-    """Otomatik eklendi."""
+    """Tarama backtest işlemi."""
+
     date: str
     ticker: str
     direction: str
@@ -44,8 +45,19 @@ class BacktestTrade:
     slippage: float
     pnl: float = 0.0
 
+    def __repr__(self) -> str:
+        """BacktestTrade okunabilir nesne temsili."""
+        return (
+            f"BacktestTrade(ticker='{self.ticker}', dir='{self.direction}', "
+            f"qty={self.quantity}, price={self.price:.2f}, pnl={self.pnl:.2f})"
+        )
+
     def to_dict(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """İşlem kaydını sözlük formatına dönüştürür.
+
+        Returns:
+            dict[str, Any]: İşlem alanlarını içeren sözlük.
+        """
         return {
             "date": self.date,
             "ticker": self.ticker,
@@ -60,20 +72,30 @@ class BacktestTrade:
 
 @dataclass
 class BacktestSignal:
-    """Otomatik eklendi."""
+    """Tarama backtest sinyali."""
+
     date: str
     ticker: str
     signal: str
     score: float
 
+    def __repr__(self) -> str:
+        """BacktestSignal okunabilir nesne temsili."""
+        return f"BacktestSignal(ticker='{self.ticker}', date='{self.date}', signal='{self.signal}', score={self.score:.1f})"
+
     def to_dict(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Sinyal kaydını sözlük formatına dönüştürür.
+
+        Returns:
+            dict[str, Any]: Sinyal alanlarını içeren sözlük.
+        """
         return {"date": self.date, "ticker": self.ticker, "signal": self.signal, "score": round(self.score, 2)}
 
 
 @dataclass
 class DailySnapshot:
-    """Otomatik eklendi."""
+    """Günlük portföy durum görüntüsü."""
+
     date: str
     equity: float
     cash: float
@@ -82,8 +104,19 @@ class DailySnapshot:
     drawdown: float
     daily_return: float
 
+    def __repr__(self) -> str:
+        """DailySnapshot okunabilir nesne temsili."""
+        return (
+            f"DailySnapshot(date='{self.date}', equity={self.equity:.2f}, "
+            f"cash={self.cash:.2f}, pos={self.positions}, dd={self.drawdown:.2%})"
+        )
+
     def to_dict(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Günlük snapshot kaydını sözlük formatına dönüştürür.
+
+        Returns:
+            dict[str, Any]: Snapshot alanlarını içeren sözlük.
+        """
         return {
             "date": self.date,
             "equity": round(self.equity, 2),
@@ -97,7 +130,8 @@ class DailySnapshot:
 
 @dataclass
 class BacktestResult:
-    """Otomatik eklendi."""
+    """Tarama backtest nihai sonuç raporu."""
+
     start_date: str
     end_date: str
     total_scans: int
@@ -112,8 +146,19 @@ class BacktestResult:
     performance: dict[str, Any]
     equity_curve: list[dict[str, Any]]
 
+    def __repr__(self) -> str:
+        """BacktestResult okunabilir nesne temsili."""
+        return (
+            f"BacktestResult(period='{self.start_date} -> {self.end_date}', "
+            f"scans={self.total_scans}, signals={self.signals_generated}, trades={self.trades_executed})"
+        )
+
     def to_dict(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Backtest sonucunu sözlük formatına dönüştürür.
+
+        Returns:
+            dict[str, Any]: Tüm özet ve performans alanlarını içeren sözlük.
+        """
         return {
             "start_date": self.start_date,
             "end_date": self.end_date,
@@ -137,29 +182,33 @@ class BacktestResult:
 class FeatureCache:
     """Ticker bazında feature cache. Tarih değişince invalidation."""
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """FeatureCache önbellek yapısını başlatır."""
         self._cache: dict[str, dict[str, Any]] = {}
         self._date_cache: dict[str, str] = {}  # ticker → son hesap tarihi
 
+    def __repr__(self) -> str:
+        """FeatureCache okunabilir nesne temsili."""
+        return f"FeatureCache(cached_tickers={len(self._cache)})"
+
     def get(self, ticker: str, date: str) -> dict[str, Any] | None:
-        """Otomatik eklendi."""
+        """Önbellekten hissenin belirtilen tarihteki feature sözlüğünü döndürür."""
         if ticker in self._cache and self._date_cache.get(ticker) == date:
             return self._cache[ticker]
         return None
 
     def set(self, ticker: str, date: str, features: dict[str, Any]) -> Any:
-        """Otomatik eklendi."""
+        """Hisse feature'larını ve hesaplanma tarihini önbelleğe kaydeder."""
         self._cache[ticker] = features
         self._date_cache[ticker] = date
 
     def invalidate(self, ticker: str) -> Any:
-        """Otomatik eklendi."""
+        """Belirtilen hissenin önbellek kaydını temizler."""
         self._cache.pop(ticker, None)
         self._date_cache.pop(ticker, None)
 
     def clear(self) -> Any:
-        """Otomatik eklendi."""
+        """Tüm feature önbelleğini sıfırlar."""
         self._cache.clear()
         self._date_cache.clear()
 
@@ -167,20 +216,24 @@ class FeatureCache:
 class QualityCache:
     """Data quality sonucu cache."""
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """QualityCache veri kalitesi önbelleğini başlatır."""
         self._cache: dict[str, tuple[bool, float]] = {}
 
+    def __repr__(self) -> str:
+        """QualityCache okunabilir nesne temsili."""
+        return f"QualityCache(cached_tickers={len(self._cache)})"
+
     def get(self, ticker: str) -> tuple[bool, float] | None:
-        """Otomatik eklendi."""
+        """Hissenin önbellekteki veri kalitesi sonucunu döndürür."""
         return self._cache.get(ticker)
 
     def set(self, ticker: str, passed: bool, score: float) -> Any:
-        """Otomatik eklendi."""
+        """Hissenin veri kalitesi sonucunu önbelleğe kaydeder."""
         self._cache[ticker] = (passed, score)
 
     def clear(self) -> Any:
-        """Otomatik eklendi."""
+        """Tüm kalite önbelleğini sıfırlar."""
         self._cache.clear()
 
 
@@ -199,8 +252,8 @@ class PortfolioSimulator:
         slippage_rate: float = 0.001,
         max_position_pct: float = 0.10,
         max_positions: int = 20,
-    ):
-        """Otomatik eklendi."""
+    ) -> None:
+        """PortfolioSimulator portföy simülasyonunu başlatır."""
         self._initial_capital = initial_capital
         self._cash = initial_capital
         self._commission_rate = commission_rate
@@ -213,12 +266,19 @@ class PortfolioSimulator:
         self._high_water_mark = initial_capital
         self._prev_equity = initial_capital
 
+    def __repr__(self) -> str:
+        """PortfolioSimulator okunabilir durum temsili."""
+        return (
+            f"PortfolioSimulator(equity={self._cash:.2f}, positions={len(self._positions)}, "
+            f"trades={len(self._trades)}, max_pos={self._max_positions})"
+        )
+
     def can_buy(self) -> bool:
-        """Otomatik eklendi."""
+        """Portföyün yeni pozisyon açıp açamayacağını kontrol eder."""
         return len(self._positions) < self._max_positions and self._cash > 0
 
     def execute_buy(self, ticker: str, price: float, date: str) -> BacktestTrade | None:
-        """Otomatik eklendi."""
+        """Alım emrini portföye uygular, nakit ve komisyonu günceller."""
         if ticker in self._positions or not self.can_buy():
             return None
         if price <= 0 or np.isnan(price):
@@ -266,7 +326,7 @@ class PortfolioSimulator:
         return trade
 
     def execute_sell(self, ticker: str, price: float, date: str) -> BacktestTrade | None:
-        """Otomatik eklendi."""
+        """Satım emrini uygular, PnL ve komisyon düşerek nakde ekler."""
         if ticker not in self._positions:
             return None
         if price <= 0 or np.isnan(price):
@@ -326,7 +386,7 @@ class PortfolioSimulator:
         self._prev_equity = equity
 
     def get_summary(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Portföyün toplam getiri, Sharpe, Sortino ve işlem özetini döndürür."""
         if not self._daily_snapshots:
             # Trade-based metrics only
             sell_trades = [t for t in self._trades if t.direction == "SELL"]
@@ -410,8 +470,8 @@ class ScannerBacktestRunner:
         commission_rate: float = 0.0003,
         slippage_rate: float = 0.001,
         min_quality_score: float = 70.0,
-    ):
-        """Otomatik eklendi."""
+    ) -> None:
+        """ScannerBacktestRunner motorunu başlatır."""
         self._calc = feature_calculator
         self._tm = TradabilityMask()
         self._dq = DataQualityV2()
@@ -421,6 +481,13 @@ class ScannerBacktestRunner:
         self._min_quality_score = min_quality_score
         self._feature_cache = FeatureCache()
         self._quality_cache = QualityCache()
+
+    def __repr__(self) -> str:
+        """ScannerBacktestRunner okunabilir durum temsili."""
+        return (
+            f"ScannerBacktestRunner(initial_capital={self._initial_capital}, "
+            f"commission={self._commission_rate}, min_quality={self._min_quality_score})"
+        )
 
     def run(
         self,
@@ -588,8 +655,8 @@ class ScannerBacktestRunner:
             equity_curve=[s.to_dict() for s in sim._daily_snapshots],
         )
 
-    def _empty_result(self, dates) -> BacktestResult:
-        """Otomatik eklendi."""
+    def _empty_result(self, dates: Any) -> BacktestResult:
+        """Veri bulunamadığında veya boş evrende sıfırlanmış boş BacktestResult nesnesi döndürür."""
         return BacktestResult(
             start_date="",
             end_date="",
@@ -619,9 +686,9 @@ class ScannerBacktestRunner:
         - technical: 20% (event ve ML yerine)
         """
 
-        def _s(v) -> Any:
-            """Otomatik eklendi."""
-            return float(v.flat[0]) if isinstance(v, np.ndarray) and v.size > 0 else float(v) if v is not None else 0
+        def _s(v: Any) -> float:
+            """Skaler sayı veya tek elemanlı diziyi float değere dönüştürür."""
+            return float(v.flat[0]) if isinstance(v, np.ndarray) and v.size > 0 else float(v) if v is not None else 0.0
 
         # Momentum skoru
         roc_5d = _s(features.get("roc_5d", 0))

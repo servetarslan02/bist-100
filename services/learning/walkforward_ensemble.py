@@ -56,6 +56,12 @@ class FoldResult:
     is_beneficial: bool
     regime: str | None = None
 
+    def __repr__(self) -> str:
+        return (
+            f"FoldResult(fold={self.fold_idx}, n_train={self.n_train}, n_val={self.n_val}, "
+            f"ensemble_ic={self.ensemble_ic:.4f}, beneficial={self.is_beneficial})"
+        )
+
 
 @dataclass
 class WalkForwardResult:
@@ -71,6 +77,14 @@ class WalkForwardResult:
     final_weights: dict[str, float]
     final_diversity: dict[str, float]
     training_timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
+
+    def __repr__(self) -> str:
+        return (
+            f"WalkForwardResult(n_folds={self.n_folds}, "
+            f"mean_ensemble_ic={self.mean_ensemble_ic:.4f}, "
+            f"mean_diversity={self.mean_diversity_score:.4f}, "
+            f"beneficial_ratio={self.beneficial_ratio:.2%})"
+        )
 
 
 class WalkForwardEnsemble:
@@ -93,7 +107,16 @@ class WalkForwardEnsemble:
         diversity_threshold: float = 0.85,
         benefit_tolerance: float = 0.95,
     ):
-        """Otomatik eklendi."""
+        """Walk-forward ensemble motorunu yapılandır.
+
+        Args:
+            n_splits: Fold dilim sayısı.
+            embargo_days: Veri sızıntısını önleyici embargo gün sayısı.
+            min_train_size: Minimum eğitim örnek sayısı.
+            min_val_size: Minimum doğrulama örnek sayısı.
+            diversity_threshold: Maksimum korelasyon çeşitlilik eşiği.
+            benefit_tolerance: Ensemble üstünlük tolerans katsayısı.
+        """
         self.n_splits = n_splits
         self.embargo_days = embargo_days
         self.min_train_size = min_train_size
@@ -399,6 +422,12 @@ class WalkForwardEnsemble:
     def get_last_result(self) -> WalkForwardResult | None:
         """Son walk-forward sonucu."""
         return self._history[-1] if self._history else None
+
+    def __repr__(self) -> str:
+        return (
+            f"WalkForwardEnsemble(n_splits={self.n_splits}, embargo_days={self.embargo_days}, "
+            f"diversity_threshold={self.diversity_threshold}, history_count={len(self._history)})"
+        )
 
 
 # Singleton

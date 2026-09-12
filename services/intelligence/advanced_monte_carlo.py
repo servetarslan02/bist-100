@@ -21,9 +21,9 @@ try:
 except ImportError:
 
     def jit(*args, **kwargs) -> Any:
-        """Otomatik eklendi."""
+        """Numba bulunmadığında kullanılan şeffaf dekoratör sarmalayıcısı."""
         def decorator(func) -> Any:
-            """Otomatik eklendi."""
+            """Orijinal fonksiyonu derlemeden doğrudan döndüren geri dönüş işlevi."""
             return func
 
         return decorator
@@ -49,7 +49,7 @@ def _run_jump_diffusion(
     n_sims: int,
     dt: float,
 ) -> np.ndarray:
-    """Otomatik eklendi."""
+    """Merton Sıçramalı Difüzyon (Jump-Diffusion) fiyat patikalarını simüle eder."""
     drift = (mu - 0.5 * sigma**2 - compensator) * dt
     diffusion = sigma * np.sqrt(dt)
 
@@ -87,7 +87,7 @@ def _run_heston_lite(
     horizon_days: int,
     n_sims: int,
 ) -> np.ndarray:
-    """Otomatik eklendi."""
+    """Heston Lite stokastik volatilite modeli patikalarını simüle eder."""
     prices = np.zeros((n_sims, horizon_days + 1))
     vols = np.zeros((n_sims, horizon_days + 1))
     for i in range(n_sims):
@@ -153,9 +153,18 @@ class AdvancedMCResult:
 
     sample_paths: np.ndarray | None = None
 
+    def __repr__(self) -> str:
+        return (
+            f"AdvancedMCResult(ticker={self.ticker!r}, model={self.model_type!r}, "
+            f"p50={self.p50:.2f}, exp_ret={self.expected_return:.2f}%, prob_pos={self.prob_positive:.2f})"
+        )
+
 
 class AdvancedMonteCarloEngine:
     """Gelişmiş Monte Carlo simülasyon motoru."""
+
+    def __repr__(self) -> str:
+        return "AdvancedMonteCarloEngine(models=['gbm', 'jump_diffusion', 'student_t', 'heston'])"
 
     def gbm_sim(
         self,
@@ -199,7 +208,7 @@ class AdvancedMonteCarloEngine:
         n_sims: int = 10000,
         seed: int | None = None,
     ) -> AdvancedMCResult:
-        """Otomatik eklendi."""
+        """Merton Jump-Diffusion modeli simülasyonunu çalıştırır ve getiri/risk dağılımını üretir."""
         if seed is not None:
             np.random.seed(seed)
 
@@ -276,7 +285,7 @@ class AdvancedMonteCarloEngine:
         n_sims: int = 10000,
         seed: int | None = None,
     ) -> AdvancedMCResult:
-        """Otomatik eklendi."""
+        """Heston Lite stokastik volatilite simülasyonunu çalıştırır ve getiri dağılımını üretir."""
         if seed is not None:
             np.random.seed(seed)
 

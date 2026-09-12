@@ -21,7 +21,7 @@ logger = structlog.get_logger()
 
 
 class AlertSeverity(StrEnum):
-    """Otomatik eklendi."""
+    """Risk uyarı ciddiyet dereceleri."""
     INFO = "INFO"
     WARNING = "WARNING"
     BLOCK = "BLOCK"
@@ -29,7 +29,7 @@ class AlertSeverity(StrEnum):
 
 
 class AlertType(StrEnum):
-    """Otomatik eklendi."""
+    """Risk uyarı tipleri ve kategorileri."""
     VAR_BREACH = "VAR_BREACH"
     DRAWDOWN = "DRAWDOWN"
     CONCENTRATION = "CONCENTRATION"
@@ -56,10 +56,13 @@ class Alert:
     timestamp: str = ""
     acknowledged: bool = False
 
-    def __post_init__(self):
-        """Otomatik eklendi."""
+    def __post_init__(self) -> None:
+        """Zaman damgası atanmamışsa UTC zamanını atar."""
         if not self.timestamp:
             self.timestamp = datetime.now(UTC).isoformat()
+
+    def __repr__(self) -> str:
+        return f"Alert({self.alert_id}: {self.severity.value} [{self.alert_type.value}] - {self.title})"
 
 
 @dataclass
@@ -77,6 +80,9 @@ class AlertRule:
     cooldown_seconds: int = 300  # 5 dakika
     last_fired: str | None = None
     description: str = ""
+
+    def __repr__(self) -> str:
+        return f"AlertRule({self.rule_id}: {self.condition} {self.threshold} on {self.metric_name})"
 
 
 @dataclass
@@ -99,17 +105,28 @@ class RiskMetricsSnapshot:
     regime: str
     risk_score: float  # 0-100
 
+    def __repr__(self) -> str:
+        return (
+            f"RiskMetricsSnapshot(val={self.portfolio_value:.0f}, "
+            f"dd={self.current_drawdown_pct:.1f}%, "
+            f"score={self.risk_score:.1f}, "
+            f"regime='{self.regime}')"
+        )
+
 
 class RiskMonitor:
     """Risk izleme ve alerting sistemi."""
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """Risk izleme motorunu, kurallarını ve geri çağırma listesini başlatır."""
         self._alerts: list[Alert] = []
         self._rules: list[AlertRule] = []
         self._metrics_history: list[RiskMetricsSnapshot] = []
         self._alert_callbacks: list[Callable] = []
         self._setup_default_rules()
+
+    def __repr__(self) -> str:
+        return f"RiskMonitor(rules={len(self._rules)}, alerts={len(self._alerts)})"
 
     def _setup_default_rules(self) -> Any:
         """Varsayılan alert kuralları."""

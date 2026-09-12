@@ -36,6 +36,13 @@ class Prediction:
     calibrated_confidence: float = 0.0
     model_agreement: float = 0.0
 
+    def __repr__(self) -> str:
+        """Sınıfın metinsel temsilini döndürür."""
+        return (
+            f"Prediction(ticker={self.ticker!r}, direction={self.direction!r}, "
+            f"return={self.expected_return_pct:+.2f}%, conf={self.confidence:.2f}, grade={self.quality_grade!r})"
+        )
+
 
 @dataclass
 class MultiHorizonPrediction:
@@ -47,6 +54,13 @@ class MultiHorizonPrediction:
     consensus_confidence: float = 0.0
     best_horizon: int = 5
     timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
+
+    def __repr__(self) -> str:
+        """Sınıfın metinsel temsilini döndürür."""
+        return (
+            f"MultiHorizonPrediction(ticker={self.ticker!r}, consensus={self.consensus_direction!r}, "
+            f"conf={self.consensus_confidence:.2f}, best_horizon={self.best_horizon}d)"
+        )
 
 
 def compute_prediction(
@@ -62,7 +76,7 @@ def compute_prediction(
     """Model prediction'dan structured prediction üret."""
 
     def _s(v) -> Any:
-        """Otomatik eklendi."""
+        """Sayısal değeri güvenli float'a dönüştürür; geçersiz veya sonsuzsa 0.0 döndürür."""
         return float(v) if isinstance(v, (int, float)) and np.isfinite(float(v)) else 0.0
 
     if ml_prediction > 1.0:

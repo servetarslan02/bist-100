@@ -33,6 +33,13 @@ class ScanMetric:
     duration_ms: float
     regime: str
 
+    def __repr__(self) -> str:
+        """ScanMetric okunabilir nesne temsili."""
+        return (
+            f"ScanMetric(type='{self.scan_type}', scanned={self.tickers_scanned}, "
+            f"opps={self.opportunities_found}, dur={self.duration_ms:.1f}ms)"
+        )
+
 
 @dataclass
 class SignalOutcome:
@@ -50,6 +57,13 @@ class SignalOutcome:
     return_pct: float = 0.0
     correct: bool = False
 
+    def __repr__(self) -> str:
+        """SignalOutcome okunabilir nesne temsili."""
+        return (
+            f"SignalOutcome(ticker='{self.ticker}', type='{self.signal_type}', "
+            f"ret={self.return_pct:.2f}%, correct={self.correct})"
+        )
+
 
 class ScanPerformanceTracker:
     """Tarama performans takip sistemi.
@@ -62,11 +76,22 @@ class ScanPerformanceTracker:
     - Top performing filters
     """
 
-    def __init__(self, max_history: int = 10000):
-        """Otomatik eklendi."""
+    def __init__(self, max_history: int = 10000) -> None:
+        """ScanPerformanceTracker performans takipçisini başlatır.
+
+        Args:
+            max_history: Bellekte tutulacak maksimum metrik geçmişi sayısı.
+        """
         self._max_history = max_history
         self._scan_metrics: list[ScanMetric] = []
         self._signal_outcomes: list[SignalOutcome] = []
+
+    def __repr__(self) -> str:
+        """ScanPerformanceTracker okunabilir durum temsili."""
+        return (
+            f"ScanPerformanceTracker(scans={len(self._scan_metrics)}, "
+            f"signals={len(self._signal_outcomes)}, max_history={self._max_history})"
+        )
 
     def record_scan(
         self,

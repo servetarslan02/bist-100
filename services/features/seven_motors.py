@@ -77,6 +77,9 @@ SCORE_DEEP_DRAWDOWN: float = 5.0             # Derin düşüş skoru
 class RelativeStrengthMotor:
     """Computes relative strength features vs benchmark."""
 
+    def __repr__(self) -> str:
+        return "RelativeStrengthMotor()"
+
     def compute(
         self,
         ticker: str,
@@ -120,6 +123,9 @@ class RelativeStrengthMotor:
 
 class SeasonalityMotor:
     """Computes seasonality features based on historical patterns."""
+
+    def __repr__(self) -> str:
+        return "SeasonalityMotor()"
 
     def compute(
         self,
@@ -167,6 +173,9 @@ class SeasonalityMotor:
 class MomentumMotor:
     """Momentum feature hesaplama motoru."""
 
+    def __repr__(self) -> str:
+        return "MomentumMotor()"
+
     def compute(self, ticker: str, close: np.ndarray, lookback: int = 20) -> dict[str, float]:
         """Momentum feature'larını hesapla.
 
@@ -189,6 +198,9 @@ class MomentumMotor:
 
 class VolumeMotor:
     """Hacim feature hesaplama motoru."""
+
+    def __repr__(self) -> str:
+        return "VolumeMotor()"
 
     def compute(self, ticker: str, volume: np.ndarray, lookback: int = 20) -> dict[str, float]:
         """Hacim feature'larını hesapla.
@@ -213,6 +225,9 @@ class VolumeMotor:
 class VolatilityMotor:
     """Volatilite feature hesaplama motoru."""
 
+    def __repr__(self) -> str:
+        return "VolatilityMotor()"
+
     def compute(self, ticker: str, close: np.ndarray, lookback: int = 20) -> dict[str, float]:
         """Volatilite feature'larını hesapla.
 
@@ -235,6 +250,9 @@ class VolatilityMotor:
 class MeanReversionMotor:
     """Ortalama geri dönüş feature hesaplama motoru."""
 
+    def __repr__(self) -> str:
+        return "MeanReversionMotor()"
+
     def compute(self, ticker: str, close: np.ndarray, lookback: int = 20) -> dict[str, float]:
         """Ortalama geri dönüş feature'larını hesapla.
 
@@ -256,6 +274,9 @@ class MeanReversionMotor:
 
 class MicrostructureMotor:
     """Mikro yapı feature hesaplama motoru."""
+
+    def __repr__(self) -> str:
+        return "MicrostructureMotor()"
 
     def compute(
         self, ticker: str, high: np.ndarray, low: np.ndarray, close: np.ndarray, lookback: int = 20

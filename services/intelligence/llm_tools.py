@@ -230,6 +230,9 @@ class LLMToolExecutor:
     Herhangi bir bağımlılık yüklü değilse graceful fallback döner.
     """
 
+    def __repr__(self) -> str:
+        return "LLMToolExecutor(tools=10)"
+
     def execute(self, tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         """Araç çağrısını çalıştır ve sonucu döndür."""
         logger.info("LLM tool call", tool=tool_name, args=list(arguments.keys()))
@@ -259,7 +262,7 @@ class LLMToolExecutor:
 
     # ── Araç 1: World State ──────────────────────────────────────────────────
     def _get_world_state(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Dünya durumu yöneticisinden anlık küresel risk ve makro verilerini döner."""
         try:
             from services.intelligence.world_state import world_state_manager
 
@@ -275,7 +278,7 @@ class LLMToolExecutor:
 
     # ── Araç 2: Knowledge Graph ──────────────────────────────────────────────
     def _get_knowledge_graph(self, entity_id: str) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Bilgi grafiğinden belirtilen varlık ve ilişkilerini döner."""
         try:
             from services.intelligence.knowledge_graph import knowledge_graph
 
@@ -302,7 +305,7 @@ class LLMToolExecutor:
 
     # ── Araç 3: Research Memory (RAG) ────────────────────────────────────────
     def _get_research_memory(self, ticker: str, limit: int = 5) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Araştırma belleğinden hisse senedine ait geçmiş analizleri döner."""
         try:
             from services.intelligence.research_memory import research_memory
 
@@ -319,7 +322,7 @@ class LLMToolExecutor:
 
     # ── Araç 4: Ticker Features ──────────────────────────────────────────────
     def _get_ticker_features(self, ticker: str) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Hisse senedi teknik ve temel özelliklerinin bağlam bilgisini döner."""
         return {
             "status": "available_in_context",
             "ticker": ticker,
@@ -328,7 +331,7 @@ class LLMToolExecutor:
 
     # ── Araç 5: Regime ───────────────────────────────────────────────────────
     def _get_regime(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Mevcut piyasa rejim durumunu ve güven skorunu döner."""
         try:
             from services.intelligence.regime import regime_engine
 
@@ -350,9 +353,9 @@ class LLMToolExecutor:
                 "error": str(exc),
             }
 
-    # ── Araç 6: Ensemble Forecast ────────────────────────────────────────────
+    # ── Araç 6: Ensemble Forecast ────────────────────────────────────
     def _get_ensemble_forecast(self, ticker: str) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Ensemble tahmin motorundan en son model tahminlerini döner."""
         try:
             from services.intelligence.ensemble_forecast import ensemble_forecaster
 
@@ -379,7 +382,7 @@ class LLMToolExecutor:
 
     # ── Araç 7: Signal Conflicts ─────────────────────────────────────────────
     def _get_signal_conflicts(self, ticker: str) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Hisse senedi için sinyal çatışma ve çelişki raporunu döner."""
         return {
             "status": "available_in_context",
             "ticker": ticker,
@@ -388,7 +391,7 @@ class LLMToolExecutor:
 
     # ── Araç 8: SPEC Score ───────────────────────────────────────────────────
     def _get_spec_score(self, ticker: str) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """SPEC motorundan hisseye ait güncel SPEC puanını döner."""
         try:
             from services.intelligence.spec_engine import spec_engine
 
@@ -482,7 +485,7 @@ class LLMToolExecutor:
         confidence: float,
         key_risks: list[str] | None = None,
     ) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """LLM analizini ve yatırım tezini araştırma belleğine kaydeder."""
         try:
             import uuid
 

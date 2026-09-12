@@ -43,7 +43,16 @@ class MarketMicrostructureEngine:
         slippage_base_pct: float = 0.05,
         slippage_max_pct: float = 0.5,
     ):
-        """Otomatik eklendi."""
+        """MarketMicrostructureEngine emir eşleştirme ve BIST mikro-yapı motorunu başlatır.
+
+        Args:
+            commission_rate: Aracı kurum komisyon oranı (%0.03).
+            exchange_fee_rate: Borsa payı oranı (%0.0056).
+            bsmv_rate: BSMV vergi oranı (%5).
+            min_commission: Asgari işlem komisyon tutarı (TL).
+            slippage_base_pct: Baz fiyat kayma oranı (%0.05).
+            slippage_max_pct: Tavan fiyat kayma oranı (%0.50).
+        """
         self.commission_rate = commission_rate
         self.exchange_fee_rate = exchange_fee_rate
         self.bsmv_rate = bsmv_rate
@@ -58,8 +67,12 @@ class MarketMicrostructureEngine:
         # Günlük ciro takibi
         self._daily_turnover: float = 0.0
 
+    def __repr__(self) -> str:
+        """Sınıfın metinsel temsilini döndürür."""
+        return f"MarketMicrostructureEngine(books_count={len(self._books)}, auction_pools={len(self._auction_pools)})"
+
     def get_or_create_book(self, ticker: str) -> OrderBook:
-        """Otomatik eklendi."""
+        """Belirtilen hisse senedine ait emir defterini döndürür; mevcut değilse oluşturur."""
         if ticker not in self._books:
             self._books[ticker] = OrderBook(ticker=ticker, tick_size=0.01)
         return self._books[ticker]
@@ -234,7 +247,7 @@ class MarketMicrostructureEngine:
         }
 
     def _compute_slippage(self, quantity: int, avg_volume: int, volatility: float, spread_pct: float) -> float:
-        """Otomatik eklendi."""
+        """İşlem büyüklüğü, ortalama hacim ve volatiliteye bağlı tahmini fiyat kaymasını (slippage) hesaplar."""
         base_slippage = (spread_pct / 100.0) / 2.0
         volume_impact = (quantity / avg_volume * volatility * 0.5) if avg_volume > 0 else 0.001
         vol_premium = volatility * 0.02
@@ -242,7 +255,7 @@ class MarketMicrostructureEngine:
         return min(total, self.slippage_max_pct / 100.0)
 
     def _compute_commission(self, amount: float) -> float:
-        """Otomatik eklendi."""
+        """İşlem tutarı üzerinden BIST ve aracı kurum komisyonu ile BSMV vergisini hesaplar."""
         broker = amount * self.commission_rate
         exchange = amount * self.exchange_fee_rate
         base = broker + exchange

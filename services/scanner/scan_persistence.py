@@ -37,13 +37,24 @@ class ScanResultRecord:
     features: dict[str, float]  # Key feature'lar
     timestamp: str
 
+    def __repr__(self) -> str:
+        """ScanResultRecord okunabilir nesne temsili."""
+        return (
+            f"ScanResultRecord(ticker='{self.ticker}', scan_id='{self.scan_id}', "
+            f"score={self.score:.1f}, signal='{self.signal}', dir='{self.direction}')"
+        )
+
     def to_dict(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Kayıt nesnesini sözlük formatına dönüştürür.
+
+        Returns:
+            dict[str, Any]: Kaydın tüm alanlarını içeren sözlük.
+        """
         return asdict(self)
 
 
 class ScanPersistence:
-    """Tarama sonuçlarını SQLite'a kaydeder.
+    """Tarama sonuçlarını DuckDB'ye kaydeder.
 
     Tablo: scan_results
     - scan_id: Benzersiz tarama kimliği
@@ -61,8 +72,12 @@ class ScanPersistence:
     - timestamp: Zaman damgası
     """
 
-    def __init__(self, db_path: str = "data/scan_results.db"):
-        """Otomatik eklendi."""
+    def __init__(self, db_path: str = "data/scan_results.db") -> None:
+        """ScanPersistence veritabanı bağdaştırıcısını başlatır.
+
+        Args:
+            db_path: DuckDB veritabanı dosya yolu.
+        """
         self._db_path = db_path
         self._initialized = False
         self._write_buffer: list[tuple[str, tuple]] = []
@@ -73,6 +88,13 @@ class ScanPersistence:
         self._periodic_thread: threading.Thread | None = None
         self._stop_periodic = threading.Event()
         self._start_periodic_flush()
+
+    def __repr__(self) -> str:
+        """ScanPersistence okunabilir durum temsili."""
+        return (
+            f"ScanPersistence(db='{self._db_path}', initialized={self._initialized}, "
+            f"buffered_writes={len(self._write_buffer)})"
+        )
 
     def _ensure_table(self) -> Any:
         """Tabloyu oluştur (yoksa). Thread-safe double-checked locking."""
@@ -177,6 +199,13 @@ class ScanPersistence:
     def flush(self) -> None:
         """Manuel flush."""
         self._flush_buffer()
+
+    def close(self) -> None:
+        """Veritabanı işlemlerini tamamlar, buffer'ı boşaltır ve arka plan iş parçacığını sonlandırır."""
+        self._stop_periodic.set()
+        if self._periodic_thread and self._periodic_thread.is_alive():
+            self._periodic_thread.join(timeout=2.0)
+        self.flush()
 
     def _start_periodic_flush(self) -> None:
         """Arka planda periyodik flush başlat."""

@@ -72,11 +72,20 @@ def is_positive_semi_definite(matrix: np.ndarray, tol: float = 1e-8) -> bool:
 class CovarianceEstimator:
     """Ledoit-Wolf shrinkage covariance estimator with guaranteed Positive Semi-Definiteness."""
 
-    def __init__(self, shrinkage_target: str = "constant_correlation", min_eigenvalue: float = 1e-7):
-        """Otomatik eklendi."""
+    def __init__(self, shrinkage_target: str = "constant_correlation", min_eigenvalue: float = 1e-7) -> None:
+        """CovarianceEstimator kovaryans matrisi tahminleyicisini başlatır.
+
+        Args:
+            shrinkage_target: Shrinkage hedef modeli (constant_correlation vb.).
+            min_eigenvalue: Pozitif yarı-tanımlılık için minimum özdeğer eşiği.
+        """
         self.shrinkage_target = shrinkage_target
         self.min_eigenvalue = min_eigenvalue
         logger.info("CovarianceEstimator initialized", target=shrinkage_target, min_eig=min_eigenvalue)
+
+    def __repr__(self) -> str:
+        """CovarianceEstimator okunabilir durum temsili."""
+        return f"CovarianceEstimator(target='{self.shrinkage_target}', min_eig={self.min_eigenvalue})"
 
     def estimate(
         self,

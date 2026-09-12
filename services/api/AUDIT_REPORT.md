@@ -674,3 +674,20 @@ Tüm `services/api/` çekirdek modülleri ve `services/api/v1/` kapsamındaki 20
 
 **Genel API Test Durumu:** 86/86 test başarılı, Ruff linter denetimi 0 hata (temiz).
 
+---
+
+## 4. Aşama: 2026-09-12 Kurumsal Seviye Yükseltme ve Çoklu Ajan / Alternatif Veri Entegrasyonu
+
+`services/alternative/` ve `services/agents/` paketlerinde yapılan büyük kurumsal yükseltmeler `services/api/` katmanına tam olarak entegre edildi:
+
+| Dosya | Yapılan Kurumsal Geliştirmeler | Durum |
+|---|---|---|
+| `services/api/v1/alternative.py` | 14 veri kaynağının tümü listelendi, `GET /api/v1/alternative/features/{ticker}` endpoint'i eklenerek kurumsal `AlternativeFeatureEngine` ve `FeatureStore` ile canlı feature hesaplama ve sorgulama yeteneği sağlandı. | ✅ Kurumsal Seviye |
+| `services/api/v1/agents.py` | Kurumsal `AgentPipelineOrchestrator` motoruna bağlanan `POST /api/v1/agents/pipeline/run` (çelişki tespiti, münazara, risk ve sentez tam döngüsü) ve `POST /api/v1/agents/pipeline/batch` (çoklu hisse paralel pipeline analizi) endpoint'leri eklendi. Pydantic v2 istek şemaları entegre edildi. | ✅ Kurumsal Seviye |
+| `services/api/rate_limiter.py` | In-memory token bucket ve rate limit gruplaması doğrulandı, stale cleanup ve thread safety kontrol edildi. | ✅ Kurumsal Seviye |
+
+### Doğrulama Sonuçları:
+- `uv run ruff check services/api/` ➡️ **All checks passed!**
+- `uv run pytest tests/test_api_v1_agents_intelligence_comprehensive.py tests/test_api_v1_macro_alt_comprehensive.py` ➡️ **12 passed in 37.75s!**
+- Kök API testleri (`test_api.py`, `test_api_auth_comprehensive.py`, vb.) ➡️ **68 passed in 60.23s!**
+

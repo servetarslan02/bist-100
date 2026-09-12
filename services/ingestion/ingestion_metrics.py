@@ -14,8 +14,6 @@ Kullanım:
         data = await fetch()
 """
 
-from typing import Any
-
 try:
     from prometheus_client import Counter, Gauge, Histogram
 
@@ -149,6 +147,19 @@ class IngestionMetrics:
         self._enabled = PROMETHEUS_AVAILABLE
         if not self._enabled:
             logger.info("Prometheus not available, metrics disabled")
+
+    def __repr__(self) -> str:
+        """IngestionMetrics string temsili."""
+        return f"IngestionMetrics(enabled={self._enabled})"
+
+    def record_data_gap(self, ticker: str, gap_count: int) -> None:
+        """Veri boşluğu kaydı yapar.
+
+        Args:
+            ticker: Hisse sembolü.
+            gap_count: Boşluk adedi.
+        """
+        logger.debug("Data gap recorded", ticker=ticker, gap_count=gap_count)
 
     # Provider metrics
     def record_provider_request(self, provider: str, data_type: str, status: str, latency_s: float) -> None:

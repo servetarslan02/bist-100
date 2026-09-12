@@ -20,16 +20,20 @@ logger = structlog.get_logger()
 
 
 class LiveScanner:
-    """
-    Canlı tarayıcı — her tick'te çalışır.
+    """Canlı tarayıcı — her tick'te çalışır.
+
     Çok düşük maliyetli: sadece değişen hissenin state'ini günceller.
     """
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """LiveScanner canlı tick tarayıcısını başlatır."""
         self._states: dict[str, dict] = {}  # ticker -> state
         self._scan_count: int = 0
         self._candidates: dict[str, float] = {}  # ticker -> score
+
+    def __repr__(self) -> str:
+        """LiveScanner okunabilir durum temsili."""
+        return f"LiveScanner(states={len(self._states)}, scans={self._scan_count}, candidates={len(self._candidates)})"
 
     def process_tick(self, ticker: str, price: float, volume: int, timestamp: datetime | None = None) -> dict | None:
         """

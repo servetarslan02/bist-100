@@ -35,6 +35,12 @@ class ScenarioResult:
     best_position: str
     recovery_estimate_days: int | None = None
 
+    def __repr__(self) -> str:
+        return (
+            f"ScenarioResult({self.scenario_name} [{self.scenario_type}]: "
+            f"impact={self.total_impact_pct:.2f}%, loss={self.total_impact_amount:,.0f} TL)"
+        )
+
 
 @dataclass
 class StressTestReport:
@@ -49,9 +55,23 @@ class StressTestReport:
     risk_score: float  # 0-100
     recommendations: list[str]
 
+    def __repr__(self) -> str:
+        return (
+            f"StressTestReport(scenarios={len(self.scenarios)}, "
+            f"worst='{self.worst_scenario.scenario_name}', "
+            f"avg_impact={self.avg_impact_pct:.2f}%, "
+            f"score={self.risk_score:.1f})"
+        )
+
 
 class StressTestEngine:
     """Kapsamlı stres test motoru."""
+
+    def __repr__(self) -> str:
+        return (
+            f"StressTestEngine(hist_scenarios={len(self.HISTORICAL_SCENARIOS)}, "
+            f"hypo_scenarios={len(self.HYPOTHETICAL_SCENARIOS)})"
+        )
 
     # =====================================================
     # TARİHSEL SENARYOLAR

@@ -34,6 +34,9 @@ class ModelForecast:
     horizon_days: int
     metadata: dict[str, Any] = field(default_factory=dict)
 
+    def __repr__(self) -> str:
+        return f"ModelForecast({self.model_name!r}, pred={self.predicted_return:.2f}%, conf={self.confidence:.2f}, h={self.horizon_days}d)"
+
 
 @dataclass
 class EnsembleResult:
@@ -50,6 +53,12 @@ class EnsembleResult:
     weights_used: dict[str, float]
     calibrated_confidence: float  # Kalibre edilmiş güven
     timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
+
+    def __repr__(self) -> str:
+        return (
+            f"EnsembleResult(ticker={self.ticker!r}, pred={self.ensemble_prediction:.2f}%, "
+            f"conf={self.ensemble_confidence:.2f}, agreement={self.model_agreement:.2f}, regime={self.regime!r})"
+        )
 
 
 class EnsembleForecaster:
@@ -80,10 +89,13 @@ class EnsembleForecaster:
         "UNKNOWN": {"lightgbm": 0.25, "xgboost": 0.25, "heuristic": 0.20, "statistical": 0.20, "momentum": 0.10},
     }
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """Ensemble tahmin motorunu boş model ve performans kayıt defterleriyle ilklendirir."""
         self._models: dict[str, Callable] = {}
         self._performance: dict[str, dict] = {}  # model → {accuracy, sharpe, ic}
+
+    def __repr__(self) -> str:
+        return f"EnsembleForecaster(registered_models={len(self._models)})"
 
     def register_model(self, name: str, predict_fn: Callable) -> Any:
         """Model kaydet."""

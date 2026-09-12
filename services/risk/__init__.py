@@ -17,6 +17,7 @@
 # - risk_parity: Risk parity position sizing
 # - monitoring: Real-time risk monitoring + alerting
 
+from .calibration import CalibrationParams, ScoreCalibrator
 from .covariance import (
     CovarianceEstimator,
     covariance_estimator,
@@ -25,18 +26,36 @@ from .covariance import (
 )
 from .drawdown_response import DrawdownAction, DrawdownResponseSystem, DrawdownSeverity, drawdown_system
 from .dynamic_limits import DynamicRiskLimits, RiskLimits, dynamic_limits
+from .enhanced_risk import (
+    ConcentrationRisk,
+    LedoitWolfCovariance,
+    PortfolioWeights,
+    RebalanceEngine,
+    RiskMetrics,
+    VolatilityTargeter,
+    concentration_risk,
+    ledoit_wolf,
+    rebalance_engine,
+    volatility_targeter,
+)
+from .enhanced_risk import (
+    PositionSizer as EnhancedPositionSizer,
+)
 from .liquidity_risk import (
     LiquidityMetrics,
     LiquidityRiskEngine,
     PortfolioLiquidityReport,
     liquidity_risk_engine,
 )
-from .monitoring import AlertSeverity, AlertType, RiskMonitor, risk_monitor
+from .monitoring import Alert, AlertRule, AlertSeverity, AlertType, RiskMetricsSnapshot, RiskMonitor, risk_monitor
 from .orchestrator import PreTradeOrderRequest, RiskOrchestrator, risk_orchestrator
-from .risk_parity import RiskParityOptimizer, risk_parity_optimizer
-from .stress_test import StressTestEngine, stress_test_engine
-from .tail_hedge import TailRiskHedger, tail_hedger
-from .var_cvar import MonteCarloResult, VaRCalculator, VaRMethod, VaRResult, var_calculator
+from .position_sizing import PositionSize, PositionSizer
+from .regime_limits import RegimeLimitsManager, RegimeRiskLimits
+from .risk_parity import RiskParityOptimizer, RiskParityResult, risk_parity_optimizer
+from .risk_parity_engine import RiskAuditResult, RiskParityEngine, RiskParityParameters
+from .stress_test import ScenarioResult, StressTestEngine, StressTestReport, stress_test_engine
+from .tail_hedge import HedgeRecommendation, TailRiskHedger, tail_hedger
+from .var_cvar import ComponentVaRResult, MonteCarloResult, VaRCalculator, VaRMethod, VaRResult, var_calculator
 
 __all__ = [
     # Risk Orchestrator
@@ -58,6 +77,7 @@ __all__ = [
     "var_calculator",
     "VaRMethod",
     "VaRResult",
+    "ComponentVaRResult",
     "MonteCarloResult",
     # Dynamic Limits
     "DynamicRiskLimits",
@@ -66,6 +86,8 @@ __all__ = [
     # Stress Test
     "StressTestEngine",
     "stress_test_engine",
+    "ScenarioResult",
+    "StressTestReport",
     # Drawdown Response
     "DrawdownResponseSystem",
     "drawdown_system",
@@ -74,12 +96,40 @@ __all__ = [
     # Tail Hedge
     "TailRiskHedger",
     "tail_hedger",
+    "HedgeRecommendation",
     # Risk Parity
     "RiskParityOptimizer",
     "risk_parity_optimizer",
+    "RiskParityResult",
+    "RiskParityEngine",
+    "RiskParityParameters",
+    "RiskAuditResult",
     # Monitoring
     "RiskMonitor",
     "risk_monitor",
+    "Alert",
+    "AlertRule",
     "AlertSeverity",
     "AlertType",
+    "RiskMetricsSnapshot",
+    # Calibration & Position Sizing
+    "ScoreCalibrator",
+    "CalibrationParams",
+    "PositionSizer",
+    "PositionSize",
+    # Enhanced Risk & Concentration
+    "LedoitWolfCovariance",
+    "ledoit_wolf",
+    "VolatilityTargeter",
+    "volatility_targeter",
+    "ConcentrationRisk",
+    "concentration_risk",
+    "RebalanceEngine",
+    "rebalance_engine",
+    "PortfolioWeights",
+    "RiskMetrics",
+    "EnhancedPositionSizer",
+    # Regime Limits
+    "RegimeLimitsManager",
+    "RegimeRiskLimits",
 ]

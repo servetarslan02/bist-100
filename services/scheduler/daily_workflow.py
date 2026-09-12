@@ -28,7 +28,15 @@ logger = structlog.get_logger()
 
 @dataclass
 class WorkflowPhase:
-    """Workflow fazı."""
+    """Günlük borsa seans akışındaki tek bir çalışma evresi tanımı.
+
+    Args:
+        name: Evre adı (ör. 'PRE_MARKET', 'CONTINUOUS').
+        start_time: Başlangıç saati (HH:MM).
+        end_time: Bitiş saati (HH:MM).
+        jobs: Bu evrede tetiklenecek görev listesi.
+        description: Evre açıklaması.
+    """
 
     name: str
     start_time: str
@@ -36,10 +44,23 @@ class WorkflowPhase:
     jobs: list[str]
     description: str
 
+    def __repr__(self) -> str:
+        return f"WorkflowPhase(name={self.name!r}, {self.start_time}-{self.end_time}, jobs={len(self.jobs)})"
+
 
 @dataclass
 class WorkflowStatus:
-    """Workflow durumu."""
+    """Günlük iş akışının anlık operasyonel durumu.
+
+    Args:
+        current_phase: Halihazırda aktif olan evre adı.
+        next_phase: Bir sonraki planlanan evre adı.
+        next_phase_in_seconds: Sıradaki evreye kalan süre (saniye).
+        jobs_run_today: Gün içinde koşturulan toplam görev sayısı.
+        jobs_failed_today: Gün içinde başarısız olan görev sayısı.
+        daily_report_generated: Gün sonu raporunun üretilip üretilmediği.
+        timestamp: Durumun sorgulandığı zaman damgası.
+    """
 
     current_phase: str
     next_phase: str
@@ -48,6 +69,12 @@ class WorkflowStatus:
     jobs_failed_today: int
     daily_report_generated: bool
     timestamp: str
+
+    def __repr__(self) -> str:
+        return (
+            f"WorkflowStatus(phase={self.current_phase!r}, next={self.next_phase!r}, "
+            f"runs={self.jobs_run_today}, failed={self.jobs_failed_today})"
+        )
 
 
 class DailyWorkflow:
@@ -124,13 +151,19 @@ class DailyWorkflow:
     }
 
     def __init__(self):
-        """Otomatik eklendi."""
+        """Günlük seans iş akışı motorunu başlatır."""
         self._handlers: dict[str, Callable[..., Awaitable[Any]]] = {}
         self._phase_handlers: dict[str, Callable] = {}
         self._jobs_run_today: int = 0
         self._jobs_failed_today: int = 0
         self._daily_report_generated: bool = False
         self._current_phase: str | None = None
+
+    def __repr__(self) -> str:
+        return (
+            f"DailyWorkflow(phase={self._current_phase!r}, handlers={len(self._handlers)}, "
+            f"runs_today={self._jobs_run_today}, fails_today={self._jobs_failed_today})"
+        )
 
     def register_handler(self, job_type: str, handler: Callable[..., Awaitable[Any]]) -> Any:
         """Job handler kaydet."""

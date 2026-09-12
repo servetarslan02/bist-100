@@ -165,11 +165,23 @@ class ModelTrainer:
     """Her fold için gerçek ML modellerini geçmiş verilerle eğiten sınıf."""
 
     def __init__(self, feature_cols: list[str]):
-        """Otomatik eklendi."""
+        """Model eğiticisini öznitelik listesiyle başlat.
+
+        Args:
+            feature_cols: Eğitimde kullanılacak öznitelik isimleri listesi.
+        """
         self.feature_cols = feature_cols
         self.lgb_model = None
         self.cat_model = None
         self.xgb_model = None
+
+    def __repr__(self) -> str:
+        return (
+            f"ModelTrainer(features={len(self.feature_cols)}, "
+            f"lgb={'fitted' if self.lgb_model else 'none'}, "
+            f"cat={'fitted' if self.cat_model else 'none'}, "
+            f"xgb={'fitted' if self.xgb_model else 'none'})"
+        )
 
     def retrain_fold(self, train_df: pl.DataFrame) -> Any:
         """t-5 öncesi verilerle modelleri fit eder."""
@@ -262,7 +274,11 @@ class ModelTrainer:
 
 
 def run_institutional_walkforward_backtest() -> Any:
-    """Otomatik eklendi."""
+    """Kurumsal seviye walk-forward uçtan uca backtest motorunu çalıştır.
+
+    Returns:
+        Walk-forward simülasyon ve performans metrikleri.
+    """
     logger.info("=================================================================")
     logger.info("ALPHA BIST — INSTITUTIONAL WALK-FORWARD END-TO-END BACKTEST")
     logger.info("=================================================================")

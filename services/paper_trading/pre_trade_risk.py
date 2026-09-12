@@ -23,43 +23,57 @@ logger = structlog.get_logger()
 
 @dataclass
 class PreTradeValidationResult:
-    """Otomatik eklendi."""
+    """Emir öncesi risk ve piyasa uygunluk doğrulama sonucu."""
     is_valid: bool
     rejection_code: str | None = None
     rejection_reason: str | None = None
     details: dict[str, Any] = None
 
     def __post_init__(self):
-        """Otomatik eklendi."""
+        """Detay sözlüğü None ise boş sözlük olarak başlatır."""
         if self.details is None:
             self.details = {}
+
+    def __repr__(self) -> str:
+        """Sınıfın metinsel temsilini döndürür."""
+        return (
+            f"PreTradeValidationResult(is_valid={self.is_valid}, "
+            f"code={self.rejection_code!r}, reason={self.rejection_reason!r})"
+        )
 
 
 class PreTradeRiskEngine:
     """BIST Emir Öncesi Çok Katmanlı Risk ve Uygunluk Motoru."""
 
     def __init__(self):
-        """Otomatik eklendi."""
+        """PreTradeRiskEngine risk ve uygunluk motorunu başlatır."""
         # Dinamik konfigürasyon ve tarihsel eligibility listeleri
         self._short_sale_eligible_tickers: set[str] = set()
         self._gross_settlement_tickers: set[str] = set()
         self._spk_banned_tickers: set[str] = set()
         self._custom_price_margins: dict[str, float] = {}  # Örn: %10, %5, %20
 
+    def __repr__(self) -> str:
+        """Sınıfın metinsel temsilini döndürür."""
+        return (
+            f"PreTradeRiskEngine(short_eligible={len(self._short_sale_eligible_tickers)}, "
+            f"gross_settlement={len(self._gross_settlement_tickers)}, banned={len(self._spk_banned_tickers)})"
+        )
+
     def set_short_sale_universe(self, tickers: list[str]) -> Any:
-        """Otomatik eklendi."""
+        """Açığa satışa uygun sembol listesini günceller."""
         self._short_sale_eligible_tickers = set(tickers)
 
     def set_gross_settlement_universe(self, tickers: list[str]) -> Any:
-        """Otomatik eklendi."""
+        """Brüt takasa tabi sembol listesini günceller."""
         self._gross_settlement_tickers = set(tickers)
 
     def set_spk_banned_universe(self, tickers: list[str]) -> Any:
-        """Otomatik eklendi."""
+        """SPK/BIST tedbirli işlem yasağı olan sembol listesini günceller."""
         self._spk_banned_tickers = set(tickers)
 
     def set_custom_price_margin(self, ticker: str, margin_pct: float) -> Any:
-        """Otomatik eklendi."""
+        """Belirli bir hisse için özel fiyat marjı eşiği tanımlar."""
         self._custom_price_margins[ticker] = margin_pct
 
     def validate_order(

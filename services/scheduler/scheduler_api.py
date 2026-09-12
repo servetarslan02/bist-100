@@ -40,11 +40,19 @@ class _RateLimiter:
     """
 
     def __init__(self, max_tokens: int = 10, refill_rate: float = 10 / 60):
-        """Otomatik eklendi."""
+        """Token bucket oran sınırlayıcısını başlatır.
+
+        Args:
+            max_tokens: Kovadaki maksimum token kapasitesi.
+            refill_rate: Saniyede havuza eklenecek token hızı.
+        """
         self._max_tokens = max_tokens
         self._tokens = float(max_tokens)
         self._refill_rate = refill_rate  # saniyede kaç token
         self._last_refill = time.time()
+
+    def __repr__(self) -> str:
+        return f"_RateLimiter(max_tokens={self._max_tokens}, remaining={self.remaining})"
 
     def allow(self) -> bool:
         """İstek izin verilmeli mi?"""
@@ -80,7 +88,7 @@ class SchedulerAPI:
     """
 
     def __init__(self):
-        """Otomatik eklendi."""
+        """Zamanlayıcı API yönetim katmanını başlatır."""
         from .daily_workflow import daily_workflow
         from .job_monitor import job_monitor
         from .learning_scheduler import learning_scheduler
@@ -93,6 +101,9 @@ class SchedulerAPI:
 
         # Rate limiter — trigger endpoint'i için
         self._trigger_limiter = _RateLimiter(max_tokens=10, refill_rate=10 / 60)
+
+    def __repr__(self) -> str:
+        return f"SchedulerAPI(scheduler={self._scheduler!r}, rate_limit_remaining={self._trigger_limiter.remaining})"
 
     def get_status(self) -> dict[str, Any]:
         """Scheduler durumu.

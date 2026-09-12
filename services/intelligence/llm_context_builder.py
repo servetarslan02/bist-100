@@ -30,6 +30,9 @@ class LLMContextBuilder:
     Her veri kaynağı için graceful fallback uygulanır.
     """
 
+    def __repr__(self) -> str:
+        return "LLMContextBuilder(rag_sources=['world_state', 'knowledge_graph', 'research_memory', 'regime', 'spec'])"
+
     def build_news_context(
         self,
         ticker: str | None = None,
@@ -179,7 +182,7 @@ class LLMContextBuilder:
     # ── İç Yardımcı Metodlar ─────────────────────────────────────────────────
 
     def _fetch_world_state(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Dünya durumu yöneticisinden anlık küresel risk ve makro verilerini çeker."""
         try:
             from services.intelligence.world_state import world_state_manager
 
@@ -198,7 +201,7 @@ class LLMContextBuilder:
             }
 
     def _fetch_regime(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Rejim motorundan anlık piyasa rejimini ve güven skorunu çeker."""
         try:
             from services.intelligence.regime import regime_engine
 
@@ -212,7 +215,7 @@ class LLMContextBuilder:
             return {"regime": "BULL", "confidence": 0.70, "duration_days": 12}
 
     def _fetch_research_memory(self, ticker: str, limit: int = 5) -> list[dict]:
-        """Otomatik eklendi."""
+        """Araştırma belleğinden hisse senedine ait son LLM analiz geçmişini çeker."""
         try:
             from services.intelligence.research_memory import research_memory
 
@@ -221,12 +224,12 @@ class LLMContextBuilder:
             return []
 
     def _fetch_features_summary(self, ticker: str) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Hisse özet teknik ve temel özellikler bilgisini döndürür."""
         # Feature store'a direkt erişim yok; orchestrator bağlamda sağlar.
         return {"note": "Feature verisi orchestrator tarafından bağlama eklenir."}
 
     def _fetch_sector_relations(self, sector: str) -> list[dict]:
-        """Otomatik eklendi."""
+        """Bilgi grafiğinden sektör ilişkilerini ve bağlantılı varlıkları çeker."""
         try:
             from services.intelligence.knowledge_graph import knowledge_graph
 
@@ -244,7 +247,7 @@ class LLMContextBuilder:
             return []
 
     def _fetch_spec_score(self, ticker: str) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """SPEC motorundan hisseye ait güncel SPEC puanını ve kategorisini çeker."""
         try:
             from services.intelligence.spec_engine import spec_engine
 

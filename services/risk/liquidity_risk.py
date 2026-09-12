@@ -37,6 +37,13 @@ class LiquidityMetrics:
     warnings: list[str] = field(default_factory=list)
     timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
+    def __repr__(self) -> str:
+        return (
+            f"LiquidityMetrics({self.ticker}: score={self.liquidity_score}, "
+            f"impact={self.expected_market_impact_pct:.3f}%, "
+            f"days={self.liquidation_days:.1f})"
+        )
+
 
 @dataclass
 class PortfolioLiquidityReport:
@@ -56,6 +63,13 @@ class PortfolioLiquidityReport:
     position_details: dict[str, LiquidityMetrics]
     recommendations: list[str] = field(default_factory=list)
 
+    def __repr__(self) -> str:
+        return (
+            f"PortfolioLiquidityReport(score={self.portfolio_liquidity_score:.1f}, "
+            f"lvar_inc={self.lvar_increment_pct:.1f}%, "
+            f"illiquid={self.illiquid_positions_count})"
+        )
+
 
 class LiquidityRiskEngine:
     """BIST Likidite Riski ve Piyasa Etkisi Hesaplama Motoru."""
@@ -66,8 +80,15 @@ class LiquidityRiskEngine:
         max_acceptable_spread_bps: float = 50.0,  # 50 bps (%0.50) üzeri yüksek makas
         default_adv_fallback: float = 20_000_000.0,  # Veri yoksa güvenli default ADV (20M TL)
         kyle_lambda_factor: float = 0.15,  # Piyasa etkisi katsayısı
-    ):
-        """Otomatik eklendi."""
+    ) -> None:
+        """BIST Likidite Riski motorunu başlatır.
+
+        Args:
+            max_adv_participation_pct: Tek emirde tolere edilen azami ADV katılım yüzdesi.
+            max_acceptable_spread_bps: Kabul edilebilir azami alış-satış makası (baz puan).
+            default_adv_fallback: ADV verisi bulunamadığında kullanılacak varsayılan hacim (TL).
+            kyle_lambda_factor: Kyle etki katsayısı çarpanı.
+        """
         self.max_adv_participation_pct = max_adv_participation_pct
         self.max_acceptable_spread_bps = max_acceptable_spread_bps
         self.default_adv_fallback = default_adv_fallback
@@ -76,6 +97,12 @@ class LiquidityRiskEngine:
             "LiquidityRiskEngine initialized",
             max_participation=max_adv_participation_pct,
             max_spread_bps=max_acceptable_spread_bps,
+        )
+
+    def __repr__(self) -> str:
+        return (
+            f"LiquidityRiskEngine(max_adv_participation={self.max_adv_participation_pct}%, "
+            f"max_spread={self.max_acceptable_spread_bps}bps)"
         )
 
     def evaluate_order_liquidity(

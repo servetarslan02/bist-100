@@ -32,12 +32,12 @@ Kullanım:
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import orjson
 import structlog
 
 logger = structlog.get_logger()
@@ -546,7 +546,7 @@ class FeatureLineageTracker:
 
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        path.write_bytes(orjson.dumps(data, option=orjson.OPT_INDENT_2))
 
         logger.info("lineage_saved", path=str(path), records=len(self._records))
 
@@ -563,13 +563,13 @@ class FeatureLineageTracker:
 
         Raises:
             FileNotFoundError: Dosya bulunamazsa.
-            json.JSONDecodeError: JSON formatı geçersizse.
+            orjson.JSONDecodeError: JSON formatı geçersizse.
         """
         path = Path(path)
         if not path.exists():
             raise FileNotFoundError(f"Lineage dosyası bulunamadı: {path}")
 
-        data = json.loads(path.read_text(encoding="utf-8"))
+        data = orjson.loads(path.read_bytes())
 
         records_data = data.get("records", {})
         for name, r in records_data.items():

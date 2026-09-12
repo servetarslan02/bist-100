@@ -11,6 +11,8 @@ from ..bist_universe import bist_universe
 
 logger = structlog.get_logger()
 
+DEFAULT_YFINANCE_TIMEOUT: int = 15
+
 
 def get_yfinance_ticker(ticker: str) -> str:
     """BIST ticker'ını Yahoo Finance formatına çevir.
@@ -274,4 +276,10 @@ class YFinanceProvider:
 yfinance_provider = YFinanceProvider()
 
 
-__all__ = ["YFinanceProvider", "yfinance_provider", "get_yfinance_ticker"]
+__all__ = [
+    "DEFAULT_YFINANCE_TIMEOUT",
+    "YFinanceProvider",
+    "yfinance_provider",
+    "get_yfinance_ticker",
+]
+

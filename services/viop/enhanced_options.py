@@ -32,11 +32,11 @@ try:
 except (ImportError, Exception):
 
     def _norm_cdf(x) -> Any:
-        """Otomatik eklendi."""
+        """Standart normal kümülatif dağılım fonksiyonu (Hata fonksiyonu erf yaklaşımı)."""
         return 0.5 * (1.0 + math.erf(float(x) / math.sqrt(2.0)))
 
     def _norm_pdf(x) -> Any:
-        """Otomatik eklendi."""
+        """Standart normal olasılık yoğunluk fonksiyonu (Gaussian bell curve)."""
         return (1.0 / math.sqrt(2.0 * math.pi)) * math.exp(-0.5 * float(x) * float(x))
 
 
@@ -153,6 +153,9 @@ class ImpliedVolatility:
     Piyasa opsiyon fiyatından gizli volatiliteyi bulur.
     Konverjans garantisi: brent method fallback.
     """
+
+    def __repr__(self) -> str:
+        return "ImpliedVolatility(method='Newton-Raphson/Bisection')"
 
     def calculate(
         self,
@@ -332,6 +335,12 @@ class OptionQuote:
             return self.spread / mid * 100
         return 0.0
 
+    def __repr__(self) -> str:
+        return (
+            f"OptionQuote(strike={self.strike}, expiry={self.expiry}, type={self.option_type!r}, "
+            f"mid={self.mid:.2f}, iv={self.implied_vol:.2f})"
+        )
+
 
 class OptionsChain:
     """Opsiyon zinciri — farklı strike ve vadelerde opsiyonlar.
@@ -340,11 +349,23 @@ class OptionsChain:
     """
 
     def __init__(self, underlying: str, spot_price: float, risk_free_rate: float = 0.15):
-        """Otomatik eklendi."""
+        """Opsiyon zincirini başlatır.
+
+        Args:
+            underlying: Dayanak varlık sembolü (ör. 'THYAO', 'XU030').
+            spot_price: Dayanak varlık anlık spot fiyatı (TL).
+            risk_free_rate: Yıllık risksiz faiz oranı (varsayılan: 0.15).
+        """
         self.underlying = underlying
         self.spot_price = spot_price
         self.risk_free_rate = risk_free_rate
         self._quotes: dict[tuple[float, date, str], OptionQuote] = {}
+
+    def __repr__(self) -> str:
+        return (
+            f"OptionsChain(underlying={self.underlying!r}, spot={self.spot_price:.2f}, "
+            f"quotes={len(self._quotes)})"
+        )
 
     def add_quote(self, quote: OptionQuote) -> None:
         """Opsiyon kotasyonu ekle."""
@@ -456,7 +477,7 @@ class PortfolioGreeksResult:
     position_details: list[dict[str, Any]]
 
     def to_dict(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Portföy Greeks sonuçlarını sözlük formatında döndürür."""
         return {
             "total_delta": self.total_delta,
             "total_gamma": self.total_gamma,
@@ -468,12 +489,21 @@ class PortfolioGreeksResult:
             "position_details": self.position_details,
         }
 
+    def __repr__(self) -> str:
+        return (
+            f"PortfolioGreeksResult(delta={self.total_delta:.3f}, gamma={self.total_gamma:.4f}, "
+            f"theta={self.total_theta:.2f}, vega={self.total_vega:.2f}, neutral={self.delta_neutral})"
+        )
+
 
 class PortfolioGreeks:
     """Portföy bazlı Greeks aggregation.
 
     Tüm opsiyon pozisyonlarının Greeks'lerini toplar.
     """
+
+    def __repr__(self) -> str:
+        return "PortfolioGreeks()"
 
     def aggregate(
         self,
@@ -567,7 +597,7 @@ class StrategyResult:
     legs: list[dict[str, Any]]
 
     def to_dict(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Strateji getiri ve risk parametrelerini sözlük olarak döndürür."""
         return {
             "strategy": self.strategy,
             "max_profit": self.max_profit,
@@ -577,6 +607,12 @@ class StrategyResult:
             "description": self.description,
             "legs": self.legs,
         }
+
+    def __repr__(self) -> str:
+        return (
+            f"StrategyResult(strategy={self.strategy!r}, max_profit={self.max_profit:.2f}, "
+            f"max_loss={self.max_loss:.2f}, risk_reward={self.risk_reward:.2f})"
+        )
 
 
 class OptionsStrategies:
@@ -589,6 +625,9 @@ class OptionsStrategies:
     - risk_reward: Kar/zarar oranı
     - legs: Pozisyon bileşenleri
     """
+
+    def __repr__(self) -> str:
+        return "OptionsStrategies(strategies=9)"
 
     def covered_call(
         self,
@@ -921,7 +960,7 @@ class DeltaHedgeResult:
     contract_multiplier: float
 
     def to_dict(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Delta hedge hesaplama sonuçlarını sözlük olarak döndürür."""
         return {
             "current_delta": self.current_delta,
             "target_delta": self.target_delta,
@@ -932,6 +971,12 @@ class DeltaHedgeResult:
             "estimated_cost": self.estimated_cost,
         }
 
+    def __repr__(self) -> str:
+        return (
+            f"DeltaHedgeResult(current_delta={self.current_delta:.2f}, target_delta={self.target_delta:.2f}, "
+            f"action={self.action!r}, contracts={self.contracts_needed})"
+        )
+
 
 class DeltaHedger:
     """Dynamic delta hedging.
@@ -939,6 +984,9 @@ class DeltaHedger:
     Options pozisyonlarında delta riskini yönetir.
     BIST-30 futures için contract_multiplier = endeks * 10.
     """
+
+    def __repr__(self) -> str:
+        return "DeltaHedger()"
 
     def hedge(
         self,
@@ -1036,6 +1084,9 @@ class SPANMarginCalculator:
     Her senaryo için fiyat ve volatilite kombinasyonu ile P&L hesaplanır,
     en kötü senaryo teminat olarak alınır.
     """
+
+    def __repr__(self) -> str:
+        return f"SPANMarginCalculator(scenarios={len(self.SCENARIOS)})"
 
     # 16 SPAN senaryosu (fiyat değişimi, volatilite değişimi)
     SCENARIOS = [
@@ -1167,6 +1218,12 @@ class ArbitrageResult:
             "estimated_profit": float(self.estimated_profit),
         }
 
+    def __repr__(self) -> str:
+        return (
+            f"ArbitrageResult(spot={self.spot_price:.2f}, futures={self.futures_price:.2f}, "
+            f"opp={self.arbitrage_opportunity}, strategy={self.strategy!r}, profit={self.estimated_profit:.2f})"
+        )
+
 
 class FuturesSpotArbitrage:
     """Futures-spot arbitraj tespiti.
@@ -1174,6 +1231,9 @@ class FuturesSpotArbitrage:
     Cost-of-carry modeli: F = S × e^((r-q)×T)
     Basis = F - S, Fair Basis = S × (e^((r-q)×T) - 1)
     """
+
+    def __repr__(self) -> str:
+        return "FuturesSpotArbitrage()"
 
     def analyze(
         self,
@@ -1293,6 +1353,9 @@ class VIOPRiskCalculator:
 
     Portföydeki VIOP pozisyonlarının risk metriklerini hesaplar.
     """
+
+    def __repr__(self) -> str:
+        return "VIOPRiskCalculator()"
 
     def calculate_portfolio_viop_risk(
         self,
@@ -1448,6 +1511,12 @@ class BacktestTrade:
     holding_days: int = 0
     legs: list[dict[str, Any]] = field(default_factory=list)
 
+    def __repr__(self) -> str:
+        return (
+            f"BacktestTrade(date={self.entry_date}, strategy={self.strategy!r}, "
+            f"spot={self.spot_price:.2f}, pnl={self.pnl:.2f})"
+        )
+
 
 @dataclass
 class BacktestResult:
@@ -1466,7 +1535,7 @@ class BacktestResult:
     trades: list[BacktestTrade]
 
     def to_dict(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Backtest performans ve kârlılık metriklerini sözlük olarak döndürür."""
         return {
             "total_trades": self.total_trades,
             "winning_trades": self.winning_trades,
@@ -1480,6 +1549,12 @@ class BacktestResult:
             "profit_factor": round(self.profit_factor, 2),
         }
 
+    def __repr__(self) -> str:
+        return (
+            f"BacktestResult(trades={self.total_trades}, win_rate={self.win_rate:.1%}, "
+            f"total_pnl={self.total_pnl:.2f}, profit_factor={self.profit_factor:.2f})"
+        )
+
 
 class OptionsBacktestEngine:
     """Opsiyon strateji backtest motoru.
@@ -1491,8 +1566,15 @@ class OptionsBacktestEngine:
     """
 
     def __init__(self, strategies: OptionsStrategies = None):
-        """Otomatik eklendi."""
+        """Opsiyon strateji simülasyon ve backtest motorunu başlatır.
+
+        Args:
+            strategies: Opsiyon strateji kütüphanesi örneği.
+        """
         self.strategies = strategies or OptionsStrategies()
+
+    def __repr__(self) -> str:
+        return f"OptionsBacktestEngine(strategies={self.strategies!r})"
 
     def backtest_covered_call(
         self,

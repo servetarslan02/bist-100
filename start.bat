@@ -95,9 +95,27 @@ echo [*] Bekleniyor... (!health_attempt!/36)
 goto health_loop
 :health_done
 
-:: 5. RESILIENCE DOĞRULAMA
+:: 5. WINDOWS TASK SCHEDULER BACKUP GOREVI
 echo.
-echo [5/5] Resilience bileşenleri doğrulanıyor...
+echo [5/6] Windows backup gorevi kontrol ediliyor...
+schtasks /Query /TN "AlphaBIST_Backup" >nul 2>&1
+if !ERRORLEVEL! EQU 0 (
+    echo   [OK] Backup gorevi zaten mevcut: AlphaBIST_Backup
+) else (
+    set LOG_FILE=%~dp0logs\backup_windows.log
+    if not exist "%~dp0logs" mkdir "%~dp0logs"
+    set BACKUP_CMD=docker compose -f "%~dp0docker-compose.yml" exec -T alpha-postgres pg_dumpall -U postgres >> "!LOG_FILE!" 2^>^&1
+    schtasks /Create /TN "AlphaBIST_Backup" /TR "powershell.exe -NonInteractive -Command ""!BACKUP_CMD!""" /SC DAILY /ST 02:00 /RL HIGHEST /F /IT >nul 2>&1
+    if !ERRORLEVEL! EQU 0 (
+        echo   [OK] Backup gorevi olusturuldu: her gun 02:00
+    ) else (
+        echo   [UYARI] Backup gorevi olusturulamadi - start.py'yi yonetici olarak calistirin
+    )
+)
+
+:: 6. RESILIENCE DOGRULAMA
+echo.
+echo [6/6] Resilience bilesenleri dogrulanıyor...
 if exist "scripts\backup_alpha.sh" (
     echo   [OK] Backup script mevcut
 ) else (

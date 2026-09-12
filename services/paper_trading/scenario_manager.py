@@ -38,17 +38,28 @@ class ScenarioResult:
 
     @property
     def is_profitable(self) -> bool:
-        """Otomatik eklendi."""
+        """Stratejinin toplam getirisinin pozitif olup olmadığını bildirir."""
         return self.total_return_pct > 0.0
 
     @property
     def beats_benchmark(self) -> bool:
-        """Otomatik eklendi."""
+        """Strateji getirisinin benchmark getirisini aşıp aşmadığını bildirir."""
         return self.total_return_pct > self.benchmark_return_pct
+
+    def __repr__(self) -> str:
+        """Sınıfın metinsel temsilini döndürür."""
+        return (
+            f"ScenarioResult(scenario={self.scenario.value}, return={self.total_return_pct:.2f}%, "
+            f"sharpe={self.sharpe_ratio:.2f}, max_dd={self.max_drawdown_pct:.2f}%)"
+        )
 
 
 class LiquidityScenarioManager:
     """3 Senaryolu Likidite Doğrulama ve Stres Kapısı."""
+
+    def __repr__(self) -> str:
+        """Sınıfın metinsel temsilini döndürür."""
+        return "LiquidityScenarioManager(scenarios=[PESSIMISTIC, NORMAL, OPTIMISTIC])"
 
     @staticmethod
     def evaluate_strategy_validity(

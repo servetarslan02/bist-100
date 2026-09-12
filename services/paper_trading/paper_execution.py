@@ -36,7 +36,17 @@ class PaperExecutionEngine:
         slippage_max_pct: float = 0.5,  # %0.5 max
         microstructure: MarketMicrostructureEngine | None = None,
     ):
-        """Otomatik eklendi."""
+        """PaperExecutionEngine sanal emir yürütme motorunu başlatır.
+
+        Args:
+            commission_rate: Aracı kurum komisyon oranı (varsayılan onbinde 3 / %0.03).
+            exchange_fee_rate: BIST borsa payı oranı (varsayılan yüzbinde 5.6).
+            bsmv_rate: BSMV vergi oranı (%5).
+            min_commission: Asgari işlem komisyon tutarı (TL).
+            slippage_base_pct: Baz fiyat kayma oranı (%0.05).
+            slippage_max_pct: İzin verilen tavan fiyat kayma oranı (%0.50).
+            microstructure: Mikro yapı ve derinlik simülatörü motoru.
+        """
         self.commission_rate = commission_rate
         self.exchange_fee_rate = exchange_fee_rate
         self.bsmv_rate = bsmv_rate
@@ -45,6 +55,13 @@ class PaperExecutionEngine:
         self.slippage_max_pct = slippage_max_pct
         self._daily_turnover_value: float = 0.0
         self.microstructure = microstructure or market_microstructure
+
+    def __repr__(self) -> str:
+        """Sınıfın metinsel temsilini döndürür."""
+        return (
+            f"PaperExecutionEngine(comm_rate={self.commission_rate}, base_slip={self.slippage_base_pct}%, "
+            f"max_slip={self.slippage_max_pct}%)"
+        )
 
     def execute_call_auction(self, ticker: str, reference_price: float = 0.0) -> dict[str, Any]:
         """Açık artırma havuzundaki emirleri BIST denge fiyatıyla eşleştirir."""
@@ -268,7 +285,7 @@ class PaperExecutionEngine:
         avg_volume: int,
         volatility: float,
         spread_pct: float,
-        side: str,
+        side: str = "BUY",
     ) -> float:
         """Slippage hesapla."""
         # Base slippage (spread'in yarisi)
@@ -290,8 +307,19 @@ class PaperExecutionEngine:
         max_slippage = self.slippage_max_pct / 100
         return min(total_slippage, max_slippage)
 
+    def compute_slippage(
+        self,
+        quantity: int,
+        avg_volume: int,
+        volatility: float,
+        spread_pct: float,
+        side: str = "BUY",
+    ) -> float:
+        """Tahmini fiyat kaymasını (slippage) hesaplar."""
+        return self._compute_slippage(quantity, avg_volume, volatility, spread_pct, side=side)
+
     def _round_to_tick(self, price: float, side: str) -> float:
-        """Otomatik eklendi."""
+        """Fiyatı BIST kurallarına uygun geçerli fiyat adımına yuvarlar."""
         return round_to_bist_tick(price, side=side)
 
     def _compute_commission(self, amount: float) -> float:

@@ -12,13 +12,16 @@ Temel altyapı:
 from __future__ import annotations
 
 import asyncio
+import threading
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
+from pathlib import Path
 from typing import Any
 
+import orjson
 import structlog
 
 logger = structlog.get_logger(__name__)
@@ -27,8 +30,12 @@ __all__ = [
     "BaseAdapter",
     "RateLimiter",
     "CircuitBreaker",
+    "CircuitState",
     "DataQualityValidator",
+    "QualityReport",
     "AdapterRegistry",
+    "adapter_registry",
+    "export_alternative_features_to_duckdb",
 ]
 
 
@@ -177,6 +184,10 @@ class QualityReport:
             "checks_passed": self.checks_passed,
             "checks_failed": self.checks_failed,
         }
+
+    def to_json(self) -> str:
+        """Raporu orjson ile JSON dizgisine çevir."""
+        return orjson.dumps(self.to_dict()).decode("utf-8")
 
 
 class DataQualityValidator:
@@ -341,6 +352,7 @@ class BaseAdapter(ABC):
         self._validator = DataQualityValidator()
         self._cache: dict[str, Any] = {}
         self._cache_ttl: dict[str, float] = {}
+        self._cache_lock = threading.RLock()
 
     @abstractmethod
     async def collect(self, ticker: str, **kwargs) -> dict[str, Any] | None:
@@ -427,29 +439,39 @@ class BaseAdapter(ABC):
         return {}
 
     def _get_cached(self, key: str) -> dict[str, float] | None:
-        """Cache'den oku."""
-        if key in self._cache:
-            ttl = self._cache_ttl.get(key, 0)
-            if time.time() < ttl:
-                return self._cache[key]
-            del self._cache[key]
-            if key in self._cache_ttl:
-                del self._cache_ttl[key]
-        return None
+        """Cache'den oku (thread-safe)."""
+        with self._cache_lock:
+            if key in self._cache:
+                ttl = self._cache_ttl.get(key, 0)
+                if time.time() < ttl:
+                    return self._cache[key]
+                del self._cache[key]
+                if key in self._cache_ttl:
+                    del self._cache_ttl[key]
+            return None
 
     def _set_cached(self, key: str, value: dict[str, float], ttl_seconds: int | None = None) -> None:
-        """Cache'e yaz."""
-        ttl = ttl_seconds if ttl_seconds is not None else self.DEFAULT_CACHE_TTL
-        self._cache[key] = value
-        self._cache_ttl[key] = time.time() + ttl
+        """Cache'e yaz (thread-safe)."""
+        with self._cache_lock:
+            ttl = ttl_seconds if ttl_seconds is not None else self.DEFAULT_CACHE_TTL
+            self._cache[key] = value
+            self._cache_ttl[key] = time.time() + ttl
+
+    def clear_cache(self) -> None:
+        """Cache'i temizle."""
+        with self._cache_lock:
+            self._cache.clear()
+            self._cache_ttl.clear()
 
     def get_status(self) -> dict[str, Any]:
         """Adapter durum bilgisini döndür."""
+        with self._cache_lock:
+            cache_size = len(self._cache)
         return {
             "source": self.source_name,
             "rate_limit": self.rate_limit,
             "circuit_state": self.circuit_breaker.state.value,
-            "cache_size": len(self._cache),
+            "cache_size": cache_size,
         }
 
     def __repr__(self) -> str:
@@ -467,26 +489,33 @@ class AdapterRegistry:
     def __init__(self):
         """Boş registry başlat."""
         self._adapters: dict[str, BaseAdapter] = {}
+        self._lock = threading.RLock()
 
     def register(self, adapter: BaseAdapter) -> None:
         """Adapter'ı registry'ye kaydet."""
-        self._adapters[adapter.source_name] = adapter
+        with self._lock:
+            self._adapters[adapter.source_name] = adapter
         logger.info("Adapter registered", source=adapter.source_name)
 
     def get(self, source_name: str) -> BaseAdapter | None:
         """Kaynak adına göre adapter getir."""
-        return self._adapters.get(source_name)
+        with self._lock:
+            return self._adapters.get(source_name)
 
     def list_adapters(self) -> list[str]:
         """Kayıtlı adapter isimlerini listele."""
-        return list(self._adapters.keys())
+        with self._lock:
+            return list(self._adapters.keys())
 
     def get_all_status(self) -> dict[str, Any]:
         """Tüm adapter'ların durum bilgisini döndür."""
-        return {name: adapter.get_status() for name, adapter in self._adapters.items()}
+        with self._lock:
+            return {name: adapter.get_status() for name, adapter in self._adapters.items()}
 
     def __repr__(self) -> str:
-        return f"AdapterRegistry(adapters={len(self._adapters)})"
+        with self._lock:
+            count = len(self._adapters)
+        return f"AdapterRegistry(adapters={count})"
 
     async def collect_all(
         self,
@@ -494,14 +523,19 @@ class AdapterRegistry:
         sources: list[str] | None = None,
     ) -> dict[str, dict[str, float]]:
         """Tüm (veya belirtilen) kaynaklardan veri topla."""
-        target_adapters = {
-            name: adapter for name, adapter in self._adapters.items() if sources is None or name in sources
-        }
+        with self._lock:
+            target_adapters = {
+                name: adapter for name, adapter in self._adapters.items() if sources is None or name in sources
+            }
+
+        if not target_adapters:
+            logger.warning("No matching adapters found for collection", sources=sources)
+            return {}
 
         # Paralel toplama
         tasks = {name: adapter.fetch(ticker) for name, adapter in target_adapters.items()}
 
-        results = {}
+        results: dict[str, dict[str, float]] = {}
         gathered = await asyncio.gather(
             *tasks.values(),
             return_exceptions=True,
@@ -519,3 +553,73 @@ class AdapterRegistry:
 
 # Singleton
 adapter_registry = AdapterRegistry()
+
+
+def export_alternative_features_to_duckdb(
+    ticker: str,
+    features: dict[str, float],
+    db_path: str = "data/alternative_features.duckdb",
+    source: str = "combined",
+) -> None:
+    """Hesaplanan alternatif veri feature'larını yerel DuckDB'ye arşivle.
+
+    GEMINI.md kurallarına uygun olarak SQLite kullanılmaz; duckdb kullanılır.
+
+    Args:
+        ticker: Hisse senedi sembolü.
+        features: Feature anahtar-değer sözlüğü.
+        db_path: DuckDB veritabanı dosya yolu.
+        source: Veri kaynağı adı.
+    """
+    if not features:
+        return
+
+    try:
+        import duckdb
+
+        db_file = Path(db_path)
+        db_file.parent.mkdir(parents=True, exist_ok=True)
+
+        con = duckdb.connect(str(db_file))
+        try:
+            con.execute(
+                """
+                CREATE TABLE IF NOT EXISTS alternative_features (
+                    timestamp TIMESTAMP WITH TIME ZONE,
+                    ticker VARCHAR,
+                    source VARCHAR,
+                    feature_name VARCHAR,
+                    feature_value DOUBLE,
+                    metadata_json VARCHAR
+                )
+                """
+            )
+
+            now_iso = datetime.now(UTC).isoformat()
+            meta_json = orjson.dumps({"source": source, "ticker": ticker}).decode("utf-8")
+
+            records = [
+                (now_iso, ticker.upper(), source, str(fname), float(fval), meta_json)
+                for fname, fval in features.items()
+                if isinstance(fval, (int, float))
+            ]
+
+            if records:
+                con.executemany(
+                    """
+                    INSERT INTO alternative_features
+                    (timestamp, ticker, source, feature_name, feature_value, metadata_json)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    records,
+                )
+                logger.info(
+                    "Alternative features exported to DuckDB",
+                    ticker=ticker,
+                    features_count=len(records),
+                    db_path=str(db_file),
+                )
+        finally:
+            con.close()
+    except Exception as e:
+        logger.error("DuckDB export for alternative features failed", ticker=ticker, error=str(e))

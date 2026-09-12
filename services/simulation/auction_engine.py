@@ -21,7 +21,18 @@ logger = structlog.get_logger()
 
 @dataclass
 class AuctionOrder:
-    """Otomatik eklendi."""
+    """Açık artırma (Call Auction) seansı için verilen emir veri modeli.
+
+    Args:
+        order_id: Benzersiz emir kimliği.
+        ticker: Hisse senedi sembolü.
+        side: Emir yönü ('BUY' veya 'SELL').
+        quantity: Talep edilen lot adedi.
+        price: Limit fiyatı (piyasa emirleri için 0.0 veya sınırsız).
+        is_market: Piyasa emri olup olmadığı göstergesi.
+        timestamp: Emrin zaman damgası (öncelik sıralaması için).
+    """
+
     order_id: str
     ticker: str
     side: str  # "BUY" | "SELL"
@@ -30,16 +41,38 @@ class AuctionOrder:
     is_market: bool = False
     timestamp: float = 0.0
 
+    def __repr__(self) -> str:
+        return (
+            f"AuctionOrder(id={self.order_id!r}, ticker={self.ticker!r}, side={self.side!r}, "
+            f"qty={self.quantity}, price={self.price:.2f}, market={self.is_market})"
+        )
+
 
 @dataclass
 class AuctionResult:
-    """Otomatik eklendi."""
+    """Açık artırma eşleşme algoritması neticesinde oluşan seans sonucu.
+
+    Args:
+        equilibrium_price: Seans denge/açılış fiyatı.
+        matched_volume: Başarıyla eşleşen toplam lot adedi.
+        matched_trades: Gerçekleşen karşılıklı işlemler listesi.
+        unfilled_orders: Eşleşmeyen veya kısmi kalan emirler.
+        imbalance_volume: Dengesizlik (karşılanamayan talep/arz) miktarı.
+        imbalance_side: Dengesizliğin olduğu yön ('BUY', 'SELL' veya 'NONE').
+    """
+
     equilibrium_price: float
     matched_volume: int
     matched_trades: list[dict[str, Any]]
     unfilled_orders: list[AuctionOrder]
     imbalance_volume: int
     imbalance_side: str  # "BUY", "SELL", "NONE"
+
+    def __repr__(self) -> str:
+        return (
+            f"AuctionResult(eq_price={self.equilibrium_price:.2f}, matched_vol={self.matched_volume}, "
+            f"imbalance={self.imbalance_volume} ({self.imbalance_side}), trades={len(self.matched_trades)})"
+        )
 
 
 class CallAuctionEngine:
@@ -157,14 +190,56 @@ class CallAuctionEngine:
             else ("SELL" if sum(s.quantity for s in sells) > sum(b.quantity for b in buys) else "NONE")
         )
 
+        unfilled_orders: list[AuctionOrder] = []
+        if buy_idx < len(buys) and rem_buy_qty > 0:
+            unfilled_orders.append(
+                AuctionOrder(
+                    order_id=buys[buy_idx].order_id,
+                    ticker=buys[buy_idx].ticker,
+                    side=buys[buy_idx].side,
+                    quantity=rem_buy_qty,
+                    price=buys[buy_idx].price,
+                    is_market=buys[buy_idx].is_market,
+                    timestamp=buys[buy_idx].timestamp,
+                )
+            )
+            unfilled_orders.extend(buys[buy_idx + 1 :])
+        elif buy_idx + 1 < len(buys):
+            unfilled_orders.extend(buys[buy_idx + 1 :])
+
+        if sell_idx < len(sells) and rem_sell_qty > 0:
+            unfilled_orders.append(
+                AuctionOrder(
+                    order_id=sells[sell_idx].order_id,
+                    ticker=sells[sell_idx].ticker,
+                    side=sells[sell_idx].side,
+                    quantity=rem_sell_qty,
+                    price=sells[sell_idx].price,
+                    is_market=sells[sell_idx].is_market,
+                    timestamp=sells[sell_idx].timestamp,
+                )
+            )
+            unfilled_orders.extend(sells[sell_idx + 1 :])
+        elif sell_idx + 1 < len(sells):
+            unfilled_orders.extend(sells[sell_idx + 1 :])
+
+        ineligible_buys = [o for o in orders if o.side == "BUY" and not o.is_market and o.price < eq_price]
+        ineligible_sells = [o for o in orders if o.side == "SELL" and not o.is_market and o.price > eq_price]
+        unfilled_orders.extend(ineligible_buys)
+        unfilled_orders.extend(ineligible_sells)
+
         return AuctionResult(
             equilibrium_price=eq_price,
             matched_volume=total_matched,
             matched_trades=matched_trades,
-            unfilled_orders=[],
+            unfilled_orders=unfilled_orders,
             imbalance_volume=imbalance_qty,
             imbalance_side=imb_side,
         )
 
+    def __repr__(self) -> str:
+        return "CallAuctionEngine(algorithm='BIST Single Price Call Auction (FIFO)')"
+
 
 call_auction_engine = CallAuctionEngine()
+

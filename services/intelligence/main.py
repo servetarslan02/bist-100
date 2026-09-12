@@ -34,11 +34,14 @@ logger = structlog.get_logger()
 class IntelligenceService:
     """AI/LLM integration for deep analysis and reasoning."""
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """İstihbarat servisini tüketici ve HTTP istemci durumlarıyla ilklendirir."""
         self._running = False
         self._consumer: EventConsumer = None
         self._http_client: httpx.AsyncClient = None
+
+    def __repr__(self) -> str:
+        return f"IntelligenceService(running={self._running})"
 
     async def start(self) -> Any:
         """Start the intelligence service."""
@@ -515,7 +518,7 @@ async def _health_server(port: int = 8080) -> Any:
     from aiohttp import web
 
     async def health_handler(request) -> Any:
-        """Otomatik eklendi."""
+        """Servis sağlık durumunu ve servis adını HTTP JSON yanıtı olarak döner."""
         return web.json_response({"status": "healthy", "service": "intelligence"})
 
     app = web.Application()

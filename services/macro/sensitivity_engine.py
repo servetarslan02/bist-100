@@ -41,8 +41,20 @@ class SensitivityResult:
     n_observations: int = 0
     window_days: int = 60
 
+    def __repr__(self) -> str:
+        """Sektör hassasiyet sonucunun okunabilir string temsili."""
+        return (
+            f"SensitivityResult(sector='{self.sector}', "
+            f"usdtry={self.usdtry_sensitivity:+.2f}, rate={self.rate_sensitivity:+.2f}, "
+            f"inflation={self.inflation_sensitivity:+.2f}, obs={self.n_observations})"
+        )
+
     def to_dict(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Hassasiyet sonucunu standart Python sözlük formatına dönüştürür.
+
+        Returns:
+            dict[str, Any]: Sektör hassasiyet katsayıları ve meta bilgileri.
+        """
         return {
             "sector": self.sector,
             "usdtry_sensitivity": round(self.usdtry_sensitivity, 4),
@@ -69,8 +81,15 @@ class CompanySensitivity:
     usdtry_override: float = 1.0
     rate_override: float = 1.0
     inflation_override: float = 1.0
-    # Neden
     reason: str = ""  # "fx_debt", "import_dependent", "exporter", "rate_sensitive"
+
+    def __repr__(self) -> str:
+        """Şirket hassasiyet override okunabilir string temsili."""
+        return (
+            f"CompanySensitivity(ticker='{self.ticker}', sector='{self.sector}', "
+            f"usdtry_override={self.usdtry_override}, rate_override={self.rate_override}, "
+            f"reason='{self.reason}')"
+        )
 
 
 class DynamicSensitivityEngine:
@@ -98,8 +117,13 @@ class DynamicSensitivityEngine:
         "METAL": {"usdtry": -0.4, "rate": -0.4, "inflation": -0.2, "vix": -0.4, "oil": -0.1, "gold": 0.3},
     }
 
-    def __init__(self, window: int = 60, min_observations: int = 20):
-        """Otomatik eklendi."""
+    def __init__(self, window: int = 60, min_observations: int = 20) -> None:
+        """Dinamik sektör-makro hassasiyet motoru başlatıcı.
+
+        Args:
+            window: Rolling korelasyon pencere boyutu (gün).
+            min_observations: Hesaplama için gereken minimum gözlem sayısı.
+        """
         self._window = window
         self._min_observations = min_observations
 
@@ -113,6 +137,15 @@ class DynamicSensitivityEngine:
         # Cache
         self._sensitivity_cache: dict[str, SensitivityResult] = {}
         self._last_cache_update: datetime | None = None
+
+    def __repr__(self) -> str:
+        """Dinamik hassasiyet motoru okunabilir string temsili."""
+        return (
+            f"DynamicSensitivityEngine(window={self._window}, "
+            f"min_obs={self._min_observations}, "
+            f"overrides={len(self._company_overrides)}, "
+            f"cached_sectors={len(self._sensitivity_cache)})"
+        )
 
     def update(self, sector_returns: dict[str, float], macro_values: dict[str, float]) -> Any:
         """Günlük güncelleme — rolling window'a veri ekle.
@@ -420,3 +453,10 @@ class DynamicSensitivityEngine:
 
 # Singleton
 macro_sensitivity_engine = DynamicSensitivityEngine()
+
+__all__ = [
+    "SensitivityResult",
+    "CompanySensitivity",
+    "DynamicSensitivityEngine",
+    "macro_sensitivity_engine",
+]

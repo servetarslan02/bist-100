@@ -20,7 +20,8 @@ logger = structlog.get_logger()
 
 
 class OrderStatus(StrEnum):
-    """Otomatik eklendi."""
+    """Emir yaşam döngüsü durumları (Order Status)."""
+
     CREATED = "CREATED"
     VALIDATED = "VALIDATED"
     RISK_APPROVED = "RISK_APPROVED"
@@ -35,13 +36,15 @@ class OrderStatus(StrEnum):
 
 
 class OrderSide(StrEnum):
-    """Otomatik eklendi."""
+    """Emir işlem yönü (Alış / Satış)."""
+
     BUY = "BUY"
     SELL = "SELL"
 
 
 class OrderType(StrEnum):
-    """Otomatik eklendi."""
+    """Emir türü (Piyasa, Limit, Stop-Limit)."""
+
     MARKET = "MARKET"
     LIMIT = "LIMIT"
     STOP_LIMIT = "STOP_LIMIT"
@@ -49,7 +52,30 @@ class OrderType(StrEnum):
 
 @dataclass
 class Order:
-    """Emir."""
+    """Sanal veya gerçek işlem emri veri modeli.
+
+    Args:
+        order_id: Benzersiz emir kimliği.
+        portfolio_id: İlgili portföy kimliği.
+        instrument_id: Finansal enstrüman ID.
+        ticker: Hisse senedi sembolü.
+        side: Emir yönü (OrderSide.BUY veya OrderSide.SELL).
+        order_type: Emir türü (MARKET, LIMIT, STOP_LIMIT).
+        quantity: Talep edilen lot adedi.
+        price: Limit fiyatı (varsayılan 0.0).
+        stop_price: Stop fiyatı (varsayılan 0.0).
+        status: Güncel emir durumu (OrderStatus).
+        filled_quantity: Gerçekleşen lot adedi.
+        avg_fill_price: Ortalama gerçekleşme fiyatı.
+        commission: Tahakkuk eden toplam komisyon (TL).
+        slippage: Gerçekleşen kayma oranı (%).
+        created_at: Emrin iletildiği zaman damgası.
+        filled_at: Emrin sonuçlandığı zaman damgası.
+        source: Emrin kaynağı (ör. 'DECISION', 'REBALANCE').
+        decision_id: Tetikleyen karar mekanizması kimliği.
+        risk_id: Risk kontrol onayı kimliği.
+        notes: Açıklamalar veya hata gerekçeleri.
+    """
 
     order_id: str
     portfolio_id: int
@@ -72,10 +98,30 @@ class Order:
     risk_id: str = ""
     notes: str = ""
 
+    def __repr__(self) -> str:
+        return (
+            f"Order(id={self.order_id!r}, ticker={self.ticker!r}, side={self.side.value!r}, "
+            f"type={self.order_type.value!r}, qty={self.quantity}, filled={self.filled_quantity}, "
+            f"price={self.price:.2f}, avg_fill={self.avg_fill_price:.2f}, status={self.status.value!r})"
+        )
+
 
 @dataclass
 class Fill:
-    """Dolum."""
+    """Gerçekleşen işlem dolum kaydı (Trade Fill).
+
+    Args:
+        fill_id: Benzersiz dolum kimliği.
+        order_id: İlgili emir kimliği.
+        instrument_id: Finansal enstrüman ID.
+        ticker: Hisse senedi sembolü.
+        side: İşlem yönü.
+        quantity: Gerçekleşen lot adedi.
+        price: Gerçekleşme fiyatı.
+        commission: Komisyon tutarı (TL).
+        slippage: Kayma oranı (%).
+        filled_at: Dolum zaman damgası.
+    """
 
     fill_id: str
     order_id: str
@@ -88,11 +134,18 @@ class Fill:
     slippage: float
     filled_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
+    def __repr__(self) -> str:
+        return (
+            f"Fill(id={self.fill_id!r}, order_id={self.order_id!r}, ticker={self.ticker!r}, "
+            f"side={self.side.value!r}, qty={self.quantity}, price={self.price:.2f}, comm={self.commission:.2f})"
+        )
+
 
 class ExecutionSimulator:
-    """Sanal execution motoru.
+    """Sanal emir iletim ve gerçekleşme simülasyon motoru.
 
-    Gercek broker yerine simulasyon.
+    BIST piyasa mikro-yapısı, slippage ve komisyon dinamiklerini modelleyerek
+    gerçekçi sanal emir dolumları üretir.
     """
 
     # Komisyon oranlari (BIST)
@@ -134,6 +187,16 @@ class ExecutionSimulator:
         spread_pct: float = 0.1,
     ) -> Order:
         """Emri simule et (internal)."""
+        if order.quantity <= 0:
+            order.status = OrderStatus.REJECTED
+            order.notes = f"Geçersiz emir miktarı: {order.quantity} <= 0"
+            return order
+
+        if market_price <= 0:
+            order.status = OrderStatus.FAILED
+            order.notes = f"Geçersiz piyasa fiyatı: {market_price} <= 0"
+            return order
+
         # Status guncelle
         order.status = OrderStatus.SUBMITTED
 
@@ -256,6 +319,13 @@ class ExecutionSimulator:
             filled_at=order.filled_at or datetime.now(UTC),
         )
 
+    def __repr__(self) -> str:
+        return (
+            f"ExecutionSimulator(broker_comm={self.BROKER_COMMISSION_RATE}, "
+            f"exchange_fee={self.EXCHANGE_FEE_RATE}, min_comm={self.MIN_COMMISSION})"
+        )
+
 
 # Singleton
 execution_simulator = ExecutionSimulator()
+

@@ -37,6 +37,12 @@ class ModelTrustScore:
     recommended_fusion_weight: float
     updated_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
+    def __repr__(self) -> str:
+        return (
+            f"ModelTrustScore(model={self.model_id!r}, rel={self.reliability_score:.2f}, "
+            f"weight={self.recommended_fusion_weight:.2f}, n={self.sample_size})"
+        )
+
 
 class ModelTrustEngine:
     """Modeller için dinamik güvenilirlik skoru ve adaptif ağırlık hesaplayıcı."""
@@ -47,12 +53,15 @@ class ModelTrustEngine:
         prior_trust: float = 0.50,
         weight_min: float = 0.05,
         weight_max: float = 0.35,
-    ):
-        """Otomatik eklendi."""
+    ) -> None:
+        """Model güvenilirlik ve füzyon ağırlık motorunu eşik ve prior parametreleriyle ilklendirir."""
         self.min_samples_threshold = min_samples_threshold
         self.prior_trust = prior_trust
         self.weight_min = weight_min
         self.weight_max = weight_max
+
+    def __repr__(self) -> str:
+        return f"ModelTrustEngine(min_samples={self.min_samples_threshold}, prior={self.prior_trust:.2f})"
 
     def compute_trust_score(
         self,
@@ -176,3 +185,7 @@ class ModelTrustEngine:
             ts.recommended_fusion_weight = final_weights.get(ts.model_id, 0.0)
 
         return final_weights
+
+
+# Singleton
+model_trust_engine = ModelTrustEngine()

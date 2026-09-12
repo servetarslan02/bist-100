@@ -1,20 +1,66 @@
-# services/agents/ — Denetim Raporu
+# services/agents/ — Kurumsal Denetim ve Geliştirme Raporu
 
-**Tarih:** 2026-09-04  
-**Kapsam:** 16 `.py` dosyası  
-**Denetim Sonucu:** ✅ 16/16 dosya denetlendi ve düzeltildi
+**Tarih:** 2026-09-12  
+**Kapsam:** 16 `.py` dosyası (Tüm Agent Sistemi)  
+**Denetim Sonucu:** ✅ 16/16 dosya kurumsal seviyeye yükseltildi, eksikler tamamlandı ve doğrulandı.
 
 ---
 
-## Denetim Kuralları
+## Yapılan Kurumsal Geliştirmeler (Enterprise Upgrades)
 
-1. **Mock / Sahte / Placeholder Veri — Kesinlikle Yasak.** Test verisi, hardcoded değer, statik JSON, placeholder data, 'Otomatik eklendi' docstring, pass ile boş fonksiyon gövdesi — production kodunda yer alamaz.
-2. **Kapsamlı Hata, Eşzamanlılık ve Sınır Kontrolleri.** Boundary hataları, dead code, sessiz exception yutma, bypass mekanizmaları düzeltilir. Polars null değerleri, ZeroDivisionError ve NaN/Inf sayısal taşmaları guard altına alınır. Paylaşılan singleton state/bağlantılarda thread-safety (threading.Lock/asyncio.Lock) zorunludur.
-3. **Eksiksiz Fonksiyonellik ve Fail-Closed İlkesi.** Eksik parametre, loglama, fallback ve validasyon tamamlanır. Hatalar asla sessizce yutulamaz (except: pass yasak); loglanıp uygun istisna fırlatılır. Tüm parametre ve dönüşlerde eksiksiz type annotation belirtilir.
-4. **Profesyonel Kod, Temizlik ve Loglama Mimarisi.** Her docstring açıklayıcı, Türkçe ve Args/Returns/Raises içeren formatta olmalıdır. Her dataclass ve veri modelinde __repr__ metodu bulunur. Fonksiyon içi gereksiz importlar dosya başına taşınır. Web/API katmanında structlog, izole quant/motor katmanlarında standart logging kullanılır. Loglar ve hata mesajları Türkçe olmalıdır. Magic number yerine DEFAULT_* sabitleri kullanılır.
-5. **Düzeltme Sonrası Canlı Doğrulama (Smoke/Execution Test).** Yalnızca syntax veya import yetmez; dosyanın ana fonksiyonlarını fiilen çalıştıran mikro test (uv run python -c '...' veya pytest) ve ruff check ile doğruluk kanıtlanmalıdır.
-6. **Geliştirme Önerileri ve Proaktif İyileştirme.** Hata olmasa dahi performans, bellek, Polars optimizasyonu veya mimari açıdan sistemi iyileştirebilecek potansiyel alanlar raporlanmalı ve faydalı olanlar sisteme kazandırılmalıdır.
-7. **Mimari Tutarlılık, Modül Dışa Aktarımı ve Göç (Migration) Takibi.** Modül seviyesinde __all__ listesi eksiksiz ve güncel olmalıdır. İsim/imza değişikliklerinde tüm repo taranıp çağıran noktalar güncellenmeli ve audit raporuna Migration tablosu eklenmelidir.
+1. **`trace_context.py`:**
+   - Senkron (`with`) ve asenkron (`async with`) hiyerarşik span bağlam yöneticisi eklendi.
+   - LLM token, model ve maliyet metrikleri thread-safe `RLock` ile izleme altına alındı.
+   - `orjson` tabanlı `to_json()` ve log entegrasyonu tamamlandı.
+
+2. **`schemas/__init__.py`:**
+   - Pydantic v2 `ConfigDict(extra="ignore")` ve katı tip denetimi.
+   - Eksik olan `PortfolioOutputSchema`, `ScenarioOutputSchema`, `BacktestOutputSchema` şemaları eklendi.
+   - Tüm sayısal alanlarda `math.isnan` ve `math.isinf` koruma kalkanları kuruldu.
+
+3. **`prompts/__init__.py`:**
+   - 9 rolün tamamı (`technical`, `fundamental`, `news`, `macro`, `valuation`, `risk`, `portfolio`, `scenario`, `backtest`) için BIST piyasa kurallarına uygun prompt şablonları eklendi.
+   - Şablon kayıt defteri `threading.Lock()` ile eşzamanlı erişim korumasına alındı.
+
+4. **`circuit_breaker.py`:**
+   - `threading.RLock()` ile thread ve async task güvenliği sağlandı.
+   - `CircuitBreakerOpenError` özel istisnası tanımlandı.
+   - Ardışık tetiklenmelerde exponential backoff kurtarma süresi eklendi.
+
+5. **`llm_client.py`:**
+   - `aiohttp.ClientSession` bağlantı havuzu yönetimi (`get_session()`, `close()`) eklenerek soket tükenmesi engellendi.
+   - `parse_llm_json` parantez sayma ve gereksiz virgül temizleme ile güçlendirildi.
+   - İstemci kayıt defteri `threading.Lock()` ile eşzamanlılığa hazır hale getirildi.
+
+6. **`conflict_detector.py` & `debate_engine.py`:**
+   - Rol ağırlıklı (`role_weights`) oy çoğunluğu ve dinamik çelişki şiddeti analizi eklendi.
+   - Consensus confidence matematiksel olarak [0, 1] aralığına sınırlandı. `to_json()` eklendi.
+
+7. **`risk_assessor.py`:**
+   - BIST %9.5 tavan/taban devre kesici ve stop-loss tavan sınırları eklendi.
+   - Risk veto edildiğinde fail-closed mekanizması devreye alındı.
+
+8. **`synthesis_engine.py`:**
+   - Rol ağırlıklı (`role_weights`) oylama ve güven katsayısı entegre edildi.
+   - Risk reddi durumunda gereksiz LLM token maliyetini sıfırlayan fail-closed veto yürütmesi eklendi.
+   - `to_json()` ve güvenli NaN kontrolleri eklendi.
+
+9. **`parallel_runner.py`:**
+   - Tüm 9 ajanı tek pipeline'da toplayan `with_all_agents()` builder API'si eklendi.
+   - `ParallelRunResult.to_dict()` ve `to_json()` eklendi.
+
+10. **`communication_bus.py`:**
+    - Mesaj kuyrukları ve Dead Letter Queue (DLQ) `threading.RLock()` ile thread-safe hale getirildi.
+    - `ConflictResolver` içine rol ağırlıklı oylama ve beraberlik çözümü eklendi.
+
+11. **`agent_memory.py`:**
+    - 3 katmanlı bellek (Working, Episodic, Semantic) `threading.RLock()` korumasına alındı.
+    - `export_to_duckdb()` fonksiyonu eklenerek ajan hafızasının DuckDB ile SQL olarak analiz edilebilmesi sağlandı.
+
+12. **`agent_pipeline.py` & `agent_system.py`:**
+    - 9 analitik ajanın tamamı orkestrasyona ve hafızaya bağlandı.
+    - BIST çoklu hisse portföyleri için `run_batch()` ve DuckDB geçmiş kaydı (`export_result_to_duckdb()`) eklendi.
+    - LLM kapalı olduğunda role-özgü çalışan deterministik `AIFallback.role_based_fallback` motoru tamamlandı.
 
 ---
 

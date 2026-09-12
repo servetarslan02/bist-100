@@ -379,6 +379,9 @@ class VIOPContractCatalog:
             "category": contract.category,
         }
 
+    def __repr__(self) -> str:
+        return f"VIOPContractCatalog(contracts={len(self.CONTRACTS)})"
+
 
 # Singleton
 viop_catalog = VIOPContractCatalog()

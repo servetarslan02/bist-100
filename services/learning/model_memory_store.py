@@ -30,47 +30,51 @@ logger = structlog.get_logger()
 
 
 class _DummyDuckDBConn:
-    """Otomatik eklendi."""
+    """DuckDB kütüphanesi bulunmadığında mock bağlantı sağlayan sahte nesne."""
+
+    def __repr__(self) -> str:
+        return "_DummyDuckDBConn()"
+
     def execute(self, *args, **kwargs) -> Any:
-        """Otomatik eklendi."""
+        """Sorgu yürütme çağrısını yutar ve kendisini döner."""
         return self
 
     def fetchall(self) -> Any:
-        """Otomatik eklendi."""
+        """Boş sonuç listesi döner."""
         return []
 
     def fetchone(self) -> Any:
-        """Otomatik eklendi."""
+        """Boş sonuç (None) döner."""
         return None
 
     def df(self) -> Any:
-        """Otomatik eklendi."""
+        """Boş pandas DataFrame nesnesi döner."""
         import pandas as pd
 
         return pd.DataFrame()
 
     def commit(self) -> Any:
-        """Otomatik eklendi."""
+        """İşlem onayını güvenle yok sayar."""
         pass
 
     def close(self) -> Any:
-        """Otomatik eklendi."""
+        """Bağlantı kapatma işlemini güvenle yok sayar."""
         pass
 
     def __enter__(self) -> Any:
-        """Otomatik eklendi."""
+        """Bağlam yöneticisi girişinde kendisini döner."""
         return self
 
     def __exit__(self, *args) -> Any:
-        """Otomatik eklendi."""
+        """Bağlam yöneticisi çıkışında kaynakları temizler."""
         pass
 
 
 class ModelMemoryStore:
     """Kalıcı model tahmin, sonuç ve metrik hafızası."""
 
-    def __init__(self, db_path: str = "data/model_memory.duckdb"):
-        """Otomatik eklendi."""
+    def __init__(self, db_path: str = "data/model_memory.duckdb") -> None:
+        """Model hafıza deposunu DuckDB veritabanı yolu ve arabellek parametreleriyle ilklendirir."""
         self.db_path = db_path
         os.makedirs(os.path.dirname(os.path.abspath(db_path)), exist_ok=True)
         self._write_buffer: list[tuple[str, tuple]] = []
@@ -83,6 +87,9 @@ class ModelMemoryStore:
         if HAS_DUCKDB:
             self._init_tables()
         self._start_periodic_flush()
+
+    def __repr__(self) -> str:
+        return f"ModelMemoryStore(db_path={self.db_path!r}, buffer_size={len(self._write_buffer)})"
 
     @contextmanager
     def _get_conn(self) -> Any:
@@ -133,6 +140,13 @@ class ModelMemoryStore:
         """Manuel flush."""
         self._flush_buffer()
 
+    def close(self) -> None:
+        """Hafıza deposunu kapatır, tamponu diske yazar ve periyodik iş parçacığını durdurur."""
+        self._stop_periodic.set()
+        self._flush_buffer()
+        if self._periodic_thread and self._periodic_thread.is_alive():
+            self._periodic_thread.join(timeout=1.0)
+
     def _start_periodic_flush(self) -> None:
         """Arka planda periyodik flush başlat."""
         def _loop() -> None:
@@ -149,8 +163,8 @@ class ModelMemoryStore:
         if time.monotonic() - self._last_flush > self._flush_interval:
             self._flush_buffer()
 
-    def _init_tables(self) -> Any:
-        """Otomatik eklendi."""
+    def _init_tables(self) -> None:
+        """DuckDB üzerinde tahminler, sonuçlar ve metrikler tablolarını ilklendirir."""
         with self._get_conn() as conn:
             conn.execute("""
             CREATE TABLE IF NOT EXISTS predictions (

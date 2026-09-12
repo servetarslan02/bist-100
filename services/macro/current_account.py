@@ -14,22 +14,25 @@ import structlog
 
 logger = structlog.get_logger()
 
+# Cari açık rejimi eşik sabitleri (milyar USD)
+DEFAULT_CA_REGIME_SURPLUS: float = 0.0
+DEFAULT_CA_REGIME_SMALL_DEFICIT: float = -5.0
+DEFAULT_CA_REGIME_MEDIUM_DEFICIT: float = -15.0
+
 
 def compute_ca_features(ca_data: dict[str, Any]) -> dict[str, float]:
-    """Cari açık feature'ları.
+    """Cari denge ve cari açık rejimi feature'larını hesaplar.
 
     Args:
-        ca_data: {
-            "ca_balance": float,         # Cari denge (milyar USD)
-            "ca_gdp_ratio": float,       # Cari denge/GSYH (%)
-            "ca_previous": float,        # Önceki denge
-            "ca_12m_avg": float,         # 12 aylık ortalama
-        }
+        ca_data: Cari denge, cari denge/GSYH oranı, önceki denge ve 12 aylık ortalama verilerini içeren sözlük.
 
     Returns:
-        Feature dictionary
+        dict[str, float]: Hesaplanmış cari denge feature sözlüğü.
+
+    Raises:
+        ValueError: Sayısal dönüştürme hatası oluştuğunda (yakalanıp loglanır).
     """
-    features = {}
+    features: dict[str, float] = {}
 
     try:
         ca_balance = ca_data.get("ca_balance")
@@ -38,11 +41,11 @@ def compute_ca_features(ca_data: dict[str, Any]) -> dict[str, float]:
 
             # Cari açık rejimi
             balance = float(ca_balance)
-            if balance > 0:
+            if balance > DEFAULT_CA_REGIME_SURPLUS:
                 features["ca_regime"] = 2.0  # FAZLA
-            elif balance > -5:
+            elif balance > DEFAULT_CA_REGIME_SMALL_DEFICIT:
                 features["ca_regime"] = 1.0  # KÜÇÜK AÇIK
-            elif balance > -15:
+            elif balance > DEFAULT_CA_REGIME_MEDIUM_DEFICIT:
                 features["ca_regime"] = 0.0  # ORTA AÇIK
             else:
                 features["ca_regime"] = -1.0  # BÜYÜK AÇIK
@@ -65,6 +68,15 @@ def compute_ca_features(ca_data: dict[str, Any]) -> dict[str, float]:
             features["ca_12m_avg"] = round(float(ca_12m), 2)
 
     except Exception as e:
-        logger.error("Current account feature computation failed", error=str(e))
+        logger.error("Cari denge feature hesaplaması başarısız oldu", error=str(e))
 
     return features
+
+
+__all__ = [
+    "DEFAULT_CA_REGIME_SURPLUS",
+    "DEFAULT_CA_REGIME_SMALL_DEFICIT",
+    "DEFAULT_CA_REGIME_MEDIUM_DEFICIT",
+    "compute_ca_features",
+]
+

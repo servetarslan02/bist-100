@@ -21,9 +21,18 @@ _MACRO_CACHE: tuple[float, dict[str, Any]] = (0.0, {})
 # Gerçek veri kaynakları — servis mevcut olduğunda dinamik olarak sorgulanabilir
 _MEVCUT_KAYNAKLAR: list[str] = [
     "google_trends",
+    "bkm",
+    "credit_card",
+    "kariyer_net",
+    "jobs",
+    "eksi_sozluk",
+    "social",
+    "investing",
+    "satellite",
+    "web_scraping",
+    "llm_sentiment",
     "kap_rss",
     "financial_news",
-    "social_sentiment",
     "macro_commodities",
 ]
 
@@ -42,16 +51,63 @@ async def data_sources(
         dict: Kaynak listesi ve durum bilgisi.
     """
     try:
+        from ...alternative import adapter_registry
+
+        adapters = adapter_registry.list_adapters()
+        all_sources = sorted(list(set(_MEVCUT_KAYNAKLAR + adapters)))
+        return {
+            "sources": all_sources,
+            "count": len(all_sources),
+            "status": "ok",
+        }
+    except Exception as exc:
+        logger.error("kaynak_listesi_hatasi: hata=%s", exc)
         return {
             "sources": _MEVCUT_KAYNAKLAR,
             "count": len(_MEVCUT_KAYNAKLAR),
             "status": "ok",
         }
+
+
+@router.get("/features/{ticker}")
+async def get_alternative_features(
+    ticker: str,
+    sources: list[str] | None = Query(default=None),
+    sector: str | None = Query(default=None),
+    user=Depends(get_current_user),
+    _=Depends(check_rate_limit),
+) -> dict[str, Any]:
+    """Hisse senedi için tüm alternatif veri feature'larını hesaplar ve döndürür.
+
+    Args:
+        ticker: Hisse kodu (ör. THYAO).
+        sources: Filtrelenecek veri kaynakları.
+        sector: Sektör bilgisi.
+        user: Kimliği doğrulanmış kullanıcı.
+
+    Returns:
+        dict: Feature sözlüğü ve metadata.
+    """
+    sym = ticker.upper().strip()
+    try:
+        from ...alternative import alt_feature_engine
+
+        features = await alt_feature_engine.compute_all_features(
+            ticker=sym,
+            sources=sources,
+            sector=sector,
+        )
+        return {
+            "ticker": sym,
+            "count": len(features),
+            "features": features,
+            "status": "success",
+        }
     except Exception as exc:
-        logger.error("kaynak_listesi_hatasi: hata=%s", exc)
+        logger.error("alternative_features_error: ticker=%s, hata=%s", sym, exc)
         raise HTTPException(
             status_code=500,
-            detail=f"Kaynak listesi alınamadı: {exc}",
+            detail=f"{sym} için alternatif veri feature'ları hesaplanamadı: {exc}",
         ) from exc
 
 

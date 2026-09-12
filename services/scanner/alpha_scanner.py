@@ -27,7 +27,8 @@ logger = structlog.get_logger()
 
 
 class SignalType:
-    """Otomatik eklendi."""
+    """BIST tarama sinyali türleri."""
+
     MOMENTUM = "MOMENTUM"  # Güçlü yükseliş devamı
     BREAKOUT = "BREAKOUT"  # Sıkışma → kırılım
     VOLUME_ANOMALY = "VOLUME_ANOMALY"  # Olağandışı hacim
@@ -87,6 +88,13 @@ class ScannerResult:
     evidence: list[str] = field(default_factory=list)
     risks: list[str] = field(default_factory=list)
 
+    def __repr__(self) -> str:
+        """ScannerResult okunabilir nesne temsili."""
+        return (
+            f"ScannerResult(ticker='{self.ticker}', opp_score={self.opportunity_score:.1f}, "
+            f"rank={self.opportunity_rank}, signal='{self.signal_type}', dir='{self.signal_direction}')"
+        )
+
 
 # =====================================================
 # Alpha Scanner
@@ -94,20 +102,26 @@ class ScannerResult:
 
 
 class AlphaScanner(ScannerInterface):
-    """
-    ALPHA'nın merkezi tarama motoru.
+    """ALPHA'nın merkezi tarama motoru.
 
     800 hisseyi tarar, fırsatları bulur, sinyal üretir.
     ScannerInterface implementasyonu — backtest ile aynı kod yolunu kullanır.
     """
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """AlphaScanner motorunu varsayılan konfigürasyonla başlatır."""
         self._last_scan: datetime | None = None
         self._scan_count: int = 0
         self._regime: str = "RANGE"
         self._regime_confidence: float = 0.5
         self._last_results: list[ScannerResult] = []
+
+    def __repr__(self) -> str:
+        """AlphaScanner okunabilir durum temsili."""
+        return (
+            f"AlphaScanner(scans={self._scan_count}, regime='{self._regime}', "
+            f"confidence={self._regime_confidence:.2f}, cached={len(self._last_results)})"
+        )
 
     def get_latest_results(self, limit: int = 50) -> list[dict[str, Any]]:
         """Son tarama sonuçlarını veya kararları dict formatında döndürür."""

@@ -19,6 +19,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -33,14 +34,17 @@ class PhaseResult:
     errors: dict[str, str] = field(default_factory=dict)
     elapsed_ms: float = 0.0
 
+    def __repr__(self) -> str:
+        return f"PhaseResult(phase={self.phase!r}, modules={len(self.modules)}, errors={len(self.errors)}, elapsed_ms={self.elapsed_ms:.1f})"
+
     @property
     def success_count(self) -> int:
-        """Otomatik eklendi."""
+        """Başarıyla tamamlanan modül sayısını döndürür."""
         return len(self.modules)
 
     @property
     def error_count(self) -> int:
-        """Otomatik eklendi."""
+        """Hata veren modül sayısını döndürür."""
         return len(self.errors)
 
 
@@ -53,6 +57,12 @@ class ParallelPipelineResult:
     total_elapsed_ms: float = 0.0
     modules_used: list[str] = field(default_factory=list)
     modules_failed: list[str] = field(default_factory=list)
+
+    def __repr__(self) -> str:
+        return (
+            f"ParallelPipelineResult(ticker={self.ticker!r}, phases={len(self.phases)}, "
+            f"used={len(self.modules_used)}, failed={len(self.modules_failed)}, elapsed_ms={self.total_elapsed_ms:.1f})"
+        )
 
     def get_module_result(self, module_name: str) -> Any | None:
         """Modül sonucunu getir."""
@@ -69,10 +79,13 @@ class ParallelIntelligencePipeline:
     Bağımsız modülleri asyncio.gather ile paralel çalıştırır.
     """
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """Paralel istihbarat motorunu ilklendirir ve alt modülleri dinamik olarak bağlar."""
         self._modules = {}
         self._load_modules()
+
+    def __repr__(self) -> str:
+        return f"ParallelIntelligencePipeline(loaded_modules={len(self._modules)})"
 
     def _load_modules(self) -> Any:
         """Modülleri yükle."""
@@ -302,7 +315,7 @@ class ParallelIntelligencePipeline:
             return None
 
     async def _run_regime(self, ticker: str, features: dict) -> dict:
-        """Otomatik eklendi."""
+        """Piyasa rejimi motorunu çalıştırır ve rejim/güven skorunu döndürür."""
         mod = self._modules.get("regime")
         if not mod:
             return {}
@@ -311,7 +324,7 @@ class ParallelIntelligencePipeline:
         return {"regime": result.regime.value, "confidence": result.confidence}
 
     async def _run_hmm_regime(self, ticker: str, features: dict) -> dict:
-        """Otomatik eklendi."""
+        """HMM tabanlı piyasa rejimi tespit motorunu çalıştırır."""
         mod = self._modules.get("hmm_regime")
         if not mod:
             return {}
@@ -323,7 +336,7 @@ class ParallelIntelligencePipeline:
         return {"regime": result.regime, "confidence": result.confidence, "probabilities": result.probabilities}
 
     async def _run_world_state(self, features: dict) -> dict:
-        """Otomatik eklendi."""
+        """Küresel makro ve piyasa rejim durumunu sorgular."""
         mod = self._modules.get("world_state")
         if not mod:
             return {}
@@ -332,7 +345,7 @@ class ParallelIntelligencePipeline:
         return {"state": str(state)} if state else {}
 
     async def _run_macro_sensitivity(self, ticker: str, features: dict) -> dict:
-        """Otomatik eklendi."""
+        """Hisse senedinin makroekonomik değişkenlere duyarlılığını hesaplar."""
         mod = self._modules.get("macro_sensitivity")
         if not mod:
             return {}
@@ -340,7 +353,7 @@ class ParallelIntelligencePipeline:
         return ms.get_company_sensitivity(ticker=ticker, sector="UNKNOWN") or {}
 
     async def _run_factor(self, ticker: str, features: dict) -> dict:
-        """Otomatik eklendi."""
+        """Temel ve teknik çoklu faktör puanlama motorunu yürütür."""
         mod = self._modules.get("factor_engine")
         if not mod:
             return {}
@@ -348,7 +361,7 @@ class ParallelIntelligencePipeline:
         return fe.compute_factor_scores(ticker=ticker, fundamentals=features, technicals=features) or {}
 
     async def _run_analysis_engines(self, features: dict) -> dict:
-        """Otomatik eklendi."""
+        """Fiyat aksiyonu ve teknik mum formasyon analizlerini çalıştırır."""
         mod = self._modules.get("analysis_engines")
         if not mod:
             return {}
@@ -361,7 +374,7 @@ class ParallelIntelligencePipeline:
         return {"patterns": str(patterns)} if patterns is not None else {}
 
     async def _run_evidence(self, ticker: str) -> dict:
-        """Otomatik eklendi."""
+        """Hisseye ilişkin delil çıkarma ve doğrulama motorunu çalıştırır."""
         mod = self._modules.get("evidence_engine")
         if not mod:
             return {}
@@ -370,7 +383,7 @@ class ParallelIntelligencePipeline:
         return {"claims_count": len(claims) if claims else 0}
 
     async def _run_impact(self, ticker: str, features: dict) -> dict:
-        """Otomatik eklendi."""
+        """Piyasa şok ve olay yayılım simülasyon motorunu çalıştırır."""
         mod = self._modules.get("impact_engine")
         if not mod:
             return {}
@@ -387,7 +400,7 @@ class ParallelIntelligencePipeline:
         )
 
     async def _run_kap_extractor(self, ticker: str) -> dict:
-        """Otomatik eklendi."""
+        """KAP bildirim ve duyuru veri çıkarma motorunu çalıştırır."""
         mod = self._modules.get("kap_extractor")
         if not mod:
             return {}
@@ -395,7 +408,7 @@ class ParallelIntelligencePipeline:
         return ke.extract(ticker=ticker, kap_id="", title="", summary="") or {}
 
     async def _run_forecasting(self, ticker: str, features: dict) -> dict:
-        """Otomatik eklendi."""
+        """Zaman serisi ve regresyon tabanlı fiyat tahminleme motorunu yürütür."""
         mod = self._modules.get("forecasting")
         if not mod:
             return {}
@@ -411,7 +424,7 @@ class ParallelIntelligencePipeline:
         return {}
 
     async def _run_monte_carlo(self, ticker: str, features: dict) -> dict:
-        """Otomatik eklendi."""
+        """Fiyat patikaları için Monte Carlo simülasyon motorunu yürütür."""
         mod = self._modules.get("monte_carlo")
         if not mod:
             return {}
@@ -432,7 +445,7 @@ class ParallelIntelligencePipeline:
         }
 
     async def _run_probability(self, ticker: str, features: dict) -> dict:
-        """Otomatik eklendi."""
+        """Getiri dağılımı olasılık analiz motorunu çalıştırır."""
         mod = self._modules.get("probability")
         if not mod:
             return {}
@@ -440,7 +453,7 @@ class ParallelIntelligencePipeline:
         return pe.compute_return_distribution(ticker=ticker, historical_returns=[]) or {}
 
     async def _run_scenario(self, ticker: str, features: dict) -> dict:
-        """Otomatik eklendi."""
+        """Stres testi ve makro senaryo analiz motorunu çalıştırır."""
         mod = self._modules.get("scenario")
         if not mod:
             return {}
@@ -451,58 +464,51 @@ class ParallelIntelligencePipeline:
     async def _run_signal_fusion(
         self, ticker: str, features: dict, p1: PhaseResult, p2: PhaseResult, p3: PhaseResult
     ) -> dict:
-        """Otomatik eklendi."""
+        """Çoklu faz çıktılarından elde edilen sinyalleri ağırlıklandırıp birleştirir."""
         mod = self._modules.get("signal_fusion")
         if not mod:
             return {}
         sf = mod.SignalFusionEngine()
         regime = p1.modules.get("regime", {}).get("regime", "UNKNOWN")
 
-        # Phase 1-3 sonuçlarından gerçek sinyaller oluştur
         signals = {
-            "technical": {"direction": "NEUTRAL", "score": 50},
-            "fundamental": {"direction": "NEUTRAL", "score": 50},
-            "momentum": {"direction": "NEUTRAL", "score": 50},
-            "macro": {"direction": "NEUTRAL", "score": 50},
-            "valuation": {"direction": "NEUTRAL", "score": 50},
-            "ai": {"direction": "NEUTRAL", "score": 50},
+            "technical": {"direction": "NEUTRAL", "score": 50.0},
+            "fundamental": {"direction": "NEUTRAL", "score": 50.0},
+            "momentum": {"direction": "NEUTRAL", "score": 50.0},
+            "macro": {"direction": "NEUTRAL", "score": 50.0},
+            "valuation": {"direction": "NEUTRAL", "score": 50.0},
+            "ai": {"direction": "NEUTRAL", "score": 50.0},
         }
 
-        # Phase 2 (forecast) sonuçlarını kullan — forecasting
-        if "forecasting" in p2.modules:
-            fc = p2.modules["forecasting"]
-            if isinstance(fc, dict) and "predicted_return" in fc:
-                ret = fc["predicted_return"]
-                signals["technical"]["direction"] = "LONG" if ret > 0 else "SHORT"
-                signals["technical"]["score"] = min(max(50 + ret * 10, 0), 100)
+        forecast = p3.modules.get("forecasting", {})
+        if isinstance(forecast, dict) and "predicted_return" in forecast:
+            ret = forecast["predicted_return"]
+            signals["technical"]["direction"] = "BULLISH" if ret > 0 else "BEARISH"
+            signals["technical"]["score"] = min(max(50.0 + ret * 10, 0.0), 100.0)
 
-        # Phase 3 (monte_carlo) sonuçlarını kullan
-        if "monte_carlo" in p3.modules:
-            mc = p3.modules["monte_carlo"]
-            if isinstance(mc, dict) and "prob_positive" in mc:
-                prob_pos = mc["prob_positive"]
-                signals["momentum"]["direction"] = "LONG" if prob_pos > 0.55 else "SHORT"
-                signals["momentum"]["score"] = prob_pos * 100
+        mc = p3.modules.get("monte_carlo", {})
+        if isinstance(mc, dict) and "prob_positive" in mc:
+            prob_pos = mc["prob_positive"]
+            signals["momentum"]["direction"] = "BULLISH" if prob_pos > 0.55 else ("BEARISH" if prob_pos < 0.45 else "NEUTRAL")
+            signals["momentum"]["score"] = prob_pos * 100.0
 
-        # Phase 3 (probability) sonuçlarını kullan
         if "probability" in p3.modules:
             prob = p3.modules["probability"]
             if isinstance(prob, dict) and "direction" in prob:
                 signals["valuation"]["direction"] = prob["direction"]
 
-        # Phase 1 (factor_engine) sonuçlarını kullan
         if "factor_engine" in p1.modules:
             factor = p1.modules["factor_engine"]
             if isinstance(factor, dict) and "composite_score" in factor:
                 score = factor["composite_score"]
-                signals["fundamental"]["direction"] = "LONG" if score > 55 else "SHORT"
-                signals["fundamental"]["score"] = score
+                signals["fundamental"]["direction"] = "BULLISH" if score > 55 else "BEARISH"
+                signals["fundamental"]["score"] = float(score)
 
         result = sf.fuse_signals(ticker, signals, regime)
         return result.__dict__ if hasattr(result, "__dict__") else {}
 
     async def _run_spec(self, ticker: str, features: dict, phase1: PhaseResult) -> dict:
-        """Otomatik eklendi."""
+        """SPEC (Sinyal, Pozisyon, Giriş, Doğrulama) motorunu çalıştırır."""
         mod = self._modules.get("spec_engine")
         if not mod:
             return {}
@@ -517,7 +523,7 @@ class ParallelIntelligencePipeline:
         )
 
     async def _run_trade_planner(self, ticker: str, features: dict, fusion_modules: dict) -> dict:
-        """Otomatik eklendi."""
+        """Hedef, zarar-kes ve risk parametrelerini içeren işlem planlayıcıyı çalıştırır."""
         mod = self._modules.get("trade_planner")
         if not mod:
             return {}
@@ -535,7 +541,7 @@ class ParallelIntelligencePipeline:
         )
 
     async def _run_knowledge_graph(self, ticker: str) -> dict:
-        """Otomatik eklendi."""
+        """Bilgi grafiği motorunun hazır olma durumunu doğrular."""
         mod = self._modules.get("knowledge_graph")
         if not mod:
             return {}
@@ -543,7 +549,7 @@ class ParallelIntelligencePipeline:
         return {"loaded": True}
 
     async def _run_research_memory(self, ticker: str) -> dict:
-        """Otomatik eklendi."""
+        """Hisse senedine ait geçmiş araştırma belleğini sorgular."""
         mod = self._modules.get("research_memory")
         if not mod:
             return {}
@@ -551,22 +557,19 @@ class ParallelIntelligencePipeline:
         return rm.get_ticker_history(ticker=ticker, limit=5) or {}
 
     async def _run_news_pipeline(self, ticker: str) -> dict:
-        """Otomatik eklendi."""
+        """Haber akış analiz ardışık düzeninin durumunu döndürür."""
         mod = self._modules.get("news_pipeline")
         if not mod:
             return {}
         return {"available": True}
 
     async def _run_prediction_layer(self, ticker: str, features: dict) -> dict:
-        """Otomatik eklendi."""
+        """Makine öğrenimi model tahmin katmanının durumunu döndürür."""
         mod = self._modules.get("prediction_layer")
         if not mod:
             return {}
         return {"available": True}
 
-
-# numpy import for runners
-import numpy as np
 
 # Singleton
 parallel_pipeline = ParallelIntelligencePipeline()

@@ -58,10 +58,18 @@ class VectorMemoryStore:
     """pgvector destekli ve NumPy fallback'li çok amaçlı vektör deposu."""
 
     def __init__(self, fallback_path: Path = FALLBACK_FILE):
-        """Otomatik eklendi."""
+        """VectorMemoryStore vektör deposunu başlatır.
+
+        Args:
+            fallback_path: pgvector erişilemediğinde kullanılacak yerel JSON fallback dosya yolu.
+        """
         self.fallback_path = fallback_path
         self._local_records: dict[str, VectorRecord] = {}
         self._load_fallback()
+
+    def __repr__(self) -> str:
+        """Sınıfın metinsel temsilini döndürür."""
+        return f"VectorMemoryStore(fallback_path={self.fallback_path!s}, local_records={len(self._local_records)})"
 
     def _load_fallback(self) -> Any:
         """Diskteki local fallback verisini yükler."""
@@ -281,8 +289,16 @@ class MarketRegimeMemory:
     """Piyasa rejimi ve tarihsel kriz / trend benzerlik motoru."""
 
     def __init__(self, vector_store: VectorMemoryStore | None = None):
-        """Otomatik eklendi."""
+        """MarketRegimeMemory rejim benzerlik hafızasını başlatır.
+
+        Args:
+            vector_store: İsteğe bağlı önceden yapılandırılmış VectorMemoryStore nesnesi.
+        """
         self.store = vector_store or VectorMemoryStore()
+
+    def __repr__(self) -> str:
+        """Sınıfın metinsel temsilini döndürür."""
+        return f"MarketRegimeMemory(store={self.store!r})"
 
     async def record_regime_fingerprint(
         self,

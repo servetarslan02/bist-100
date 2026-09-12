@@ -38,7 +38,19 @@ class PaperTradingOrchestrator:
         strict_t2: bool = True,
         scenario: str = "NORMAL",
     ):
-        """Otomatik eklendi."""
+        """PaperTradingOrchestrator sanal işlem orkestratörünü başlatır.
+
+        Args:
+            champion_version: Canlıda koşan şampiyon ML modeli versiyon etiketi.
+            initial_capital: Başlangıç sermayesi (TL).
+            db_path: Kalıcı durum DuckDB veritabanı yolu.
+            store: İsteğe bağlı önceden başlatılmış PaperStateStore nesnesi.
+            state_store: Alternatif PaperStateStore parametresi.
+            execution: İsteğe bağlı PaperExecutionEngine yürütme motoru.
+            require_next_open: Emirlerin bir sonraki seans açılışında yürütülüp yürütülmeyeceği.
+            strict_t2: BIST T+2 takas kurallarının zorunlu tutulup tutulmayacağı.
+            scenario: Likidite ve kayma senaryosu (PESSIMISTIC, NORMAL, OPTIMISTIC).
+        """
         self._champion_version = champion_version
         self.initial_capital = initial_capital
         self.require_next_open = require_next_open
@@ -60,6 +72,13 @@ class PaperTradingOrchestrator:
             require_next_open=require_next_open,
             strict_t2=strict_t2,
             scenario=self.scenario,
+        )
+
+    def __repr__(self) -> str:
+        """Sınıfın metinsel temsilini döndürür."""
+        return (
+            f"PaperTradingOrchestrator(champion={self._champion_version!r}, "
+            f"capital={self.initial_capital}, scenario={self.scenario!r})"
         )
 
     def recover_from_downtime(
@@ -304,7 +323,7 @@ class PaperTradingOrchestrator:
                     try:
 
                         def _get_val(r, *keys, default=0.0) -> Any:
-                            """Otomatik eklendi."""
+                            """Sözlük veya Series nesnesinden verilen alternatif anahtarlarla değer çeker."""
                             for k in keys:
                                 if k in r:
                                     return r[k]
@@ -538,7 +557,7 @@ class PaperTradingOrchestrator:
         return self.get_full_report()
 
     def get_full_report(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Tüm portföy durumu, özvarlık eğrisi ve performans metriklerini içeren kapsamlı rapor üretir."""
         equity_curve = self.portfolio.get_equity_curve()
         trades = self.portfolio.get_trades()
         metrics = self.performance.compute_full_metrics(equity_curve, trades)
@@ -562,7 +581,7 @@ class PaperTradingOrchestrator:
         data_quality_ok: bool = True,
         next_open_prices: dict[str, float] | None = None,
     ) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Gelen tek bir model alım/satım sinyalini risk denetimlerinden geçirip emir ve işlem olarak işler."""
         ticker = signal.get("ticker", "")
         direction = signal.get("direction", "")
         price = prices.get(ticker, 0.0)
@@ -726,7 +745,7 @@ class PaperTradingOrchestrator:
     # ===================== AUDIT HELPERS =====================
 
     def _audit_signal(self, date: str, signal: dict[str, Any]) -> Any:
-        """Otomatik eklendi."""
+        """Üretilen al/sat sinyalini denetim günlüğüne (audit log) kaydeder."""
         entry = {
             "timestamp": datetime.now(UTC).isoformat(),
             "date": date,
@@ -741,7 +760,7 @@ class PaperTradingOrchestrator:
         self.store.append_audit(entry)
 
     def _audit_order(self, date: str, order: dict[str, Any]) -> Any:
-        """Otomatik eklendi."""
+        """Oluşturulan veya yürütülen emri denetim günlüğüne kaydeder."""
         entry = {
             "timestamp": datetime.now(UTC).isoformat(),
             "date": date,
@@ -754,7 +773,7 @@ class PaperTradingOrchestrator:
         self.store.append_audit(entry)
 
     def _audit_performance(self, date: str, perf: dict[str, Any]) -> Any:
-        """Otomatik eklendi."""
+        """Günlük performans sonucunu denetim günlüğüne kaydeder."""
         entry = {
             "timestamp": datetime.now(UTC).isoformat(),
             "date": date,
@@ -764,7 +783,7 @@ class PaperTradingOrchestrator:
         self.store.append_audit(entry)
 
     def _audit_no_trade(self, date: str, reason: str, ticker: str | None = None) -> Any:
-        """Otomatik eklendi."""
+        """İşlem yapılmama gerekçesini denetim günlüğüne kaydeder."""
         entry = {
             "timestamp": datetime.now(UTC).isoformat(),
             "date": date,
@@ -775,7 +794,7 @@ class PaperTradingOrchestrator:
         self.store.append_audit(entry)
 
     def _audit_error(self, date: str, error_type: str, message: str, ticker: str | None = None) -> Any:
-        """Otomatik eklendi."""
+        """Karşılaşılan istisna ve hataları denetim günlüğüne kaydeder."""
         entry = {
             "timestamp": datetime.now(UTC).isoformat(),
             "date": date,

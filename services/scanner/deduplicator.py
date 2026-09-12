@@ -30,6 +30,13 @@ class ScanRecord:
     last_tier: int = 0
     forced: bool = False  # Event-driven force scan
 
+    def __repr__(self) -> str:
+        """ScanRecord okunabilir nesne temsili."""
+        return (
+            f"ScanRecord(ticker='{self.ticker}', score={self.last_score:.1f}, "
+            f"tier={self.last_tier}, forced={self.forced})"
+        )
+
 
 class ScanDeduplicator:
     """Tarama deduplication — aynı hisseyi tekrar tarama.
@@ -51,8 +58,14 @@ class ScanDeduplicator:
         cooldown_seconds: int = 300,  # 5 dakika default
         event_cooldown_seconds: int = 10,  # Event-driven: 10 saniye
         max_tracked_tickers: int = 1000,  # Maksimum takip edilen hisse
-    ):
-        """Otomatik eklendi."""
+    ) -> None:
+        """ScanDeduplicator deduplication yöneticisini başlatır.
+
+        Args:
+            cooldown_seconds: Normal taramalar için bekleme süresi (varsayılan 300 sn).
+            event_cooldown_seconds: Olay güdümlü tetiklemeler için bekleme süresi (varsayılan 10 sn).
+            max_tracked_tickers: Bellekte tutulacak maksimum hisse sayısı.
+        """
         self._cooldown = cooldown_seconds
         self._event_cooldown = event_cooldown_seconds
         self._max_tracked = max_tracked_tickers
@@ -64,6 +77,13 @@ class ScanDeduplicator:
         self._total_allowed = 0
         self._total_blocked = 0
         self._total_forced = 0
+
+    def __repr__(self) -> str:
+        """ScanDeduplicator okunabilir durum temsili."""
+        return (
+            f"ScanDeduplicator(tracked={len(self._records)}, cooldown={self._cooldown}s, "
+            f"checks={self._total_checks}, allowed={self._total_allowed}, blocked={self._total_blocked})"
+        )
 
     def should_scan(self, ticker: str) -> bool:
         """Bu hisse taranmalı mı?

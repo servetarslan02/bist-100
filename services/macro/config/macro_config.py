@@ -143,6 +143,15 @@ class MacroConfig(BaseModel):
     enable_event_bus: bool = Field(default=True, description="Event bus aktif mi")
     enable_dynamic_sensitivity: bool = Field(default=True, description="Dynamic sensitivity aktif mi")
 
+    def __repr__(self) -> str:
+        """Makro konfigürasyonu okunabilir string temsili."""
+        return (
+            f"MacroConfig(log_level='{self.log_level}', "
+            f"event_bus={self.enable_event_bus}, "
+            f"dynamic_sensitivity={self.enable_dynamic_sensitivity}, "
+            f"persistence_path='{self.state_persistence_path}')"
+        )
+
     @classmethod
     def from_env(cls) -> "MacroConfig":
         """Ortam değişkenlerinden override."""
@@ -161,3 +170,17 @@ class MacroConfig(BaseModel):
 
 # Singleton
 macro_config = MacroConfig()
+
+__all__ = [
+    "SurpriseConfig",
+    "RegimeConfig",
+    "SensitivityConfig",
+    "StressTestConfig",
+    "CorrelationConfig",
+    "CalendarConfig",
+    "DecayConfig",
+    "HistoricalStoreConfig",
+    "MacroConfig",
+    "macro_config",
+]
+
