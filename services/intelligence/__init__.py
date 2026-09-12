@@ -59,6 +59,8 @@ from .ensemble_forecast import EnsembleForecaster
 from .evidence_engine import EvidenceVerificationEngine
 from .factor_engine import FactorEngine
 from .forecasting import ForecastingEngine
+from .forecasting_utils import EventTimelineEngine, NewsDuplicationEngine, NewsImpactEngine
+from .gemini_service import analyze_company_gemini, call_gemini
 from .hmm_regime import HMMRegimeDetector
 from .impact_engine import ImpactEngine
 
@@ -115,6 +117,13 @@ __all__ = [
     "ForecastingEngine",
     "Prediction",
     "MultiHorizonPrediction",
+    # Forecasting Utils
+    "NewsImpactEngine",
+    "NewsDuplicationEngine",
+    "EventTimelineEngine",
+    # Gemini
+    "call_gemini",
+    "analyze_company_gemini",
     # Signal
     "SignalFusionEngine",
     "MLSignalFusion",

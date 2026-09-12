@@ -1,7 +1,9 @@
-"""ALPHA BIST - Event → Asset Impact Propagation Engine v1.1
+"""ALPHA BIST — Event → Asset Impact Propagation Engine v1.2
 
 Olayların varlıklara nasıl yayıldığını modelleyen motor.
 """
+
+from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -12,22 +14,51 @@ import structlog
 
 logger = structlog.get_logger()
 
+# ─── Sabitler ────────────────────────────────────────────────────────
+IMPACT_MIN: float = -1.0
+IMPACT_MAX: float = 1.0
+DEFAULT_DECAY_HOURS: float = 24.0
+TICKER_MIN_LEN: int = 4
+TICKER_MAX_LEN: int = 5
+
+__all__ = [
+    "PropagationRule",
+    "PropagationResult",
+    "PROPAGATION_RULES",
+    "ImpactEngine",
+    "impact_engine",
+    "analyze_event_impact",
+]
+
 
 @dataclass
 class PropagationRule:
-    """Tek bir yayılım kuralı."""
+    """Tek bir yayılım kuralı.
+
+    Bir olay türünün hedef varlığa olan etkisini, gecikmesini ve güvenini tanımlar.
+    """
 
     source_event: str
     target: str
-    impact: float  # -1.0 ile +1.0 arası
+    impact: float
     lag_hours: float
     confidence: float
-    decay_hours: float = 24.0  # etki ne kadar sürede azalır
+    decay_hours: float = DEFAULT_DECAY_HOURS
+
+    def __repr__(self) -> str:
+        return (
+            f"<PropagationRule {self.source_event}→{self.target} "
+            f"impact={self.impact:+.2f} lag={self.lag_hours}h>"
+        )
 
 
 @dataclass
 class PropagationResult:
-    """Yayılım sonucu."""
+    """Yayılım sonucu.
+
+    Bir olayın tetiklediği etki zincirini, etkilenen enstrümanları ve
+    dünya durumu değişimlerini içerir.
+    """
 
     source_event_type: str
     source_event_id: str
@@ -35,6 +66,13 @@ class PropagationResult:
     affected_instruments: list[dict[str, Any]]
     world_state_delta: dict[str, float]
     propagation_chain: list[dict[str, Any]]
+
+    def __repr__(self) -> str:
+        return (
+            f"<PropagationResult event={self.source_event_type!r} "
+            f"affected={len(self.affected_instruments)} "
+            f"world_delta_keys={list(self.world_state_delta.keys())}>"
+        )
 
 
 # =====================================================
@@ -106,12 +144,24 @@ PROPAGATION_RULES: list[PropagationRule] = [
     PropagationRule("BIST_SURGE", "ALL_STOCKS", +0.6, 0, 0.8),
 ]
 
+# Dünya durumu hedefleri (makro göstergeler)
+_WORLD_STATE_TARGETS: frozenset[str] = frozenset({
+    "USD_INDEX", "EM_RISK", "GOLD", "US_10Y", "VIX",
+    "TURKEY_MACRO", "USD_TRY", "TCMB_RATE_EXPECTATION",
+})
+
 
 class ImpactEngine:
-    """Event → Asset Impact Propagation Engine."""
+    """Event → Asset Impact Propagation Engine.
 
-    def __init__(self):
-        """Olay-Varlık yayılım motorunu başlatır ve dinamik BIST evren sektör haritasını yükler."""
+    Olayların varlık fiyatlarına ve makro göstergelere nasıl yayıldığını modelleyen motor.
+    """
+
+    def __repr__(self) -> str:
+        return f"<ImpactEngine rules={len(self.rules)} sectors={len(self._sector_stocks)}>"
+
+    def __init__(self) -> None:
+        """Olay-Varlık yayılım motorunu başlat."""
         self.rules = PROPAGATION_RULES
         self._instrument_sector_map: dict[str, str] = {}
         self._sector_stocks: dict[str, list[str]] = {}
@@ -120,20 +170,23 @@ class ImpactEngine:
 
             if bist_universe.SECTOR_MAP:
                 self.load_sector_map(bist_universe.SECTOR_MAP)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("sektor_haritasi_yuklenemedi", error=str(e))
 
-    def load_sector_map(self, instrument_sector: dict[str, str]) -> Any:
-        """Load instrument → sector mapping."""
+    def load_sector_map(self, instrument_sector: dict[str, str]) -> None:
+        """Enstrüman → sektör haritasını yükle.
+
+        Args:
+            instrument_sector: Ticker → sektör adı sözlüğü.
+        """
         self._instrument_sector_map = instrument_sector
 
-        # Reverse: sector → instruments
         sector_stocks: dict[str, list[str]] = {}
         for ticker, sector in instrument_sector.items():
-            if sector not in sector_stocks:
-                sector_stocks[sector] = []
-            sector_stocks[sector].append(ticker)
+            sector_stocks.setdefault(sector, []).append(ticker)
         self._sector_stocks = sector_stocks
+
+        logger.info("sektor_haritasi_yuklendi", sectors=len(sector_stocks), tickers=len(instrument_sector))
 
     def propagate(
         self,
@@ -141,21 +194,28 @@ class ImpactEngine:
         event_data: dict[str, Any],
         event_id: str,
         current_world_state: dict[str, float],
-        instrument_states: dict[str, dict],
+        instrument_states: dict[str, dict[str, Any]],
     ) -> PropagationResult:
-        """
-        Propagate an event through the impact graph.
+        """Olayı etki grafiği üzerinden yay.
 
-        Returns affected instruments with impact magnitudes.
-        """
-        chain = []
-        affected = []
-        world_delta = {}
+        Args:
+            event_type: Olay törü (ör. 'FED_RATE_HIKE').
+            event_data: Olay verisi.
+            event_id: Olay kimliği.
+            current_world_state: Mevcut dünya durumu.
+            instrument_states: Enstrüman durumları.
 
-        # Find matching rules
+        Returns:
+            PropagationResult: Etkilenen enstrümanlar ve dünya durumu deltası.
+        """
+        chain: list[dict[str, Any]] = []
+        affected: list[dict[str, Any]] = []
+        world_delta: dict[str, float] = {}
+
         matching_rules = [r for r in self.rules if r.source_event == event_type]
 
         if not matching_rules:
+            logger.warning("eslesen_kural_bulunamadi", event_type=event_type)
             return PropagationResult(
                 source_event_type=event_type,
                 source_event_id=event_id,
@@ -166,98 +226,74 @@ class ImpactEngine:
             )
 
         for rule in matching_rules:
-            # Apply rule
             impact_magnitude = rule.impact * rule.confidence
 
-            # World state update
-            if rule.target in [
-                "USD_INDEX",
-                "EM_RISK",
-                "GOLD",
-                "US_10Y",
-                "VIX",
-                "TURKEY_MACRO",
-                "USD_TRY",
-                "TCMB_RATE_EXPECTATION",
-            ]:
+            if rule.target in _WORLD_STATE_TARGETS:
                 world_delta[rule.target] = world_delta.get(rule.target, 0) + impact_magnitude
 
-            # Instrument-specific
             elif rule.target == "STOCK":
-                # Direct stock impact (KAP events)
                 ticker = event_data.get("ticker", "")
                 if ticker:
-                    affected.append(
-                        {
-                            "ticker": ticker,
-                            "instrument_id": event_data.get("instrument_id"),
-                            "impact": impact_magnitude,
-                            "lag_hours": rule.lag_hours,
-                            "confidence": rule.confidence,
-                            "source_rule": rule.source_event,
-                        }
-                    )
-
-            elif rule.target.startswith("BIST_"):
-                # Sector impact
-                sector = rule.target.replace("BIST_", "")
-                for ticker in self._sector_stocks.get(sector, []):
-                    affected.append(
-                        {
-                            "ticker": ticker,
-                            "impact": impact_magnitude,
-                            "lag_hours": rule.lag_hours,
-                            "confidence": rule.confidence,
-                            "source_rule": rule.source_event,
-                        }
-                    )
-
-            elif rule.target == "ALL_STOCKS":
-                # Market-wide impact
-                for ticker in self._instrument_sector_map:
-                    affected.append(
-                        {
-                            "ticker": ticker,
-                            "impact": impact_magnitude,
-                            "lag_hours": rule.lag_hours,
-                            "confidence": rule.confidence,
-                            "source_rule": rule.source_event,
-                        }
-                    )
-
-            elif rule.target in self._instrument_sector_map or (len(rule.target) in (4, 5) and rule.target.isalpha()):
-                # Dinamik tek hisse hedefi (Tüm BIST hisseleri için geçerli)
-                affected.append(
-                    {
-                        "ticker": rule.target,
+                    affected.append({
+                        "ticker": ticker,
+                        "instrument_id": event_data.get("instrument_id"),
                         "impact": impact_magnitude,
                         "lag_hours": rule.lag_hours,
                         "confidence": rule.confidence,
                         "source_rule": rule.source_event,
-                    }
-                )
+                    })
 
-            chain.append(
-                {
-                    "source": event_type,
-                    "target": rule.target,
-                    "impact": rule.impact,
+            elif rule.target.startswith("BIST_"):
+                sector = rule.target.replace("BIST_", "")
+                for ticker in self._sector_stocks.get(sector, []):
+                    affected.append({
+                        "ticker": ticker,
+                        "impact": impact_magnitude,
+                        "lag_hours": rule.lag_hours,
+                        "confidence": rule.confidence,
+                        "source_rule": rule.source_event,
+                    })
+
+            elif rule.target == "ALL_STOCKS":
+                for ticker in self._instrument_sector_map:
+                    affected.append({
+                        "ticker": ticker,
+                        "impact": impact_magnitude,
+                        "lag_hours": rule.lag_hours,
+                        "confidence": rule.confidence,
+                        "source_rule": rule.source_event,
+                    })
+
+            elif rule.target in self._instrument_sector_map or (
+                len(rule.target) in (TICKER_MIN_LEN, TICKER_MAX_LEN) and rule.target.isalpha()
+            ):
+                affected.append({
+                    "ticker": rule.target,
+                    "impact": impact_magnitude,
                     "lag_hours": rule.lag_hours,
                     "confidence": rule.confidence,
-                }
-            )
+                    "source_rule": rule.source_event,
+                })
 
-        # Aggregate affected instruments (same ticker can appear multiple times)
-        aggregated = {}
+            chain.append({
+                "source": event_type,
+                "target": rule.target,
+                "impact": rule.impact,
+                "lag_hours": rule.lag_hours,
+                "confidence": rule.confidence,
+            })
+
+        # Aggregate
+        aggregated: dict[str, dict[str, Any]] = {}
         for a in affected:
             ticker = a["ticker"]
             if ticker not in aggregated:
                 aggregated[ticker] = {
                     "ticker": ticker,
                     "instrument_id": a.get("instrument_id"),
-                    "total_impact": 0,
-                    "max_lag_hours": 0,
-                    "avg_confidence": 0,
+                    "total_impact": 0.0,
+                    "max_lag_hours": 0.0,
+                    "avg_confidence": 0.0,
                     "rules": [],
                     "count": 0,
                 }
@@ -266,12 +302,17 @@ class ImpactEngine:
             aggregated[ticker]["rules"].append(a["source_rule"])
             aggregated[ticker]["count"] += 1
 
-        # Compute average confidence
         for ticker, data in aggregated.items():
             matching_affected = [a for a in affected if a["ticker"] == ticker]
-            data["avg_confidence"] = np.mean([a["confidence"] for a in matching_affected])
-            # Normalize impact
-            data["total_impact"] = min(max(data["total_impact"], -1.0), 1.0)
+            data["avg_confidence"] = float(np.mean([a["confidence"] for a in matching_affected]))
+            data["total_impact"] = min(max(data["total_impact"], IMPACT_MIN), IMPACT_MAX)
+
+        logger.info(
+            "yayilma_tamamlandi",
+            event_type=event_type,
+            affected=len(aggregated),
+            world_delta=len(world_delta),
+        )
 
         return PropagationResult(
             source_event_type=event_type,
@@ -290,11 +331,21 @@ impact_engine = ImpactEngine()
 # =====================================================
 # B31 Event Study entegrasyonu
 # =====================================================
-def analyze_event_impact(ticker: str, event_type: str, stock_returns: list, market_returns: list) -> dict[str, Any]:
-    """Event study ile olay etkisi analizi."""
-    try:
-        from datetime import datetime, timezone  # noqa: F401
+def analyze_event_impact(
+    ticker: str, event_type: str, stock_returns: list[float], market_returns: list[float]
+) -> dict[str, Any]:
+    """Event study ile olay etkisi analizi.
 
+    Args:
+        ticker: Hisse sembolü.
+        event_type: Olay türü.
+        stock_returns: Hisse getiri serisi.
+        market_returns: Piyasa getiri serisi.
+
+    Returns:
+        Event study sonuçları.
+    """
+    try:
         from services.event_study.impact import calculate_event_impact
         from services.event_study.kap_event import analyze_kap_event_simple
 
@@ -310,4 +361,5 @@ def analyze_event_impact(ticker: str, event_type: str, stock_returns: list, mark
         result["impact"] = impact
         return result
     except ImportError:
+        logger.warning("event_study_modul_bulunamadi")
         return {"ticker": ticker, "event_type": event_type, "error": "event_study not available"}

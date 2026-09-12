@@ -1,12 +1,11 @@
 """
-ALPHA BIST — Forecasting & Ensemble v1.0
+ALPHA BIST — Forecasting & Ensemble v1.1
 
 - Forecasting Engine (multi-horizon)
 - Ensemble Forecasting
-- News Impact Engine
-- News Duplication Engine
-- Event Timeline Engine
 """
+
+from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -16,10 +15,38 @@ import structlog
 
 logger = structlog.get_logger()
 
+# ─── Sabitler ────────────────────────────────────────────────────────
+DEFAULT_HORIZONS: list[int] = [1, 5, 20, 60, 120]
+MOMENTUM_WEIGHT: float = 0.3
+RSI_OVERBOUGHT: float = 70.0
+RSI_OVERSOLD: float = 30.0
+RSI_DEFAULT: float = 50.0
+RSI_PENALTY: float = 1.0
+HORIZON_BASE: float = 20.0
+PROB_BASE: float = 0.5
+PROB_SCALE: float = 20.0
+PROB_CAP: float = 0.85
+PROB_FLOOR: float = 0.15
+CONFIDENCE_BASE: float = 0.8
+CONFIDENCE_FLOOR: float = 0.3
+CONFIDENCE_HORIZON_DIVISOR: float = 200.0
+DEFAULT_VOL: float = 20.0
+
+__all__ = [
+    "Forecast",
+    "ForecastingEngine",
+    "EnsembleForecasting",
+    "forecasting_engine",
+    "ensemble_forecasting",
+]
+
 
 @dataclass
 class Forecast:
-    """Tahmin sonucu."""
+    """Tahmin sonucu.
+
+    Belirli bir zaman ufku için tahmini getiri, olasılık ve güven bilgisi.
+    """
 
     ticker: str
     horizon_days: int
@@ -29,11 +56,24 @@ class Forecast:
     model_source: str
     timestamp: str = ""
 
+    def __repr__(self) -> str:
+        return (
+            f"<Forecast ticker={self.ticker!r} horizon={self.horizon_days}d "
+            f"ret={self.predicted_return:+.2f}% prob={self.probability_positive:.3f} "
+            f"conf={self.confidence:.3f} src={self.model_source!r}>"
+        )
+
 
 class ForecastingEngine:
-    """Çoklu ufuk tahmin motoru."""
+    """Çoklu ufuk tahmin motoru.
 
-    HORIZONS = [1, 5, 20, 60, 120]
+    Farklı zaman ufukları için momentum ve RSI bazlı heuristic tahmin üretir.
+    """
+
+    HORIZONS: list[int] = DEFAULT_HORIZONS
+
+    def __repr__(self) -> str:
+        return f"<ForecastingEngine horizons={self.HORIZONS}>"
 
     def compute_forecasts(
         self,
@@ -41,43 +81,67 @@ class ForecastingEngine:
         features: dict[str, float],
         historical_returns: list[float],
     ) -> list[Forecast]:
-        """Farklı zaman ufukları için tahmin üret."""
-        forecasts = []
+        """Farklı zaman ufukları için tahmin üret.
 
+        Args:
+            ticker: Varlık kodu.
+            features: Feature sözlüğü (momentum, RSI vb.).
+            historical_returns: Geçmiş getiri serisi.
+
+        Returns:
+            Her ufuk için bir Forecast listesi.
+        """
+        forecasts: list[Forecast] = []
         for horizon in self.HORIZONS:
             forecast = self._forecast_horizon(ticker, features, historical_returns, horizon)
             forecasts.append(forecast)
 
+        logger.info(
+            "forecast_uretildi",
+            ticker=ticker,
+            horizons=len(forecasts),
+            avg_return=round(np.mean([f.predicted_return for f in forecasts]), 2),
+        )
         return forecasts
 
-    def _forecast_horizon(self, ticker: str, features: dict, returns: list[float], horizon: int) -> Forecast:
-        """Tek ufuk için tahmin."""
-        # Feature-based heuristic prediction
-        momentum = features.get("momentum_20d", 0)
-        features.get("realized_vol_20d", 20)
-        rsi = features.get("rsi_14", 50)
+    def _forecast_horizon(
+        self, ticker: str, features: dict[str, float], returns: list[float], horizon: int
+    ) -> Forecast:
+        """Tek ufuk için tahmin üret.
+
+        Args:
+            ticker: Varlık kodu.
+            features: Feature sözlüğü.
+            returns: Geçmiş getiri serisi.
+            horizon: Tahmin ufku (gün).
+
+        Returns:
+            Forecast: Tahmin sonucu.
+        """
+        momentum = features.get("momentum_20d", 0.0)
+        rsi = features.get("rsi_14", RSI_DEFAULT)
 
         # Base return estimate
-        base_return = momentum * 0.3  # Momentum devam varsayımı
+        base_return = momentum * MOMENTUM_WEIGHT
 
         # RSI adjustment
-        if rsi > 70:
-            base_return -= 1.0  # Aşırı alım
-        elif rsi < 30:
-            base_return += 1.0  # Aşırı satım
+        if rsi > RSI_OVERBOUGHT:
+            base_return -= RSI_PENALTY
+        elif rsi < RSI_OVERSOLD:
+            base_return += RSI_PENALTY
 
         # Horizon scaling
-        horizon_factor = np.sqrt(horizon / 20)  # Square root of time
+        horizon_factor = np.sqrt(horizon / HORIZON_BASE)
         predicted_return = base_return * horizon_factor
 
         # Probability
         if predicted_return > 0:
-            prob = min(0.5 + abs(predicted_return) / 20, 0.85)
+            prob = min(PROB_BASE + abs(predicted_return) / PROB_SCALE, PROB_CAP)
         else:
-            prob = max(0.5 - abs(predicted_return) / 20, 0.15)
+            prob = max(PROB_BASE - abs(predicted_return) / PROB_SCALE, PROB_FLOOR)
 
         # Confidence (düşük ufuk = daha yüksek güven)
-        confidence = max(0.3, 0.8 - horizon / 200)
+        confidence = max(CONFIDENCE_FLOOR, CONFIDENCE_BASE - horizon / CONFIDENCE_HORIZON_DIVISOR)
 
         return Forecast(
             ticker=ticker,
@@ -91,31 +155,46 @@ class ForecastingEngine:
 
 
 class EnsembleForecasting:
-    """Ensemble tahmin — çoklu model birleştirme."""
+    """Ensemble tahmin — çoklu model birleştirme.
+
+    Farklı modellerin tahminlerini ağırlıklı olarak birleştirir.
+    """
+
+    def __repr__(self) -> str:
+        return "<EnsembleForecasting>"
 
     def combine_forecasts(
         self,
         forecasts: list[Forecast],
         weights: dict[str, float] | None = None,
     ) -> Forecast:
-        """Çoklu tahminleri birleştir."""
+        """Çoklu tahminleri ağırlıklı olarak birleştir.
+
+        Args:
+            forecasts: Tahmin listesi.
+            weights: Model adı → ağırlık sözlüğü (None = eşit ağırlık).
+
+        Returns:
+            Forecast: Birleştirilmiş tahmin.
+        """
         if not forecasts:
+            logger.warning("bos_forecast_listesi")
             return Forecast(
                 ticker="",
                 horizon_days=0,
-                predicted_return=0,
-                probability_positive=0.5,
-                confidence=0,
+                predicted_return=0.0,
+                probability_positive=PROB_BASE,
+                confidence=0.0,
                 model_source="ensemble",
             )
 
         if weights is None:
             weights = {f.model_source: 1.0 for f in forecasts}
 
-        total_weight = 0
-        weighted_return = 0
-        weighted_prob = 0
-        weighted_confidence = 0
+        total_weight = 0.0
+        weighted_return = 0.0
+        weighted_prob = 0.0
+        weighted_confidence = 0.0
 
         for f in forecasts:
             w = weights.get(f.model_source, 1.0) * f.confidence
