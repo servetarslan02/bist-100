@@ -108,7 +108,14 @@ class SocialProvider:
     """Sosyal medya veri sağlayıcısı (async)."""
 
     def __init__(self) -> None:
-        """SocialProvider örneği oluşturur."""
+        """SocialProvider örneği oluşturur.
+
+        Args:
+            Yok.
+
+        Returns:
+            Yok.
+        """
         self._client = get_client("social", timeout=15.0, max_retries=2)
         self._x_api_key: str | None = None
 
@@ -125,6 +132,9 @@ class SocialProvider:
 
         Args:
             key: X API anahtarı.
+
+        Returns:
+            Yok.
         """
         self._x_api_key = key
 
@@ -137,7 +147,15 @@ class SocialProvider:
         query: str = "$BIST OR $BIST100 OR borsa istanbul",
         max_results: int = 50,
     ) -> list[dict[str, Any]]:
-        """X (Twitter) mentions çek (async)."""
+        """X (Twitter) mentions çeker (async).
+
+        Args:
+            query: Arama sorgusu.
+            max_results: Maksimum sonuç sayısı.
+
+        Returns:
+            Tweet listesi.
+        """
         if not self._x_api_key:
             logger.debug("X API key not configured")
             return []
@@ -189,7 +207,14 @@ class SocialProvider:
     # =====================================================
 
     async def fetch_stocktwits(self, ticker: str) -> list[dict[str, Any]]:
-        """StockTwits mesajları çek (async)."""
+        """StockTwits mesajlarını çeker (async).
+
+        Args:
+            ticker: Hisse sembolü.
+
+        Returns:
+            Mesaj listesi.
+        """
         url = f"https://api.stocktwits.com/api/2/streams/symbol/{ticker}.json"
 
         try:
@@ -237,11 +262,14 @@ class SocialProvider:
         query: str,
         max_entries: int = 20,
     ) -> list[dict[str, Any]]:
-        """Ekşi Sözlük başlığı çek (async).
+        """Ekşi Sözlük başlığını çeker (async).
 
         Args:
-            query: Arama terimi (ör: "thyao", "borsa")
-            max_entries: Maksimum entry sayısı
+            query: Arama terimi (ör: "thyao", "borsa").
+            max_entries: Maksimum entry sayısı.
+
+        Returns:
+            Entry listesi.
         """
         try:
             # Ekşi Sözlük arama API'si
@@ -275,7 +303,15 @@ class SocialProvider:
             return []
 
     def _parse_eksi_html(self, html: str, max_entries: int) -> list[dict[str, Any]]:
-        """Ekşi Sözlük HTML'den entry'leri çıkar."""
+        """Ekşi Sözlük HTML'den entry'leri çıkarır.
+
+        Args:
+            html: Ham HTML içeriği.
+            max_entries: Maksimum entry sayısı.
+
+        Returns:
+            Entry sözlükleri listesi.
+        """
         entries = []
 
         # Entry content pattern
@@ -327,7 +363,15 @@ class SocialProvider:
         ticker: str,
         company_name: str | None = None,
     ) -> list[dict[str, Any]]:
-        """Hisse ile ilgili Ekşi Sözlük entry'leri (async)."""
+        """Hisse ile ilgili Ekşi Sözlük entry'lerini çeker (async).
+
+        Args:
+            ticker: Hisse sembolü.
+            company_name: Şirket adı (opsiyonel).
+
+        Returns:
+            Entry listesi.
+        """
         all_entries = []
 
         # Ticker ile ara
@@ -356,12 +400,15 @@ class SocialProvider:
         query: str | None = None,
         limit: int = 25,
     ) -> list[dict[str, Any]]:
-        """Reddit Türkiye subreddit'inden gönderileri çek (async).
+        """Reddit Türkiye subreddit'inden gönderileri çeker (async).
 
         Args:
-            subreddit: Alt reddit (varsayılan: yatirim)
-            query: Arama terimi (opsiyonel)
-            limit: Maksimum gönderi sayısı
+            subreddit: Alt reddit (varsayılan: yatirim).
+            query: Arama terimi (opsiyonel).
+            limit: Maksimum gönderi sayısı.
+
+        Returns:
+            Gönderi listesi.
         """
         try:
             if query:
@@ -419,7 +466,15 @@ class SocialProvider:
         ticker: str,
         subreddits: list[str] | None = None,
     ) -> list[dict[str, Any]]:
-        """Hisse ile ilgili Reddit gönderileri (async)."""
+        """Hisse ile ilgili Reddit gönderilerini çeker (async).
+
+        Args:
+            ticker: Hisse sembolü.
+            subreddits: Alt reddit listesi (opsiyonel).
+
+        Returns:
+            Gönderi listesi.
+        """
         if subreddits is None:
             subreddits = ["yatirim", "borsa", "turkey", "KucukYatirimci"]
 
@@ -437,7 +492,14 @@ class SocialProvider:
 
     def _analyze_sentiment(self, text: str) -> float:
         """Gelişmiş Türkçe/İngilizce sentiment analizi (-1.0 ile +1.0 arası).
+
         Negation handling ile: 'iyi değil' → negative, 'kötü değil' → positive.
+
+        Args:
+            text: Analiz edilecek metin.
+
+        Returns:
+            Sentiment skoru (-1.0 ile +1.0 arası).
         """
         if not text:
             return 0.0
@@ -505,7 +567,14 @@ class SocialProvider:
         return round(max(-1.0, min(1.0, sentiment)), 3)
 
     def _analyze_sentiment_batch(self, texts: list[str]) -> dict[str, Any]:
-        """Toplu sentiment analizi."""
+        """Toplu sentiment analizi yapar.
+
+        Args:
+            texts: Analiz edilecek metin listesi.
+
+        Returns:
+            Sentiment istatistikleri sözlüğü.
+        """
         if not texts:
             return {"avg_sentiment": 0.0, "positive_ratio": 0.0, "count": 0}
 
@@ -534,7 +603,15 @@ class SocialProvider:
         ticker: str,
         company_name: str | None = None,
     ) -> dict[str, Any]:
-        """Tüm sosyal medya kaynaklarından veri çek (async, paralel)."""
+        """Tüm sosyal medya kaynaklarından veri çeker (async, paralel).
+
+        Args:
+            ticker: Hisse sembolü.
+            company_name: Şirket adı (opsiyonel).
+
+        Returns:
+            Sosyal medya veri sözlüğü.
+        """
         tasks = [
             self.fetch_stocktwits(ticker),
             self.fetch_eksi_stock_mentions(ticker, company_name),

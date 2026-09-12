@@ -11,12 +11,21 @@ from ..bist_universe import bist_universe
 
 logger = structlog.get_logger()
 
+# Varsayılan sabitler
+DEFAULT_YFINANCE_TIMEOUT: int = 15
+
 
 def get_yfinance_ticker(ticker: str) -> str:
-    """BIST ticker'ını Yahoo Finance formatına çevir.
+    """BIST ticker'ını Yahoo Finance formatına çevirir.
 
     THYAO → THYAO.IS
     XU100 → XU100.IS (endeks)
+
+    Args:
+        ticker: BIST hisse sembolü.
+
+    Returns:
+        Yahoo Finance formatında sembol.
     """
     if ticker.endswith(".IS"):
         return ticker
@@ -27,18 +36,35 @@ class YFinanceProvider:
     """yfinance üzerinden BIST piyasa verisi çeker (15dk gecikmeli, ücretsiz)."""
 
     def __init__(self) -> None:
-        """YFinanceProvider örneği oluşturur."""
+        """YFinanceProvider örneği oluşturur.
+
+        Args:
+            Yok.
+
+        Returns:
+            Yok.
+        """
         self._cache: dict[str, Any] = {}
 
     def __repr__(self) -> str:
-        """YFinanceProvider string temsili."""
+        """YFinanceProvider string temsili.
+
+        Returns:
+            İnsan tarafından okunabilir temsil.
+        """
         return f"YFinanceProvider(cache_size={len(self._cache)})"
 
     @staticmethod
     def _expand_period(period: str) -> str:
-        """Hafta sonu/tatil günlerini telafi etmek için period'u genişlet.
+        """Hafta sonu/tatil günlerini telafi etmek için period'u genişletir.
 
         60d → 90d, 30d → 45d, 1y → 1y (zaten yeterli)
+
+        Args:
+            period: Orijinal period string'i.
+
+        Returns:
+            Genişletilmiş period string'i.
         """
         import re
 
@@ -55,7 +81,17 @@ class YFinanceProvider:
 
     @staticmethod
     def _run_with_timeout(fn, *args, timeout: int = 15, **kwargs) -> Any:
-        """Blocking fonksiyonu timeout ile çalıştır."""
+        """Blocking fonksiyonu timeout ile çalıştırır.
+
+        Args:
+            fn: Çalıştırılacak fonksiyon.
+            *args: Fonksiyon argümanları.
+            timeout: Zaman aşımı (saniye).
+            **kwargs: Fonksiyon anahtar kelime argümanları.
+
+        Returns:
+            Fonksiyon sonucu veya None.
+        """
         import concurrent.futures
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
@@ -67,7 +103,14 @@ class YFinanceProvider:
                 return None
 
     def fetch_current_price(self, ticker: str) -> dict[str, Any] | None:
-        """Fetch current price data for a single ticker."""
+        """Tek hisse için güncel fiyat verisini çeker.
+
+        Args:
+            ticker: Hisse sembolü.
+
+        Returns:
+            Fiyat verisi sözlüğü veya None.
+        """
         yf_ticker = get_yfinance_ticker(ticker)
         try:
             t = yf.Ticker(yf_ticker)
@@ -105,7 +148,16 @@ class YFinanceProvider:
         period: str = "1y",
         interval: str = "1d",
     ) -> pl.DataFrame | None:
-        """Fetch OHLCV data for a single ticker."""
+        """Tek hisse için OHLCV verisini çeker.
+
+        Args:
+            ticker: Hisse sembolü.
+            period: Veri süresi (örn. "1y", "60d").
+            interval: Veri aralığı (örn. "1d", "1h").
+
+        Returns:
+            Polars DataFrame veya None.
+        """
         yf_ticker = get_yfinance_ticker(ticker)
         try:
             t = yf.Ticker(yf_ticker)
@@ -152,7 +204,16 @@ class YFinanceProvider:
         period: str = "1y",
         interval: str = "1d",
     ) -> dict[str, pl.DataFrame]:
-        """Fetch OHLCV data for multiple tickers."""
+        """Birden fazla hisse için OHLCV verisini çeker.
+
+        Args:
+            tickers: Hisse sembolleri listesi. None ise tüm evren.
+            period: Veri süresi.
+            interval: Veri aralığı.
+
+        Returns:
+            {ticker: DataFrame} sözlüğü.
+        """
         if tickers is None:
             tickers = bist_universe.get_tickers()
 
@@ -217,7 +278,14 @@ class YFinanceProvider:
         return results
 
     def fetch_index(self, index_symbol: str = "XU100") -> dict[str, Any] | None:
-        """Fetch BIST index data."""
+        """BIST endeks verisini çeker.
+
+        Args:
+            index_symbol: Endeks sembolü.
+
+        Returns:
+            Endeks verisi sözlüğü veya None.
+        """
         yf_symbol = f"{index_symbol}.IS"
         try:
             t = yf.Ticker(yf_symbol)
@@ -238,9 +306,15 @@ class YFinanceProvider:
             return None
 
     def fetch_macro(self) -> dict[str, Any]:
-        """Fetch macro indicators (USD/TRY, Gold, Oil, VIX).
+        """Makro göstergeleri çeker (USD/TRY, Altın, Petrol, VIX).
 
         Düzeltme: USD/TRY ve EUR/TRY için doğru yfinance symbol'leri kullanılır.
+
+        Args:
+            Yok.
+
+        Returns:
+            Makro göstergeler sözlüğü.
         """
         macro_tickers = {
             "USDTRY=X": "USD/TRY",

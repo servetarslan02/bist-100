@@ -80,6 +80,9 @@ class TCMBProvider:
 
         Args:
             api_key: TCMB EVDS API anahtarı. None ise ortam değişkeninden okunur.
+
+        Returns:
+            Yok.
         """
         self.api_key = api_key or os.getenv("TCMB_API_KEY") or os.getenv("EVDS_API_KEY")
         self._client = get_client("tcmb", timeout=DEFAULT_TCMB_TIMEOUT, max_retries=DEFAULT_TCMB_MAX_RETRIES)
@@ -165,6 +168,9 @@ class TCMBProvider:
 
     async def fetch_all_macro(self) -> dict[str, Any]:
         """Tüm kritik makro göstergeleri çeker (baz değer fallback ile).
+
+        Args:
+            Yok.
 
         Returns:
             Makro göstergeler sözlüğü.

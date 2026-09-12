@@ -36,6 +36,9 @@ class InvestingProvider:
 
         Args:
             timeout: HTTP istekleri için zaman aşımı (saniye).
+
+        Returns:
+            Yok.
         """
         self._timeout = timeout
         self._cache: dict[str, dict[str, Any]] = {}
@@ -60,6 +63,9 @@ class InvestingProvider:
         """Küresel makro piyasaların özet durumunu döndürür.
 
         Dolar, Altın, Petrol, Faiz ve VIX güncel durumları.
+
+        Args:
+            Yok.
 
         Returns:
             Makro varlıkların güncel durumları sözlüğü.
@@ -88,6 +94,9 @@ class InvestingProvider:
 
     async def fetch_economic_calendar_events(self) -> list[dict[str, Any]]:
         """TCMB, FED, ECB gibi kritik faiz ve enflasyon takvim olaylarını döndürür.
+
+        Args:
+            Yok.
 
         Returns:
             Ekonomik takvim olayları listesi.

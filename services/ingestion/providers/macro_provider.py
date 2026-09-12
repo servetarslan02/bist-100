@@ -88,7 +88,14 @@ class MacroProvider:
     """Makro veri sağlayıcısı — resmi kaynaklar (async)."""
 
     def __init__(self) -> None:
-        """MacroProvider örneği oluşturur."""
+        """MacroProvider örneği oluşturur.
+
+        Args:
+            Yok.
+
+        Returns:
+            Yok.
+        """
         self._client = get_client("macro", timeout=DEFAULT_MACRO_TIMEOUT, max_retries=DEFAULT_MACRO_MAX_RETRIES)
         self._tcmb_client = get_client("tcmb", timeout=DEFAULT_TCMB_TIMEOUT, max_retries=DEFAULT_MACRO_MAX_RETRIES)
         self._cache: dict[str, Any] = {}
@@ -108,6 +115,9 @@ class MacroProvider:
 
     async def fetch_yahoo_macro(self) -> dict[str, Any]:
         """Yahoo Finance makro verilerini çeker (async).
+
+        Args:
+            Yok.
 
         Returns:
             {sembol_adı: veri_sözlüğü} yapısı.
@@ -155,6 +165,7 @@ class MacroProvider:
         output: dict[str, Any] = {}
         for item in results:
             if isinstance(item, Exception):
+                logger.error("Yahoo macro fetch task failed", error=str(item))
                 continue
             name, data = item
             output[name] = data
@@ -219,6 +230,7 @@ class MacroProvider:
 
         for item in results_list:
             if isinstance(item, Exception):
+                logger.error("TCMB fetch task failed", error=str(item))
                 continue
             name, data = item
             results[name] = data
@@ -292,6 +304,7 @@ class MacroProvider:
 
         for item in results_list:
             if isinstance(item, Exception):
+                logger.error("FRED fetch task failed", error=str(item))
                 continue
             name, data = item
             results[name] = data
@@ -301,6 +314,9 @@ class MacroProvider:
 
     async def fetch_ecb_data(self) -> dict[str, Any]:
         """ECB makro verilerini çeker (async).
+
+        Args:
+            Yok.
 
         Returns:
             ECB veri sözlüğü.
@@ -334,6 +350,9 @@ class MacroProvider:
         - Altın/USD trendi
         - Petrol fiyatı
         - Tahvil faizi (US 10Y)
+
+        Args:
+            Yok.
 
         Returns:
             BIST makro göstergeleri sözlüğü.

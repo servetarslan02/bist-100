@@ -24,7 +24,14 @@ DEFAULT_BIST_SEMAPHORE: int = 5
 
 
 class BISTProvider:
-    """Borsa İstanbul resmi veri sağlayıcısı (async)."""
+    """Borsa İstanbul resmi veri sağlayıcısı (async).
+
+    Borsa İstanbul'un resmi sitesinden endeks, hisse ve sektör
+    verilerini çeker. Ücretsiz erişimde 15 dk gecikme vardır.
+
+    Args:
+        Yok — singleton olarak kullanılır.
+    """
 
     BASE_URL = "https://www.borsaistanbul.com"
 
@@ -44,6 +51,12 @@ class BISTProvider:
         """BISTProvider örneği oluşturur.
 
         VERDA API kimlik bilgileri gerektirir.
+
+        Args:
+            Yok.
+
+        Returns:
+            Yok.
         """
         self._client = get_client(
             "bist",
@@ -65,22 +78,50 @@ class BISTProvider:
         return f"BISTProvider(base_url={self.BASE_URL!r})"
 
     async def fetch_index_data(self) -> dict[str, Any]:
-        """BIST endeks verilerini çek (async)."""
+        """BIST endeks verilerini çeker (async).
+
+        Args:
+            Yok.
+
+        Returns:
+            Endeks verisi sözlüğü. Boş sözlük döner.
+        """
         logger.warning("BIST Provider requires institutional VERDA API credentials. Endpoint disabled.")
         return {}
 
     async def fetch_market_summary(self) -> dict[str, Any]:
-        """Piyasa özeti: yükselen/düşen/hacim (async)."""
+        """Piyasa özetini çeker: yükselen/düşen/hacim (async).
+
+        Args:
+            Yok.
+
+        Returns:
+            Piyasa özeti sözlüğü. Boş sözlük döner.
+        """
         logger.warning("BIST Provider requires institutional VERDA API credentials. Endpoint disabled.")
         return {}
 
     async def fetch_stock_price(self, ticker: str) -> dict[str, Any] | None:
-        """Tek hisse fiyatı — 15dk gecikmeli (async)."""
+        """Tek hisse fiyatını çeker — 15dk gecikmeli (async).
+
+        Args:
+            ticker: Hisse sembolü (örn. "THYAO").
+
+        Returns:
+            Fiyat verisi sözlüğü veya None.
+        """
         logger.warning("BIST Provider requires institutional VERDA API credentials. Endpoint disabled.")
         return None
 
     async def fetch_batch_prices(self, tickers: list[str]) -> dict[str, dict]:
-        """Toplu fiyat çekme (async, paralel)."""
+        """Toplu fiyat çeker (async, paralel).
+
+        Args:
+            tickers: Hisse sembolleri listesi.
+
+        Returns:
+            {ticker: fiyat_verisi} sözlüğü. Başarısız olanlar hariç.
+        """
         semaphore = asyncio.Semaphore(DEFAULT_BIST_SEMAPHORE)
 
         async def _fetch_one(ticker: str) -> tuple[str, dict[str, Any] | None]:
@@ -102,6 +143,7 @@ class BISTProvider:
         output = {}
         for item in results:
             if isinstance(item, Exception):
+                logger.error("BIST batch fetch hatası", error=str(item))
                 continue
             ticker, data = item
             if data:
@@ -111,7 +153,14 @@ class BISTProvider:
         return output
 
     async def fetch_sector_indices(self) -> dict[str, Any]:
-        """Sektör endeksleri (async)."""
+        """Sektör endekslerini çeker (async).
+
+        Args:
+            Yok.
+
+        Returns:
+            {sembol: endeks_bilgisi} sözlüğü.
+        """
         results = {}
         for symbol, name in self.INDICES.items():
             try:
@@ -126,6 +175,7 @@ class BISTProvider:
                     }
             except Exception as e:
                 logger.warning("BIST sektör endeksi çekme hatası", symbol=symbol, error=str(e))
+                continue
 
         return results
 
@@ -152,7 +202,14 @@ class BISTProvider:
         return indices
 
     async def close(self) -> None:
-        """HTTP istemcisini kapatır."""
+        """HTTP istemcisini kapatır.
+
+        Args:
+            Yok.
+
+        Returns:
+            Yok.
+        """
         await self._client.close()
 
 

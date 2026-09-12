@@ -27,6 +27,9 @@ class IsYatirimProvider:
 
         Args:
             timeout: HTTP istekleri için zaman aşımı (saniye).
+
+        Returns:
+            Yok.
         """
         self._timeout = timeout
         self._cache: dict[str, dict[str, Any]] = {}

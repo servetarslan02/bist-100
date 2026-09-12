@@ -159,6 +159,9 @@ class NewsCredibility:
     def get_source_report(self) -> dict[str, dict[str, Any]]:
         """Tüm kaynakların raporunu döndürür.
 
+        Args:
+            Yok.
+
         Returns:
             {kaynak_key: rapor_sözlüğü} yapısı.
         """
