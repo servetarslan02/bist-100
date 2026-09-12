@@ -24,13 +24,15 @@ def get_yfinance_ticker(ticker: str) -> str:
 
 
 class YFinanceProvider:
-    """Fetches BIST market data from yfinance (15min delayed, free)."""
+    """yfinance üzerinden BIST piyasa verisi çeker (15dk gecikmeli, ücretsiz)."""
 
-    _FETCH_TIMEOUT = 15  # saniye
-
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """YFinanceProvider örneği oluşturur."""
         self._cache: dict[str, Any] = {}
+
+    def __repr__(self) -> str:
+        """YFinanceProvider string temsili."""
+        return f"YFinanceProvider(cache_size={len(self._cache)})"
 
     @staticmethod
     def _expand_period(period: str) -> str:
@@ -69,7 +71,7 @@ class YFinanceProvider:
         yf_ticker = get_yfinance_ticker(ticker)
         try:
             t = yf.Ticker(yf_ticker)
-            info = self._run_with_timeout(lambda t=t: t.info, timeout=self._FETCH_TIMEOUT)
+            info = self._run_with_timeout(lambda t=t: t.info, timeout=DEFAULT_YFINANCE_TIMEOUT)
             if info is None:
                 return None
 
@@ -112,7 +114,7 @@ class YFinanceProvider:
             expanded_period = self._expand_period(period)
             df = self._run_with_timeout(
                 lambda: t.history(period=expanded_period, interval=interval),
-                timeout=self._FETCH_TIMEOUT,
+                timeout=DEFAULT_YFINANCE_TIMEOUT,
             )
             if df is None or (hasattr(df, "empty") and df.empty):
                 return None
@@ -219,7 +221,7 @@ class YFinanceProvider:
         yf_symbol = f"{index_symbol}.IS"
         try:
             t = yf.Ticker(yf_symbol)
-            info = self._run_with_timeout(lambda t=t: t.info, timeout=self._FETCH_TIMEOUT)
+            info = self._run_with_timeout(lambda t=t: t.info, timeout=DEFAULT_YFINANCE_TIMEOUT)
             if info is None:
                 return None
 
@@ -254,7 +256,7 @@ class YFinanceProvider:
         for yf_symbol, name in macro_tickers.items():
             try:
                 t = yf.Ticker(yf_symbol)
-                info = self._run_with_timeout(lambda t=t: t.info, timeout=self._FETCH_TIMEOUT)
+                info = self._run_with_timeout(lambda t=t: t.info, timeout=DEFAULT_YFINANCE_TIMEOUT)
                 if info is None:
                     results[name] = {"price": None, "change_pct": None, "error": "no data"}
                     continue
@@ -270,3 +272,6 @@ class YFinanceProvider:
 
 # Singleton
 yfinance_provider = YFinanceProvider()
+
+
+__all__ = ["YFinanceProvider", "yfinance_provider", "get_yfinance_ticker"]
