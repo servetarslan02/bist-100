@@ -29,16 +29,24 @@ logger = structlog.get_logger()
 
 @dataclass
 class PITConfig:
-    """Point-in-time yapılandırması."""
+    """Point-in-time yapılandırması.
+
+    Attributes:
+        data_type: Veri tipi tanımlayıcısı.
+        delay: Verinin kullanılabilir olması için gereken gecikme.
+        description: İnsan tarafından okunabilir açıklama.
+    """
 
     data_type: str
     delay: timedelta
     description: str
 
+    def __repr__(self) -> str:
+        return f"PITConfig(type={self.data_type!r}, delay={self.delay})"
+
 
 class PointInTimeValidator:
-    """
-    Look-ahead bias önleme.
+    """Look-ahead bias önleme.
 
     Her veri tipi için tanımlı gecikme süresiyle,
     verinin o anda bilinip bilinmediğini kontrol eder.
@@ -99,17 +107,16 @@ class PointInTimeValidator:
         data_timestamp: datetime,
         query_timestamp: datetime,
     ) -> bool:
-        """
-        Veri query_timestamp'te biliniyor muydu?
+        """Veri query_timestamp'te biliniyor muydu kontrol eder.
 
         Args:
-            data_type: Veri tipi (ör: "market_price", "fundamental")
-            data_timestamp: Verinin oluşturulma/zaman damgası
-            query_timestamp: Sorgu zamanı (backtest'te o anki zaman)
+            data_type: Veri tipi (ör. "market_price", "fundamental").
+            data_timestamp: Verinin oluşturulma/zaman damgası.
+            query_timestamp: Sorgu zamanı (backtest'te o anki zaman).
 
         Returns:
-            True: Veri o anda biliniyordu
-            False: Veri gelecekte (look-ahead bias!)
+            True: Veri o anda biliniyordu.
+            False: Veri gelecekte (look-ahead bias!).
         """
         # Timezone uyumluluğu sağla
         if data_timestamp.tzinfo is not None and query_timestamp.tzinfo is None:
@@ -119,7 +126,6 @@ class PointInTimeValidator:
 
         config = self.DATA_DELAYS.get(data_type)
         if not config:
-            # Bilinmeyen veri tipi — varsayılan: anında
             return data_timestamp <= query_timestamp
 
         delay = config.delay
@@ -129,30 +135,28 @@ class PointInTimeValidator:
 
     def filter_available(
         self,
-        data: list[dict],
+        data: list[dict[str, Any]],
         data_type: str,
         query_timestamp: datetime,
         timestamp_field: str = "timestamp",
-    ) -> list[dict]:
-        """
-        Sadece o tarihte bilinen veriyi döndür.
+    ) -> list[dict[str, Any]]:
+        """Sadece o tarihte bilinen veriyi döndürür.
 
         Args:
-            data: Veri listesi
-            data_type: Veri tipi
-            query_timestamp: Sorgu zamanı
-            timestamp_field: Timestamp alan adı
+            data: Veri listesi.
+            data_type: Veri tipi.
+            query_timestamp: Sorgu zamanı.
+            timestamp_field: Timestamp alan adı.
 
         Returns:
-            Filtrelenmiş veri listesi
+            Filtrelenmiş veri listesi.
         """
-        filtered = []
+        filtered: list[dict[str, Any]] = []
         removed_count = 0
 
         for item in data:
             ts_str = item.get(timestamp_field)
             if not ts_str:
-                # Timestamp yok → bilinmeyen durum, filtrele
                 removed_count += 1
                 continue
 
@@ -174,22 +178,23 @@ class PointInTimeValidator:
 
     def validate_no_lookahead(
         self,
-        data: list[dict],
+        data: list[dict[str, Any]],
         data_type: str,
         query_timestamp: datetime,
         timestamp_field: str = "timestamp",
     ) -> dict[str, Any]:
-        """
-        Look-ahead bias kontrolü — sadece doğrulama, filtreleme yapmaz.
+        """Look-ahead bias kontrolü yapar — sadece doğrulama, filtrelemez.
+
+        Args:
+            data: Veri listesi.
+            data_type: Veri tipi.
+            query_timestamp: Sorgu zamanı.
+            timestamp_field: Timestamp alan adı.
 
         Returns:
-            {
-                "clean": True/False,
-                "violations": [...],
-                "total_checked": int,
-            }
+            Doğrulama sonucu: clean, violations, total_checked, violation_count.
         """
-        violations = []
+        violations: list[dict[str, Any]] = []
 
         for i, item in enumerate(data):
             ts_str = item.get(timestamp_field)
@@ -200,14 +205,12 @@ class PointInTimeValidator:
                 data_ts = ts_str if isinstance(ts_str, datetime) else datetime.fromisoformat(str(ts_str))
 
                 if not self.is_available_at(data_type, data_ts, query_timestamp):
-                    violations.append(
-                        {
-                            "index": i,
-                            "data_timestamp": data_ts.isoformat(),
-                            "query_timestamp": query_timestamp.isoformat(),
-                            "data_type": data_type,
-                        }
-                    )
+                    violations.append({
+                        "index": i,
+                        "data_timestamp": data_ts.isoformat(),
+                        "query_timestamp": query_timestamp.isoformat(),
+                        "data_type": data_type,
+                    })
             except (ValueError, TypeError):
                 continue
 
@@ -219,12 +222,25 @@ class PointInTimeValidator:
         }
 
     def get_delay(self, data_type: str) -> timedelta | None:
-        """Veri tipi için gecikme süresini döndür."""
+        """Veri tipi için gecikme süresini döndürür.
+
+        Args:
+            data_type: Veri tipi.
+
+        Returns:
+            Gecikme süresi veya None (bilinmeyen tip).
+        """
         config = self.DATA_DELAYS.get(data_type)
         return config.delay if config else None
 
-    def set_custom_delay(self, data_type: str, delay: timedelta, description: str = "") -> Any:
-        """Özel gecikme süresi tanımla."""
+    def set_custom_delay(self, data_type: str, delay: timedelta, description: str = "") -> None:
+        """Özel gecikme süresi tanımlar.
+
+        Args:
+            data_type: Veri tipi.
+            delay: Gecikme süresi.
+            description: İnsan tarafından okunabilir açıklama.
+        """
         self.DATA_DELAYS[data_type] = PITConfig(
             data_type=data_type,
             delay=delay,
@@ -235,3 +251,10 @@ class PointInTimeValidator:
 
 # Singleton
 pit_validator = PointInTimeValidator()
+
+
+__all__ = [
+    "PITConfig",
+    "PointInTimeValidator",
+    "pit_validator",
+]

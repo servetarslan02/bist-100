@@ -40,6 +40,13 @@ class ReconciliationResult:
     warnings: list[str] = field(default_factory=list)
     timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
+    def __repr__(self) -> str:
+        return (
+            f"ReconciliationResult(ticker={self.ticker!r}, "
+            f"price={self.canonical_price}, conflict={self.conflict}, "
+            f"quality={self.quality_score:.2f})"
+        )
+
 
 class SourceReconciler:
     """
@@ -166,7 +173,14 @@ class SourceReconciler:
         return results
 
     def _compute_canonical_price(self, prices: dict[str, float]) -> float:
-        """Ağırlıklı ortalama ile canonical price hesapla."""
+        """Ağırlıklı ortalama ile canonical price hesaplar.
+
+        Args:
+            prices: {kaynak: fiyat} sözlüğü.
+
+        Returns:
+            Ağırlıklı canonical fiyat.
+        """
         total_weight = 0
         weighted_sum = 0
 
@@ -184,7 +198,16 @@ class SourceReconciler:
         deviations: dict[str, float],
         conflict: bool,
     ) -> float:
-        """Kalite skoru (0-1)."""
+        """Kalite skoru hesaplar (0-1).
+
+        Args:
+            prices: {kaynak: fiyat} sözlüğü.
+            deviations: {kaynak: sapma_%} sözlüğü.
+            conflict: Kaynaklar arası çakışma var mı.
+
+        Returns:
+            Kalite skoru (0.0-1.0).
+        """
         score = 1.0
 
         # Kaynak sayısına göre
@@ -235,3 +258,10 @@ class SourceReconciler:
 
 # Singleton
 source_reconciler = SourceReconciler()
+
+
+__all__ = [
+    "ReconciliationResult",
+    "SourceReconciler",
+    "source_reconciler",
+]

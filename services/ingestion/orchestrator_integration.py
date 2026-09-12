@@ -39,25 +39,60 @@ logger = structlog.get_logger()
 
 @dataclass
 class IngestionResult:
-    """Ingestion sonuç raporu."""
+    """Tek bir hisse için ingestion sonuç raporu.
+
+    Attributes:
+        ticker: Hisse sembolü.
+        market_data: Piyasa verisi sonucu.
+        fundamental_data: Temel veri (bilanço, rasyo).
+        kap_disclosures: KAP açıklamaları.
+        news: İlgili haberler.
+        social: Sosyal medya gönderileri.
+        macro: Makro ekonomik veriler.
+        quality_score: Veri kalite puanı (0-100).
+        reconciliation: Kaynak doğrulama sonucu.
+        errors: Hata mesajları listesi.
+        elapsed_ms: İşlem süresi (milisaniye).
+        timestamp: Sonuç zaman damgası.
+    """
 
     ticker: str
     market_data: ProviderResult | None = None
-    fundamental_data: dict | None = None
-    kap_disclosures: list[dict] = field(default_factory=list)
-    news: list[dict] = field(default_factory=list)
-    social: list[dict] = field(default_factory=list)
-    macro: dict = field(default_factory=dict)
+    fundamental_data: dict[str, Any] | None = None
+    kap_disclosures: list[dict[str, Any]] = field(default_factory=list)
+    news: list[dict[str, Any]] = field(default_factory=list)
+    social: list[dict[str, Any]] = field(default_factory=list)
+    macro: dict[str, Any] = field(default_factory=dict)
     quality_score: float = 0.0
-    reconciliation: dict | None = None
+    reconciliation: dict[str, Any] | None = None
     errors: list[str] = field(default_factory=list)
     elapsed_ms: float = 0.0
     timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
+    def __repr__(self) -> str:
+        return (
+            f"IngestionResult(ticker={self.ticker!r}, "
+            f"quality={self.quality_score:.1f}, "
+            f"errors={len(self.errors)})"
+        )
+
 
 @dataclass
 class PipelineReport:
-    """Tam pipeline raporu."""
+    """Tam pipeline çalıştırma raporu.
+
+    Attributes:
+        total_tickers: Toplam hisse sayısı.
+        successful: Başarılı ingestion sayısı.
+        failed: Başarısız ingestion sayısı.
+        skipped: Atlanan hisse sayısı (incremental).
+        avg_quality_score: Ortalama kalite puanı.
+        total_elapsed_s: Toplam süre (saniye).
+        results: Ticker bazlı sonuçlar.
+        macro_data: Makro veriler.
+        errors: Genel hata mesajları.
+        metrics: Sistem metrikleri.
+    """
 
     total_tickers: int = 0
     successful: int = 0
@@ -66,21 +101,31 @@ class PipelineReport:
     avg_quality_score: float = 0.0
     total_elapsed_s: float = 0.0
     results: dict[str, IngestionResult] = field(default_factory=dict)
-    macro_data: dict = field(default_factory=dict)
+    macro_data: dict[str, Any] = field(default_factory=dict)
     errors: list[str] = field(default_factory=list)
-    metrics: dict = field(default_factory=dict)
+    metrics: dict[str, Any] = field(default_factory=dict)
+
+    def __repr__(self) -> str:
+        return (
+            f"PipelineReport(total={self.total_tickers}, "
+            f"success={self.successful}, failed={self.failed}, "
+            f"skipped={self.skipped})"
+        )
 
 
 class IngestionOrchestrator:
-    """
-    Ingestion orchestrator — tüm pipeline'ı yönetir.
+    """Ingestion orchestrator — tüm pipeline'ı yönetir.
 
     Market data + Fundamental + KAP + News + Social + Macro
-    Tüm resilience katmanları ile korumalı.
+    Tüm resilience katmanları (circuit breaker, rate limiter,
+    dedup, incremental) ile korumalı.
     """
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """IngestionOrchestrator örneği oluşturur.
+
+        Tüm resilience katmanlarını ve provider manager'ı başlatır.
+        """
         # Resilience katmanları
         self._cb_manager = CircuitBreakerManager()
         self._rate_limiter = create_default_rate_limiter()
@@ -96,8 +141,11 @@ class IngestionOrchestrator:
         )
         self._register_providers()
 
-    def _register_providers(self) -> Any:
-        """Provider'ları kaydet."""
+    def _register_providers(self) -> None:
+        """Provider'ları ProviderManager'a kaydeder.
+
+        Market price ve fundamental provider'ları öncelik sırasıyla kaydeder.
+        """
         # Market data providers
         self._pm.register(
             "market_price",
@@ -147,19 +195,22 @@ class IngestionOrchestrator:
         include_macro: bool = True,
         use_reconciliation: bool = True,
     ) -> PipelineReport:
-        """Tam ingestion pipeline çalıştır.
+        """Tam ingestion pipeline çalıştırır.
+
+        Market data, fundamental, KAP, haber, sosyal medya ve makro
+        verilerini paralel olarak çeker.
 
         Args:
-            tickers: Hisse listesi
-            include_fundamental: Fundamental veri dahil mi
-            include_kap: KAP açıklamaları dahil mi
-            include_news: Haberler dahil mi
-            include_social: Sosyal medya dahil mi
-            include_macro: Makro veriler dahil mi
-            use_reconciliation: Kaynaklar arası doğrulama
+            tickers: Hisse listesi.
+            include_fundamental: Fundamental veri dahil mi.
+            include_kap: KAP açıklamaları dahil mi.
+            include_news: Haberler dahil mi.
+            include_social: Sosyal medya dahil mi.
+            include_macro: Makro veriler dahil mi.
+            use_reconciliation: Kaynaklar arası doğrulama.
 
         Returns:
-            PipelineReport
+            PipelineReport: Tam pipeline raporu.
         """
         start_time = time.time()
         report = PipelineReport(total_tickers=len(tickers))
@@ -171,20 +222,31 @@ class IngestionOrchestrator:
             if include_macro:
                 report.macro_data = await self._fetch_macro()
 
-            # 2. Market data + fundamental + KAP paralel
-            market_tasks = []
+            # 2. Haberleri tek seferde çek (tüm ticker'lar paylaşır)
+            shared_news: list[dict[str, Any]] = []
+            if include_news:
+                try:
+                    shared_news = await news_provider.fetch_financial_news_rss()
+                except Exception as exc:
+                    logger.warning("Shared news fetch failed", error=str(exc))
+
+            # 3. Market data + fundamental + KAP paralel
+            market_tasks: list[asyncio.Task[IngestionResult]] = []
             for ticker in tickers:
                 if not self._incremental.should_fetch(ticker, min_interval_seconds=60):
                     report.skipped += 1
                     continue
                 market_tasks.append(
-                    self._ingest_single(
-                        ticker,
-                        include_fundamental=include_fundamental,
-                        include_kap=include_kap,
-                        include_news=include_news,
-                        include_social=include_social,
-                        use_reconciliation=use_reconciliation,
+                    asyncio.create_task(
+                        self._ingest_single(
+                            ticker,
+                            include_fundamental=include_fundamental,
+                            include_kap=include_kap,
+                            include_news=False,  # Haberler yukarıda çekildi
+                            include_social=include_social,
+                            use_reconciliation=use_reconciliation,
+                            shared_news=shared_news,
+                        )
                     )
                 )
 
@@ -235,26 +297,33 @@ class IngestionOrchestrator:
         include_news: bool = True,
         include_social: bool = True,
         use_reconciliation: bool = True,
+        shared_news: list[dict[str, Any]] | None = None,
     ) -> IngestionResult:
-        """Tek hisse için tam ingestion."""
+        """Tek bir hisse için tam ingestion yapar.
+
+        Args:
+            ticker: Hisse sembolü.
+            include_fundamental: Fundamental veri dahil mi.
+            include_kap: KAP açıklamaları dahil mi.
+            include_news: Haberler dahil mi (shared_news yoksa tek başına çeker).
+            include_social: Sosyal medya dahil mi.
+            use_reconciliation: Kaynaklar arası doğrulama.
+            shared_news: Önceden çekilmiş haber listesi (tüm ticker'lar paylaşır).
+
+        Returns:
+            IngestionResult: Hisse bazlı sonuç.
+        """
         start = time.time()
         result = IngestionResult(ticker=ticker)
 
         # Market data
         try:
-            if use_reconciliation:
-                # Çoklu kaynaktan çek
-                market_result = await self._pm.fetch("market_price", ticker=ticker)
-                if market_result:
-                    result.market_data = market_result
-                    result.quality_score = market_result.quality * 100
-            else:
-                market_result = await self._pm.fetch("market_price", ticker=ticker)
-                if market_result:
-                    result.market_data = market_result
-                    result.quality_score = 80.0
-        except Exception as e:
-            result.errors.append(f"market_data: {str(e)}")
+            market_result = await self._pm.fetch("market_price", ticker=ticker)
+            if market_result:
+                result.market_data = market_result
+                result.quality_score = market_result.quality * 100 if use_reconciliation else 80.0
+        except Exception as exc:
+            result.errors.append(f"market_data: {exc}")
 
         # Fundamental
         if include_fundamental:
@@ -262,43 +331,45 @@ class IngestionOrchestrator:
                 fund = await self._pm.fetch("fundamental", ticker=ticker)
                 if fund:
                     result.fundamental_data = fund.data
-            except Exception as e:
-                result.errors.append(f"fundamental: {str(e)}")
+            except Exception as exc:
+                result.errors.append(f"fundamental: {exc}")
 
         # KAP
         if include_kap:
             try:
                 disclosures = await kap_provider.fetch_disclosures(ticker=ticker, limit=10)
-                # Dedup
                 for disc in disclosures:
                     if not self._dedup.check_and_mark(disc):
                         result.kap_disclosures.append(disc)
-            except Exception as e:
-                result.errors.append(f"kap: {str(e)}")
+            except Exception as exc:
+                result.errors.append(f"kap: {exc}")
 
-        # News
-        if include_news:
+        # News — shared_news kullan veya tek başına çek
+        if include_news or shared_news is not None:
             try:
-                news = await news_provider.fetch_financial_news_rss()
-                # Hisse ile eşleştir
-                matched = [n for n in news if news_provider.match_news_to_ticker(n, ticker)]
+                news_items = shared_news if shared_news is not None else await news_provider.fetch_financial_news_rss()
+                matched = [n for n in news_items if news_provider.match_news_to_ticker(n, ticker)]
                 result.news = matched[:5]
-            except Exception as e:
-                result.errors.append(f"news: {str(e)}")
+            except Exception as exc:
+                result.errors.append(f"news: {exc}")
 
         # Social
         if include_social:
             try:
                 social = await social_provider.fetch_all_social(ticker)
                 result.social = social.get("items", [])[:10]
-            except Exception as e:
-                result.errors.append(f"social: {str(e)}")
+            except Exception as exc:
+                result.errors.append(f"social: {exc}")
 
         result.elapsed_ms = round((time.time() - start) * 1000, 2)
         return result
 
     async def _fetch_macro(self) -> dict[str, Any]:
-        """Makro verileri çek."""
+        """Makro ekonomik verileri çeker.
+
+        Returns:
+            Makro veri sözlüğü. Hata durumunda boş dict.
+        """
         try:
             from ..core.config import settings
 
@@ -313,12 +384,16 @@ class IngestionOrchestrator:
                 tcmb_api_key=tcmb_key,
                 fred_api_key=fred_key,
             )
-        except Exception as e:
-            logger.warning("Macro fetch failed", error=str(e))
+        except Exception as exc:
+            logger.warning("Macro fetch failed", error=str(exc))
             return {}
 
     def get_health(self) -> dict[str, Any]:
-        """Sistem sağlık durumu."""
+        """Sistem sağlık durumunu döndürür.
+
+        Returns:
+            Provider, circuit breaker, rate limiter, dedup ve incremental durumları.
+        """
         return {
             "providers": self._pm.get_health(),
             "circuit_breakers": self._cb_manager.get_all_states(),
@@ -330,3 +405,11 @@ class IngestionOrchestrator:
 
 # Singleton
 ingestion_orchestrator = IngestionOrchestrator()
+
+
+__all__ = [
+    "IngestionResult",
+    "PipelineReport",
+    "IngestionOrchestrator",
+    "ingestion_orchestrator",
+]
