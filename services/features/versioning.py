@@ -55,6 +55,9 @@ class VersionSnapshot:
     created_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     created_by: str = "system"
 
+    def __repr__(self) -> str:
+        return f"VersionSnapshot({self.feature_name!r}, v{self.version}, pit_safe={self.pit_safe})"
+
 
 @dataclass
 class VersionDiff:
@@ -68,6 +71,9 @@ class VersionDiff:
     is_compatible: bool
     compatibility_notes: list[str]
 
+    def __repr__(self) -> str:
+        return f"VersionDiff({self.feature_name!r}, v{self.old_version}→v{self.new_version}, compatible={self.is_compatible})"
+
 
 @dataclass
 class CompatibilityReport:
@@ -80,6 +86,9 @@ class CompatibilityReport:
     breaking_changes: list[str]
     warnings: list[str]
     notes: list[str]
+
+    def __repr__(self) -> str:
+        return f"CompatibilityReport({self.feature_name!r}, compatible={self.is_compatible}, breaking={len(self.breaking_changes)})"
 
 
 class FeatureVersionManager:
@@ -96,11 +105,15 @@ class FeatureVersionManager:
     def __init__(self) -> None:
         """Feature version manager başlatıcısı.
 
-        Version geçmişi ve mevcut version havuzlarını初始化ler.
+        Version geçmişi ve mevcut version havuzlarını başlatır.
         """
         self._versions: dict[str, list[VersionSnapshot]] = {}  # feature_name → [versions]
         self._current: dict[str, VersionSnapshot] = {}  # feature_name → current version
         self._history: list[dict[str, Any]] = []
+
+    def __repr__(self) -> str:
+        total_versions = sum(len(v) for v in self._versions.values())
+        return f"FeatureVersionManager(features={len(self._versions)}, versions={total_versions})"
 
     def register(self, contract: Any) -> int:
         """Feature contract'ı kaydet. Değişiklik varsa version artır.
@@ -415,6 +428,8 @@ class FeatureVersionManager:
         if len(self._history) > 1000:
             self._history = self._history[-1000:]
 
+
+__all__: list[str] = ["VersionSnapshot", "VersionDiff", "CompatibilityReport", "FeatureVersionManager", "feature_version_manager"]
 
 # Singleton
 feature_version_manager = FeatureVersionManager()
