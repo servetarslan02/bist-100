@@ -14,10 +14,13 @@ import structlog
 
 logger = structlog.get_logger()
 
-TRADINGVIEW_SCANNER_URL = "https://scanner.tradingview.com/turkey/scan"
+# Varsayılan sabitler
+DEFAULT_TRADINGVIEW_SCANNER_URL: str = "https://scanner.tradingview.com/turkey/scan"
+DEFAULT_TRADINGVIEW_TIMEOUT: float = 10.0
+DEFAULT_TRADINGVIEW_MAX_ROWS: int = 800
 
 # İstenen metrikler ve indikatör sütunları
-SCANNER_COLUMNS = [
+DEFAULT_SCANNER_COLUMNS: list[str] = [
     "name",
     "description",
     "close",
@@ -44,7 +47,12 @@ SCANNER_COLUMNS = [
 class TradingViewProvider:
     """TradingView Scanner API üzerinden yüksek performanslı BIST veri sağlayıcısı."""
 
-    def __init__(self, timeout: float = 10.0):
+    def __init__(self, timeout: float = DEFAULT_TRADINGVIEW_TIMEOUT) -> None:
+        """TradingViewProvider örneği oluşturur.
+
+        Args:
+            timeout: HTTP istekleri için zaman aşımı (saniye).
+        """
         self._timeout = timeout
         self._cache: dict[str, dict[str, Any]] = {}
         self._last_fetch_time: datetime | None = None
@@ -58,6 +66,14 @@ class TradingViewProvider:
             "Content-Type": "application/json",
         }
 
+    def __repr__(self) -> str:
+        """TradingViewProvider string temsili.
+
+        Returns:
+            İnsan tarafından okunabilir temsil.
+        """
+        return f"TradingViewProvider(cached={len(self._cache)}, last_fetch={self._last_fetch_time})"
+
     async def fetch_all_bist_stocks(self) -> dict[str, dict[str, Any]]:
         """Tüm BIST hisselerini tek bir istekte çeker ve sözlük olarak döner.
 
@@ -68,15 +84,15 @@ class TradingViewProvider:
             "filter": [],
             "options": {"lang": "tr"},
             "symbols": {"query": {"types": []}},
-            "columns": SCANNER_COLUMNS,
+            "columns": DEFAULT_SCANNER_COLUMNS,
             "sort": {"sortBy": "Value.Traded", "sortOrder": "desc"},
-            "range": [0, 800],
+            "range": [0, DEFAULT_TRADINGVIEW_MAX_ROWS],
         }
 
         try:
             async with httpx.AsyncClient(timeout=self._timeout) as client:
                 response = await client.post(
-                    TRADINGVIEW_SCANNER_URL,
+                    DEFAULT_TRADINGVIEW_SCANNER_URL,
                     json=payload,
                     headers=self._headers,
                 )
@@ -95,10 +111,10 @@ class TradingViewProvider:
 
                 for row in rows:
                     cols = row.get("d", [])
-                    if not cols or len(cols) < len(SCANNER_COLUMNS):
+                    if not cols or len(cols) < len(DEFAULT_SCANNER_COLUMNS):
                         continue
 
-                    raw_item = dict(zip(SCANNER_COLUMNS, cols, strict=False))
+                    raw_item = dict(zip(DEFAULT_SCANNER_COLUMNS, cols, strict=False))
                     ticker = raw_item.get("name")
                     if not ticker or not isinstance(ticker, str):
                         continue
@@ -168,3 +184,6 @@ class TradingViewProvider:
 
 # Global singleton
 tradingview_provider = TradingViewProvider()
+
+
+__all__ = ["TradingViewProvider", "tradingview_provider"]
