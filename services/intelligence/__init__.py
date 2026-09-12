@@ -35,6 +35,21 @@ Modüller:
 
 # Core pipeline
 from .advanced_monte_carlo import AdvancedMonteCarloEngine
+from .analysis_engines import (  # noqa: E402
+    CorrelationEngine,
+    DataConfidenceEngine,
+    DrawdownEngine,
+    ModelRiskEngine,
+    PortfolioOptimization,
+    PositionRiskEngine,
+    PriceActionEngine,
+    RelativeStrengthEngine,
+    SectorEngine,
+    SupportResistanceEngine,
+    VolumeEngine,
+)
+from .candle_patterns import CandlePatternEngine, CandleMetrics, CandlePatternResult
+from .dynamic_candle_matrix import DynamicCandleMatrix, DynamicPatternMetrics
 
 # Calibration
 from .confidence_calibrator import ConfidenceCalibrator
@@ -108,6 +123,25 @@ __all__ = [
     # Monte Carlo
     "MonteCarloEngine",
     "AdvancedMonteCarloEngine",
+    # Analysis Engines
+    "PriceActionEngine",
+    "SupportResistanceEngine",
+    "VolumeEngine",
+    "SectorEngine",
+    "RelativeStrengthEngine",
+    "CorrelationEngine",
+    "DrawdownEngine",
+    "PositionRiskEngine",
+    "ModelRiskEngine",
+    "DataConfidenceEngine",
+    "PortfolioOptimization",
+    # Candle Patterns
+    "CandlePatternEngine",
+    "CandleMetrics",
+    "CandlePatternResult",
+    # Dynamic Candle Matrix
+    "DynamicCandleMatrix",
+    "DynamicPatternMetrics",
     # Engines
     "SPECEngine",
     "TradePlanner",

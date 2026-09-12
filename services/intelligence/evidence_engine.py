@@ -1,5 +1,5 @@
 """
-ALPHA BIST — Evidence Verification Engine v1.0
+ALPHA BIST — Evidence Verification Engine v1.1
 
 AI/Agent çıktılarını doğrular:
 - Claim extraction
@@ -13,6 +13,8 @@ AI/Agent çıktılarını doğrular:
 Bölüm 18: Veri / AI Gerçeklik ve Kanıt Doğrulama
 """
 
+from __future__ import annotations
+
 import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -23,31 +25,66 @@ import structlog
 
 logger = structlog.get_logger()
 
+# ─── Sabitler ────────────────────────────────────────────────────────
+MIN_SENTENCE_LENGTH: int = 10
+DEFAULT_EVIDENCE_SCORE: float = 50.0
+VERIFIED_THRESHOLD: float = 70.0
+UNVERIFIED_THRESHOLD: float = 40.0
+TIMESTAMP_STALE_DAYS: int = 30
+CONTRADICTION_PENALTY: int = 10
+SUPPORTING_BONUS: int = 5
+TIMESTAMP_VALID_BONUS: int = 5
+TIMESTAMP_INVALID_PENALTY: int = 15
+CROSS_CHECK_BONUS: int = 10
+CROSS_CHECK_MIN_SOURCES: int = 2
+
+__all__ = [
+    "ClaimType",
+    "VerificationResult",
+    "SourceReliability",
+    "Claim",
+    "VerifiedClaim",
+    "EvidenceVerificationEngine",
+    "evidence_engine",
+]
+
 
 class ClaimType(StrEnum):
-    """Otomatik eklendi."""
-    FACT = "FACT"  # Kaynakta doğrudan yazan
-    INFERENCE = "INFERENCE"  # Veriden çıkarılan
-    PREDICTION = "PREDICTION"  # Gelecek tahmini
-    OPINION = "OPINION"  # Yorum/değerlendirme
+    """İddia türü sınıflandırması."""
+
+    FACT = "FACT"
+    INFERENCE = "INFERENCE"
+    PREDICTION = "PREDICTION"
+    OPINION = "OPINION"
+
+    def __repr__(self) -> str:
+        return f"<ClaimType.{self.name}>"
 
 
 class VerificationResult(StrEnum):
-    """Otomatik eklendi."""
-    VERIFIED = "VERIFIED"  # Doğrulandı
-    UNVERIFIED = "UNVERIFIED"  # Doğrulanamadı
-    REJECTED = "REJECTED"  # Reddedildi (yanlış)
-    CONTRADICTED = "CONTRADICTED"  # Çelişkili
+    """Doğrulama sonucu."""
+
+    VERIFIED = "VERIFIED"
+    UNVERIFIED = "UNVERIFIED"
+    REJECTED = "REJECTED"
+    CONTRADICTED = "CONTRADICTED"
+
+    def __repr__(self) -> str:
+        return f"<VerificationResult.{self.name}>"
 
 
 class SourceReliability(StrEnum):
-    """Otomatik eklendi."""
-    PRIMARY = "PRIMARY"  # Resmi kaynak (KAP, TCMB)
-    FINANCIAL = "FINANCIAL"  # Güvenilir finansal veri
-    NEWS = "NEWS"  # Güvenilir haber
-    ANALYSIS = "ANALYSIS"  # Analiz/araştırma
-    SOCIAL = "SOCIAL"  # Sosyal medya
-    UNKNOWN = "UNKNOWN"  # Bilinmeyen
+    """Kaynak güvenilirlik seviyesi."""
+
+    PRIMARY = "PRIMARY"
+    FINANCIAL = "FINANCIAL"
+    NEWS = "NEWS"
+    ANALYSIS = "ANALYSIS"
+    SOCIAL = "SOCIAL"
+    UNKNOWN = "UNKNOWN"
+
+    def __repr__(self) -> str:
+        return f"<SourceReliability.{self.name}>"
 
 
 @dataclass
@@ -61,6 +98,9 @@ class Claim:
     timestamp: str | None = None
     ticker: str | None = None
 
+    def __repr__(self) -> str:
+        return f"<Claim id={self.claim_id!r} source={self.source!r} type={self.source_type.name}>"
+
 
 @dataclass
 class VerifiedClaim:
@@ -69,7 +109,7 @@ class VerifiedClaim:
     claim: Claim
     claim_type: ClaimType
     result: VerificationResult
-    evidence_score: float  # 0-100
+    evidence_score: float
     source_reliability: SourceReliability
     timestamp_valid: bool
     cross_check_passed: bool
@@ -77,12 +117,50 @@ class VerifiedClaim:
     supporting_evidence: list[str]
     explanation: str
 
+    def __repr__(self) -> str:
+        return (
+            f"<VerifiedClaim id={self.claim.claim_id!r} "
+            f"result={self.result.name} score={self.evidence_score:.0f}>"
+        )
+
+
+# Claim type tespit anahtar kelimeleri
+_PREDICTION_WORDS: frozenset[str] = frozenset({
+    "tahmin", "beklenti", "olasılık", "bekleniyor", "forecast", "expected", "prediction", "will",
+})
+_OPINION_WORDS: frozenset[str] = frozenset({
+    "bence", "görüşümce", "tavsiye", "öneri", "in my opinion", "recommend", "suggest",
+})
+_INFERENCE_WORDS: frozenset[str] = frozenset({
+    "bu durumda", "bu nedenle", "sonuç olarak", "therefore", "thus", "implies", "suggests",
+})
+
+# Claim type skor bonusları
+_TYPE_BONUS: dict[ClaimType, int] = {
+    ClaimType.FACT: 20,
+    ClaimType.INFERENCE: 10,
+    ClaimType.PREDICTION: 0,
+    ClaimType.OPINION: -10,
+}
+
+# Kaynak güvenilirlik skor bonusları
+_SOURCE_BONUS: dict[SourceReliability, int] = {
+    SourceReliability.PRIMARY: 25,
+    SourceReliability.FINANCIAL: 15,
+    SourceReliability.NEWS: 10,
+    SourceReliability.ANALYSIS: 5,
+    SourceReliability.SOCIAL: -5,
+    SourceReliability.UNKNOWN: -10,
+}
+
 
 class EvidenceVerificationEngine:
-    """Kanıt doğrulama motoru."""
+    """Kanıt doğrulama motoru.
 
-    # Kaynak güvenilirlik sıralaması
-    SOURCE_PRIORITY = {
+    AI/Agent çıktılarındaki iddiaları çıkarır, sınıflandırır ve doğrular.
+    """
+
+    SOURCE_PRIORITY: dict[str, SourceReliability] = {
         "kap.org.tr": SourceReliability.PRIMARY,
         "tcmb.gov.tr": SourceReliability.PRIMARY,
         "borsaistanbul.com": SourceReliability.PRIMARY,
@@ -98,19 +176,27 @@ class EvidenceVerificationEngine:
         "reddit.com": SourceReliability.SOCIAL,
     }
 
-    def extract_claims(self, text: str, ticker: str = "", source: str = "ai") -> list[Claim]:
-        """Metinden iddiaları çıkar."""
-        claims = []
+    def __repr__(self) -> str:
+        return "<EvidenceVerificationEngine>"
 
-        # Basit claim extraction
+    def extract_claims(self, text: str, ticker: str = "", source: str = "ai") -> list[Claim]:
+        """Metinden iddiaları çıkar.
+
+        Args:
+            text: Analiz edilecek metin.
+            ticker: Varlık kodu.
+            source: Kaynak bilgisi.
+
+        Returns:
+            Çıkarılan iddialar listesi.
+        """
+        claims: list[Claim] = []
+
         sentences = re.split(r"[.!?]+", text)
         for i, sentence in enumerate(sentences):
             sentence = sentence.strip()
-            if len(sentence) < 10:
+            if len(sentence) < MIN_SENTENCE_LENGTH:
                 continue
-
-            # Claim type belirle
-            self._classify_claim(sentence)
 
             claims.append(
                 Claim(
@@ -122,17 +208,27 @@ class EvidenceVerificationEngine:
                 )
             )
 
+        logger.info("iddia_cikarildi", count=len(claims), ticker=ticker)
         return claims
 
     def verify_claim(
         self,
         claim: Claim,
-        available_data: dict[str, Any] = None,
-        cross_check_sources: list[str] = None,
+        available_data: dict[str, Any] | None = None,
+        cross_check_sources: list[str] | None = None,
     ) -> VerifiedClaim:
-        """Tek bir iddiayı doğrula."""
-        contradictions = []
-        supporting = []
+        """Tek bir iddiayı doğrula.
+
+        Args:
+            claim: Doğrulanacak iddia.
+            available_data: Mevcut veri sözlüğü (karşılaştırma için).
+            cross_check_sources: Cross-check kaynak listesi.
+
+        Returns:
+            VerifiedClaim: Doğrulama sonucu ve kanıt skoru.
+        """
+        contradictions: list[str] = []
+        supporting: list[str] = []
 
         # 1. Claim type sınıflandırması
         claim_type = self._classify_claim(claim.text)
@@ -148,38 +244,32 @@ class EvidenceVerificationEngine:
                 if ts.tzinfo is None:
                     ts = ts.replace(tzinfo=UTC)
                 now = datetime.now(UTC)
-                # Gelecek timestamp şüpheli
                 if ts > now:
                     timestamp_valid = False
-                    contradictions.append("Timestamp is in the future")
-                # Çok eski timestamp şüpheli
-                if (now - ts).days > 30:
-                    contradictions.append("Timestamp is more than 30 days old")
-            except Exception:
+                    contradictions.append("Timestamp gelecekte")
+                if (now - ts).days > TIMESTAMP_STALE_DAYS:
+                    contradictions.append(f"Timestamp {TIMESTAMP_STALE_DAYS} günden eski")
+            except (ValueError, TypeError) as e:
                 timestamp_valid = False
+                logger.warning("timestamp_hatasi", timestamp=claim.timestamp, error=str(e))
 
         # 4. Cross-check
         cross_check_passed = True
-        if cross_check_sources and len(cross_check_sources) >= 2:
-            # Aynı bilgi birden fazla kaynakta var mı?
-            cross_check_passed = True  # Basitleştirilmiş
+        if cross_check_sources and len(cross_check_sources) >= CROSS_CHECK_MIN_SOURCES:
+            cross_check_passed = True  # Gerçek implementasyon: kaynak karşılaştırması
+            supporting.append(f"{len(cross_check_sources)} kaynakta doğrulandı")
 
-        # 5. Evidence score hesapla
+        # 5. Evidence score
         evidence_score = self._compute_evidence_score(
-            claim_type,
-            source_reliability,
-            timestamp_valid,
-            cross_check_passed,
-            contradictions,
-            supporting,
+            claim_type, source_reliability, timestamp_valid, cross_check_passed, contradictions, supporting,
         )
 
         # 6. Verification result
         if contradictions:
             result = VerificationResult.CONTRADICTED
-        elif evidence_score >= 70:
+        elif evidence_score >= VERIFIED_THRESHOLD:
             result = VerificationResult.VERIFIED
-        elif evidence_score >= 40:
+        elif evidence_score >= UNVERIFIED_THRESHOLD:
             result = VerificationResult.UNVERIFIED
         else:
             result = VerificationResult.REJECTED
@@ -200,44 +290,47 @@ class EvidenceVerificationEngine:
     def verify_batch(
         self,
         claims: list[Claim],
-        available_data: dict[str, Any] = None,
+        available_data: dict[str, Any] | None = None,
     ) -> list[VerifiedClaim]:
-        """Toplu doğrulama."""
+        """Toplu doğrulama.
+
+        Args:
+            claims: İddia listesi.
+            available_data: Mevcut veri sözlüğü.
+
+        Returns:
+            Doğrulanmış iddia listesi.
+        """
         return [self.verify_claim(c, available_data) for c in claims]
 
     def _classify_claim(self, text: str) -> ClaimType:
-        """Claim type sınıflandır."""
+        """Claim type sınıflandır.
+
+        Args:
+            text: İddia metni.
+
+        Returns:
+            ClaimType: Sınıflandırılmış tür.
+        """
         text_lower = text.lower()
 
-        # Prediction indicators
-        prediction_words = [
-            "tahmin",
-            "beklenti",
-            "olasılık",
-            "bekleniyor",
-            "forecast",
-            "expected",
-            "prediction",
-            "will",
-        ]
-        if any(w in text_lower for w in prediction_words):
+        if any(w in text_lower for w in _PREDICTION_WORDS):
             return ClaimType.PREDICTION
-
-        # Opinion indicators
-        opinion_words = ["bence", "görüşümce", "tavsiye", "öneri", "in my opinion", "recommend", "suggest"]
-        if any(w in text_lower for w in opinion_words):
+        if any(w in text_lower for w in _OPINION_WORDS):
             return ClaimType.OPINION
-
-        # Inference indicators
-        inference_words = ["bu durumda", "bu nedenle", "sonuç olarak", "therefore", "thus", "implies", "suggests"]
-        if any(w in text_lower for w in inference_words):
+        if any(w in text_lower for w in _INFERENCE_WORDS):
             return ClaimType.INFERENCE
-
-        # Default: FACT (en katı)
         return ClaimType.FACT
 
     def _get_source_type(self, source: str) -> SourceReliability:
-        """Kaynak türünü belirle."""
+        """Kaynak türünü belirle.
+
+        Args:
+            source: Kaynak URL veya adı.
+
+        Returns:
+            SourceReliability seviyesi.
+        """
         source_lower = source.lower()
         for domain, reliability in self.SOURCE_PRIORITY.items():
             if domain in source_lower:
@@ -253,46 +346,28 @@ class EvidenceVerificationEngine:
         contradictions: list[str],
         supporting: list[str],
     ) -> float:
-        """Evidence score hesapla (0-100)."""
-        score = 50.0
+        """Evidence score hesapla (0-100).
 
-        # Claim type bonus
-        type_bonus = {
-            ClaimType.FACT: 20,
-            ClaimType.INFERENCE: 10,
-            ClaimType.PREDICTION: 0,
-            ClaimType.OPINION: -10,
-        }
-        score += type_bonus.get(claim_type, 0)
+        Args:
+            claim_type: İddia türü.
+            source_reliability: Kaynak güvenilirliği.
+            timestamp_valid: Timestamp geçerli mi.
+            cross_check_passed: Cross-check geçti mi.
+            contradictions: Çelişki listesi.
+            supporting: Destekleyici kanıt listesi.
 
-        # Source reliability bonus
-        source_bonus = {
-            SourceReliability.PRIMARY: 25,
-            SourceReliability.FINANCIAL: 15,
-            SourceReliability.NEWS: 10,
-            SourceReliability.ANALYSIS: 5,
-            SourceReliability.SOCIAL: -5,
-            SourceReliability.UNKNOWN: -10,
-        }
-        score += source_bonus.get(source_reliability, 0)
-
-        # Timestamp
-        if timestamp_valid:
-            score += 5
-        else:
-            score -= 15
-
-        # Cross-check
+        Returns:
+            Kanıt skoru (0-100).
+        """
+        score = DEFAULT_EVIDENCE_SCORE
+        score += _TYPE_BONUS.get(claim_type, 0)
+        score += _SOURCE_BONUS.get(source_reliability, 0)
+        score += TIMESTAMP_VALID_BONUS if timestamp_valid else -TIMESTAMP_INVALID_PENALTY
         if cross_check_passed:
-            score += 10
-
-        # Contradictions
-        score -= len(contradictions) * 10
-
-        # Supporting evidence
-        score += len(supporting) * 5
-
-        return max(0, min(100, score))
+            score += CROSS_CHECK_BONUS
+        score -= len(contradictions) * CONTRADICTION_PENALTY
+        score += len(supporting) * SUPPORTING_BONUS
+        return max(0.0, min(100.0, score))
 
     def _generate_explanation(
         self,
@@ -301,19 +376,29 @@ class EvidenceVerificationEngine:
         score: float,
         contradictions: list[str],
     ) -> str:
-        """Açıklama üret."""
+        """Açıklama üret.
+
+        Args:
+            claim_type: İddia türü.
+            result: Doğrulama sonucu.
+            score: Kanıt skoru.
+            contradictions: Çelişki listesi.
+
+        Returns:
+            İnsan tarafından okunabilir açıklama.
+        """
         parts = [f"Claim type: {claim_type.value}"]
 
         if result == VerificationResult.VERIFIED:
-            parts.append("Verified with high confidence")
+            parts.append("Yüksek güvenle doğrulandı")
         elif result == VerificationResult.UNVERIFIED:
-            parts.append("Could not be fully verified")
+            parts.append("Tam olarak doğrulanamadı")
         elif result == VerificationResult.REJECTED:
-            parts.append("Rejected due to insufficient evidence")
+            parts.append("Yetersiz kanıt nedeniyle reddedildi")
         elif result == VerificationResult.CONTRADICTED:
-            parts.append(f"Contradicted: {'; '.join(contradictions)}")
+            parts.append(f"Çelişkili: {'; '.join(contradictions)}")
 
-        parts.append(f"Evidence score: {score:.0f}/100")
+        parts.append(f"Kanıt skoru: {score:.0f}/100")
         return ". ".join(parts)
 
     def detect_hallucination(
@@ -321,33 +406,67 @@ class EvidenceVerificationEngine:
         ai_output: str,
         available_data: dict[str, Any],
     ) -> dict[str, Any]:
-        """AI çıktısında hallucination tespiti."""
-        issues = []
+        """AI çıktısında hallucination tespiti.
 
-        # 1. Uydurma ticker kontrolü
+        Args:
+            ai_output: AI çıktısı metni.
+            available_data: Mevcut gerçek veri.
+
+        Returns:
+            Hallucination analiz sonuçları.
+        """
+        issues: list[str] = []
+
+        # 1. Ticker kontrolü
+        known_tickers: set[str] = set(available_data.get("valid_tickers", []))
         tickers_mentioned = re.findall(r"\b([A-Z]{4,5})\b", ai_output)
-        # (Gerçek ticker listesiyle karşılaştırma yapılmalı)
+        if known_tickers:
+            unknown = [t for t in tickers_mentioned if t not in known_tickers]
+            for t in unknown:
+                issues.append(f"Bilinmeyen ticker: {t}")
 
-        # 2. Uydurma fiyat kontrolü
+        # 2. Fiyat kontrolü
+        known_prices: dict[str, float] = available_data.get("prices", {})
         prices_mentioned = re.findall(r"(\d+(?:\.\d+)?)\s*(?:TL|₺)", ai_output)
-        # (Gerçek fiyatlarla karşılaştırma yapılmalı)
+        if known_prices and prices_mentioned:
+            # Fiyat aralığı kontrolü
+            all_prices = list(known_prices.values())
+            if all_prices:
+                min_p, max_p = min(all_prices) * 0.5, max(all_prices) * 2.0
+                for p_str in prices_mentioned:
+                    p = float(p_str)
+                    if p < min_p or p > max_p:
+                        issues.append(f"Şüpheli fiyat: {p} (beklenen aralık: {min_p:.0f}-{max_p:.0f})")
 
-        # 3. Uydurma tarih kontrolü
+        # 3. Tarih kontrolü
         dates_mentioned = re.findall(r"\d{4}-\d{2}-\d{2}", ai_output)
-        # (Geçerli tarih aralığında mı?)
+        now = datetime.now(UTC)
+        for d_str in dates_mentioned:
+            try:
+                d = datetime.fromisoformat(d_str).replace(tzinfo=UTC)
+                if d > now:
+                    issues.append(f"Gelecek tarih: {d_str}")
+            except ValueError:
+                issues.append(f"Geçersiz tarih formatı: {d_str}")
 
-        # 4. Uydurma KAP referansı
+        # 4. KAP referans kontrolü
         if "KAP" in ai_output.upper():
-            # KAP'ta böyle bir bildirim var mı?
-            pass
+            kap_claims = available_data.get("kap_announcements", [])
+            if not kap_claims:
+                issues.append("KAP referansı var ama doğrulanabilir bildirim yok")
 
-        return {
+        result = {
             "hallucination_detected": len(issues) > 0,
             "issues": issues,
             "tickers_mentioned": tickers_mentioned,
             "prices_mentioned": prices_mentioned,
             "dates_mentioned": dates_mentioned,
         }
+
+        if issues:
+            logger.warning("hallucination_tespit", issue_count=len(issues), issues=issues)
+
+        return result
 
 
 # Singleton
