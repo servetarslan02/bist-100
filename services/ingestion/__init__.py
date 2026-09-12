@@ -40,6 +40,9 @@ from .retry_policy import HTTPStatusError, RetryExhaustedError, RetryPolicy, get
 def get_orchestrator() -> Any:
     """Gecikmeli (lazy) orchestrator yükleyici — sadece gerektiğinde import edilir.
 
+    Args:
+        Yok.
+
     Returns:
         IngestionOrchestrator: Hazır orchestrator örneği.
 

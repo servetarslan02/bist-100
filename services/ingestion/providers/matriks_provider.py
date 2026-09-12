@@ -29,7 +29,14 @@ class MatriksProvider:
     """Matriks veri sağlayıcısı (async, cross-validation)."""
 
     def __init__(self) -> None:
-        """MatriksProvider örneği oluşturur."""
+        """MatriksProvider örneği oluşturur.
+
+        Args:
+            Yok.
+
+        Returns:
+            Yok.
+        """
         self._client = get_client(
             "matriks",
             timeout=DEFAULT_MATRIKS_TIMEOUT,
@@ -90,6 +97,7 @@ class MatriksProvider:
         output: dict[str, dict] = {}
         for item in results:
             if isinstance(item, Exception):
+                logger.error("Matriks batch fetch hatası", error=str(item))
                 continue
             ticker, data = item
             if data:

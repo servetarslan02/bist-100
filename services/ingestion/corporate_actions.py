@@ -103,6 +103,11 @@ class CorporateAction:
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def __repr__(self) -> str:
+        """CorporateAction string temsili.
+
+        Returns:
+            İnsan tarafından okunabilir temsil.
+        """
         return (
             f"CorporateAction(ticker={self.ticker!r}, "
             f"type={self.action_type.value!r}, "
@@ -121,7 +126,14 @@ class CorporateActionsHandler:
     """
 
     def __init__(self) -> None:
-        """CorporateActionsHandler örneği oluşturur."""
+        """CorporateActionsHandler örneği oluşturur.
+
+        Args:
+            Yok.
+
+        Returns:
+            Yok.
+        """
         self._actions: dict[str, list[CorporateAction]] = {}
         self._applied: set[str] = set()
 
@@ -145,6 +157,9 @@ class CorporateActionsHandler:
 
         Raises:
             ValueError: Ticker boş olduğunda.
+
+        Returns:
+            Yok.
         """
         if not action.ticker or not action.ticker.strip():
             logger.warning("Corporate action rejected: empty ticker", action_id=action.action_id)
@@ -330,6 +345,9 @@ class CorporateActionsHandler:
 
         Args:
             kap_events: KAP ham olay listesi.
+
+        Returns:
+            Yok.
         """
         if not kap_events:
             return

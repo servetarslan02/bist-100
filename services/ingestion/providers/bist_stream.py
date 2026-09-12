@@ -1,7 +1,7 @@
 """
 ALPHA BIST — BIST Market Data Stream v1.0
 
-5. Gerçek BIST streaming market data provider.
+Gerçek BIST streaming market data provider.
 Ücretsiz seçenekler:
 - BISTECH API (ücretli ama en doğru)
 - Investing.com WebSocket (ücretsiz, gecikmeli)
@@ -10,6 +10,7 @@ ALPHA BIST — BIST Market Data Stream v1.0
 """
 
 import asyncio
+import os
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -60,7 +61,14 @@ class BISTStreamProvider:
     """
 
     def __init__(self) -> None:
-        """BISTStreamProvider örneği oluşturur."""
+        """BISTStreamProvider örneği oluşturur.
+
+        Args:
+            Yok.
+
+        Returns:
+            Yok.
+        """
         self._handlers: list[Callable] = []
         self._running = False
         self._source = "yfinance"
@@ -98,6 +106,12 @@ class BISTStreamProvider:
 
         Args:
             source: Veri kaynağı ("yfinance", "investing", "websocket").
+
+        Returns:
+            Yok.
+
+        Raises:
+            ValueError: Bilinmeyen kaynak adı.
         """
         self._source = source
         self._running = True
@@ -112,7 +126,14 @@ class BISTStreamProvider:
             logger.error("Unknown stream source", source=source)
 
     async def stop(self) -> None:
-        """Stream'i durdurur."""
+        """Stream'i durdurur.
+
+        Args:
+            Yok.
+
+        Returns:
+            Yok.
+        """
         self._running = False
         logger.info("BIST stream stopped", source=self._source, ticks=self._tick_count)
 
@@ -121,6 +142,12 @@ class BISTStreamProvider:
 
         Ücretsiz, 15dk gecikmeli, ama sürekli.
         Blokluyor yf.download() asyncio.to_thread ile sarılır.
+
+        Args:
+            Yok.
+
+        Returns:
+            Yok.
         """
         from ..bist_universe import bist_universe
 
@@ -183,6 +210,12 @@ class BISTStreamProvider:
         """Investing.com WebSocket stream.
 
         Ücretsiz, gecikmeli, ama sürekli.
+
+        Args:
+            Yok.
+
+        Returns:
+            Yok.
         """
         try:
             import websockets
@@ -194,7 +227,7 @@ class BISTStreamProvider:
                 subscribe_msg = orjson.dumps(
                     {
                         "_event": "bulk-subscribe",
-                        "message": "pid-list:497,347,1052,...",  # Investing.com BIST IDs
+                        "message": "pid-list:" + os.getenv("INVESTING_BIST_IDS", ""),
                     }
                 ).decode()
                 await ws.send(subscribe_msg)
@@ -244,9 +277,13 @@ class BISTStreamProvider:
 
         BISTECH veya özel feed bağlanabilir.
         API key ortam değişkeninden okunmalıdır.
-        """
-        import os
 
+        Args:
+            Yok.
+
+        Returns:
+            Yok.
+        """
         api_key = os.getenv("BISTECH_API_KEY", "")
         if not api_key:
             logger.error("BISTECH_API_KEY ortam değişkeni tanımlı değil")
@@ -316,6 +353,9 @@ class BISTStreamProvider:
 
     def get_stats(self) -> dict[str, Any]:
         """İstatistikleri döndürür.
+
+        Args:
+            Yok.
 
         Returns:
             Provider istatistik sözlüğü.

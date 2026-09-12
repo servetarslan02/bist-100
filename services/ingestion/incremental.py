@@ -45,6 +45,11 @@ class FetchState:
     last_success: bool = True
 
     def __repr__(self) -> str:
+        """FetchState string temsili.
+
+        Returns:
+            İnsan tarafından okunabilir temsil.
+        """
         return (
             f"FetchState(ticker={self.ticker!r}, "
             f"fetch_count={self.fetch_count}, "
@@ -69,6 +74,11 @@ class IncrementalStats:
     total_errors: int = 0
 
     def __repr__(self) -> str:
+        """IncrementalStats string temsili.
+
+        Returns:
+            İnsan tarafından okunabilir temsil.
+        """
         return (
             f"IncrementalStats(checks={self.total_checks}, "
             f"fetches={self.total_fetches}, "
@@ -91,6 +101,9 @@ class IncrementalFetcher:
 
         Args:
             default_lookback_hours: İlk çekimde geriye dönük bakılacak saat.
+
+        Returns:
+            Yok.
         """
         self._states: dict[str, FetchState] = {}
         self._checkpoints: dict[str, str] = {}
@@ -160,6 +173,9 @@ class IncrementalFetcher:
             ticker: Hisse kodu.
             success: Çekme başarılı mı.
             error: Hata mesajı (başarısızsa).
+
+        Returns:
+            Yok.
         """
         now = time.time()
         state = self._states.get(ticker)
@@ -215,6 +231,9 @@ class IncrementalFetcher:
     def get_all_states(self) -> dict[str, dict[str, Any]]:
         """Tüm ticker durumlarını döndürür.
 
+        Args:
+            Yok.
+
         Returns:
             {ticker: durum_sözlüğü} yapısı.
         """
@@ -232,6 +251,9 @@ class IncrementalFetcher:
 
     def get_stats(self) -> dict[str, Any]:
         """İstatistikleri döndürür.
+
+        Args:
+            Yok.
 
         Returns:
             İstatistik sözlüğü.
@@ -271,6 +293,9 @@ class IncrementalFetcher:
 
         Args:
             ticker: Belirli bir ticker sıfırlanacak (None = tümü).
+
+        Returns:
+            Yok.
         """
         if ticker:
             self._states.pop(ticker, None)

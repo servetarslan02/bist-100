@@ -80,7 +80,14 @@ class RateLimiter:
     """
 
     def __init__(self) -> None:
-        """RateLimiter örneği oluşturur."""
+        """RateLimiter örneği oluşturur.
+
+        Args:
+            Yok.
+
+        Returns:
+            Yok.
+        """
         self._limits: dict[str, RateLimitConfig] = {}
         self._timestamps: dict[str, list[float]] = {}
         self._stats: dict[str, RateLimitStats] = {}
@@ -104,6 +111,9 @@ class RateLimiter:
             max_requests: Pencerede izin verilen maksimum istek.
             window_seconds: Pencere süresi (saniye).
             burst_size: Anlık patlama izni (0 = max_requests ile aynı).
+
+        Returns:
+            Yok.
         """
         self._limits[provider] = RateLimitConfig(
             max_requests=max_requests,
@@ -221,6 +231,9 @@ class RateLimiter:
             Args:
                 limiter: Üst RateLimiter örneği.
                 provider: Provider adı.
+
+            Returns:
+                Yok.
             """
             self._limiter = limiter
             self._provider = provider
@@ -289,6 +302,9 @@ class RateLimiter:
     def get_all_stats(self) -> dict[str, dict[str, Any]]:
         """Tüm provider istatistiklerini döndürür.
 
+        Args:
+            Yok.
+
         Returns:
             {provider_adı: istatistik_sözlüğü} yapısı.
         """
@@ -322,6 +338,9 @@ BIST_RATE_LIMITS: dict[str, dict[str, int | float]] = {  # noqa: RUF012
 
 def create_default_rate_limiter() -> RateLimiter:
     """Varsayılan BIST limitleri ile rate limiter oluşturur.
+
+    Args:
+        Yok.
 
     Returns:
         Yapılandırılmış RateLimiter örneği.

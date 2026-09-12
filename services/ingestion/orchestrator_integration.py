@@ -124,6 +124,12 @@ class IngestionOrchestrator:
         """IngestionOrchestrator örneği oluşturur.
 
         Tüm resilience katmanlarını ve provider manager'ı başlatır.
+
+        Args:
+            Yok.
+
+        Returns:
+            Yok.
         """
         # Resilience katmanları
         self._cb_manager = CircuitBreakerManager()
@@ -388,6 +394,9 @@ class IngestionOrchestrator:
 
     def get_health(self) -> dict[str, Any]:
         """Sistem sağlık durumunu döndürür.
+
+        Args:
+            Yok.
 
         Returns:
             Provider, circuit breaker, rate limiter, dedup ve incremental durumları.

@@ -280,7 +280,14 @@ class SurvivorshipBiasProtection:
     """
 
     def __init__(self) -> None:
-        """SurvivorshipBiasProtection örneği oluşturur."""
+        """SurvivorshipBiasProtection örneği oluşturur.
+
+        Args:
+            Yok.
+
+        Returns:
+            Yok.
+        """
         self._delisted: dict[str, dict[str, str]] = {}
 
     def __repr__(self) -> str:
@@ -298,6 +305,9 @@ class SurvivorshipBiasProtection:
             ticker: Hisse sembolü.
             delist_date: Delist tarihi (ISO format).
             reason: Delist sebebi.
+
+        Returns:
+            Yok.
         """
         self._delisted[ticker] = {
             "delist_date": delist_date,
@@ -340,6 +350,9 @@ class SurvivorshipBiasProtection:
 
     def get_delisted(self) -> dict[str, dict[str, str]]:
         """Delisted şirketleri döndürür.
+
+        Args:
+            Yok.
 
         Returns:
             {ticker: delist_bilgisi} sözlüğü.

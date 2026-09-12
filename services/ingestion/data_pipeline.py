@@ -60,6 +60,11 @@ class PipelineResult:
     processing_time_ms: float = 0.0
 
     def __repr__(self) -> str:
+        """PipelineResult string temsili.
+
+        Returns:
+            İnsan tarafından okunabilir temsil.
+        """
         return (
             f"PipelineResult(ticker={self.ticker!r}, "
             f"accepted={self.accepted}, "
@@ -68,6 +73,9 @@ class PipelineResult:
 
     def to_dict(self) -> dict[str, Any]:
         """Sonucu sözlüğe dönüştürür.
+
+        Args:
+            Yok.
 
         Returns:
             PipelineResult sözlük gösterimi.
@@ -105,6 +113,11 @@ class PipelineReport:
     elapsed_s: float
 
     def __repr__(self) -> str:
+        """PipelineReport string temsili.
+
+        Returns:
+            İnsan tarafından okunabilir temsil.
+        """
         return (
             f"PipelineReport(total={self.total}, "
             f"accepted={self.accepted}, "
@@ -114,6 +127,9 @@ class PipelineReport:
 
     def to_dict(self) -> dict[str, Any]:
         """Raporu sözlüğe dönüştürür.
+
+        Args:
+            Yok.
 
         Returns:
             PipelineReport sözlük gösterimi.
@@ -130,6 +146,9 @@ class PipelineReport:
 
     def _count_rejections(self) -> dict[str, int]:
         """Reddetme sebeplerini sayar.
+
+        Args:
+            Yok.
 
         Returns:
             {sebep: sayı} sözlüğü.
@@ -162,6 +181,9 @@ class DataPipeline:
         Args:
             min_quality_score: Kabul için minimum kalite puanı (0-100).
             require_passing: Kalite kontrol geçme zorunluluğu.
+
+        Returns:
+            Yok.
         """
         self._dq = DataQualityV2()
         self._calc = FeatureCalculator()
@@ -346,6 +368,9 @@ class DataPipeline:
             action: İşlem türü ("accepted", "rejected", "error").
             reason: Reddetme sebebi.
             quality_score: Kalite puanı.
+
+        Returns:
+            Yok.
         """
         self._audit_log.append(
             {

@@ -57,7 +57,11 @@ class StockInfo:
     source: str = ""
 
     def __repr__(self) -> str:
-        """StockInfo string temsili."""
+        """StockInfo string temsili.
+
+        Returns:
+            İnsan tarafından okunabilir temsil.
+        """
         return (
             f"StockInfo(ticker={self.ticker!r}, "
             f"sector={self.sector!r}, status={self.listing_status!r})"
@@ -68,7 +72,14 @@ class LiveUniverseScraper:
     """Canlı kamu ve finans kaynaklarından tüm BIST hisselerini çeker."""
 
     def __init__(self, timeout_seconds: float = DEFAULT_UNIVERSE_TIMEOUT) -> None:
-        """LiveUniverseScraper örneği oluşturur."""
+        """LiveUniverseScraper örneği oluşturur.
+
+        Args:
+            timeout_seconds: HTTP zaman aşımı (saniye).
+
+        Returns:
+            Yok.
+        """
         self.timeout = httpx.Timeout(timeout_seconds, connect=DEFAULT_UNIVERSE_CONNECT_TIMEOUT)
         self.headers = {
             "User-Agent": (
@@ -81,7 +92,14 @@ class LiveUniverseScraper:
         }
 
     def _get_client(self) -> httpx.Client:
-        """Yeni veya havuzlu HTTP client döndür."""
+        """Yeni veya havuzlu HTTP client döndürür.
+
+        Args:
+            Yok.
+
+        Returns:
+            Yapılandırılmış httpx.Client.
+        """
         return httpx.Client(headers=self.headers, timeout=self.timeout, follow_redirects=True)
 
     def __repr__(self) -> str:
@@ -142,11 +160,13 @@ class LiveUniverseScraper:
         return discovered
 
     def discover_all_bist_stocks(self) -> dict[str, StockInfo]:
-        """Tüm kaynakları tarayarak eksiksiz BIST hisse evrenini keşfet.
+        """Tüm kaynakları tarayarak eksiksiz BIST hisse evrenini keşfeder.
 
-        ÖNCELİK SIRASI:
-        1. BİRİNCİL LİSTE: TradingView Scanner API (Tüm BIST hisseleri tek pakette)
-        2. YEDEK LİSTE: Mynet Finans, Bigpara, İş Yatırım (Eksik veya alternatif hisseler için)
+        Args:
+            Yok.
+
+        Returns:
+            {ticker: StockInfo} sözlüğü.
         """
         discovered: dict[str, StockInfo] = {}
 
@@ -241,7 +261,17 @@ class LiveUniverseScraper:
         tv_sector: str = "",
         tv_industry: str = "",
     ) -> str:
-        """Hisse sembolü, şirket adı veya TradingView sektöründen BIST sektörünü eşle."""
+        """Hisse sembolü, şirket adı veya TradingView sektöründen BIST sektörünü eşler.
+
+        Args:
+            ticker: Hisse sembolü.
+            name: Şirket adı.
+            tv_sector: TradingView sektörü.
+            tv_industry: TradingView endüstrisi.
+
+        Returns:
+            Sektör string'i.
+        """
         # 1. TradingView sektör eşlemesi
         if tv_sector:
             sec_map = {
@@ -342,7 +372,14 @@ class UniverseAutoUpdater:
     DEFAULT_CACHE_TTL_HOURS: int = 12
 
     def __init__(self) -> None:
-        """UniverseAutoUpdater örneği oluşturur."""
+        """UniverseAutoUpdater örneği oluşturur.
+
+        Args:
+            Yok.
+
+        Returns:
+            Yok.
+        """
         self.scraper = LiveUniverseScraper()
         self._universe: dict[str, StockInfo] = {}
         self._indices: dict[str, list[str]] = {
@@ -355,7 +392,14 @@ class UniverseAutoUpdater:
         return f"<UniverseAutoUpdater(total_stocks={len(self._universe)}, indices={list(self._indices.keys())})>"
 
     def get_universe(self, force_refresh: bool = False) -> dict[str, StockInfo]:
-        """Güncel hisse evrenini döndür."""
+        """Güncel hisse evrenini döndürür.
+
+        Args:
+            force_refresh: Zorla yenileme bayrağı.
+
+        Returns:
+            {ticker: StockInfo} sözlüğü.
+        """
         if not force_refresh and self._is_cache_valid():
             self._load_from_cache()
             if len(self._universe) > DEFAULT_MIN_UNIVERSE_SIZE:
@@ -364,7 +408,14 @@ class UniverseAutoUpdater:
         return self.refresh_universe()
 
     def refresh_universe(self) -> dict[str, StockInfo]:
-        """Hisse evrenini tüm canlı kaynaklardan sıfırdan çek ve güncelle."""
+        """Hisse evrenini tüm canlı kaynaklardan sıfırdan çeker ve günceller.
+
+        Args:
+            Yok.
+
+        Returns:
+            {ticker: StockInfo} sözlüğü.
+        """
         logger.info("Starting complete live BIST universe auto-discovery...")
 
         # 1. Canlı kaynaklardan tüm BIST hisselerini çek
@@ -387,7 +438,13 @@ class UniverseAutoUpdater:
         return self._universe
 
     def _filter_delisted_tickers(self) -> None:
-        """TradingView Scanner üzerinden aktif olmayan hisseleri evrenden temizle.
+        """TradingView Scanner üzerinden aktif olmayan hisseleri evrenden temizler.
+
+        Args:
+            Yok.
+
+        Returns:
+            Yok.
 
         Mantık:
         - TradingView Scanner tüm aktif BIST hisselerini döndürür (birincil kaynak).
@@ -470,7 +527,14 @@ class UniverseAutoUpdater:
 
 
     def _refresh_index_compositions(self) -> None:
-        """BIST 100, BIST 30, BIST 50 endeks üyeliklerini belirler."""
+        """BIST 100, BIST 30, BIST 50 endeks üyeliklerini belirler.
+
+        Args:
+            Yok.
+
+        Returns:
+            Yok.
+        """
         BIST_100_BENCHMARK = [
             "AEFES",
             "AGHOL",
@@ -643,25 +707,53 @@ class UniverseAutoUpdater:
             info.index_membership = members
 
     def get_index_members(self, index: str = "XU100") -> list[str]:
-        """Endeks üyelerini döndür."""
+        """Endeks üyelerini döndürür.
+
+        Args:
+            index: Endeks adı.
+
+        Returns:
+            Ticker listesi.
+        """
         if not self._universe:
             self.get_universe()
         return self._indices.get(index, [])
 
     def get_tickers_by_sector(self, sector: str) -> list[str]:
-        """Sektöre göre hisseleri döndür."""
+        """Sektöre göre hisseleri döndürür.
+
+        Args:
+            sector: Sektör adı.
+
+        Returns:
+            Ticker listesi.
+        """
         if not self._universe:
             self.get_universe()
         return [t for t, info in self._universe.items() if info.sector == sector.upper()]
 
     def get_all_sectors(self) -> list[str]:
-        """Tüm sektörleri döndür."""
+        """Tüm sektörleri döndürür.
+
+        Args:
+            Yok.
+
+        Returns:
+            Sektör listesi.
+        """
         if not self._universe:
             self.get_universe()
         return sorted(list(set(info.sector for info in self._universe.values())))
 
     def get_sector_stats(self) -> dict[str, int]:
-        """Sektör bazlı istatistikler."""
+        """Sektör bazlı istatistikleri döndürür.
+
+        Args:
+            Yok.
+
+        Returns:
+            {sektör: hisse_sayısı} sözlüğü.
+        """
         if not self._universe:
             self.get_universe()
         stats = {}
@@ -670,13 +762,27 @@ class UniverseAutoUpdater:
         return stats
 
     def is_active(self, ticker: str) -> bool:
-        """Hisse aktif mi?"""
+        """Hissenin aktif olup olmadığını kontrol eder.
+
+        Args:
+            ticker: Hisse sembolü.
+
+        Returns:
+            True: Aktif, False: Değil.
+        """
         if not self._universe:
             self.get_universe()
         return ticker in self._universe
 
     def _is_cache_valid(self) -> bool:
-        """Cache geçerli mi?"""
+        """Cache geçerli mi kontrol eder.
+
+        Args:
+            Yok.
+
+        Returns:
+            True: Geçerli, False: Süresi dolmuş.
+        """
         if not self.CACHE_FILE.exists():
             return False
         try:
@@ -686,7 +792,14 @@ class UniverseAutoUpdater:
             return False
 
     def _load_from_cache(self) -> None:
-        """Cache'den yükler."""
+        """Cache'den yükler.
+
+        Args:
+            Yok.
+
+        Returns:
+            Yok.
+        """
         try:
             with open(self.CACHE_FILE, encoding="utf-8") as f:
                 data = orjson.loads(f.read())
@@ -698,7 +811,14 @@ class UniverseAutoUpdater:
             logger.warning("Cache load failed", error=str(e))
 
     def _save_to_cache(self, force: bool = False) -> None:
-        """Cache'e kaydeder (debounced — SSD dostu)."""
+        """Cache'e kaydeder (debounced — SSD dostu).
+
+        Args:
+            force: Zorla kaydetme bayrağı.
+
+        Returns:
+            Yok.
+        """
         from services.core.debounce import should_save
 
         if not self._universe:
@@ -729,32 +849,74 @@ universe_updater = UniverseAutoUpdater()
 
 
 def get_current_universe() -> dict[str, StockInfo]:
-    """Güncel hisse evrenini döndürür."""
+    """Güncel hisse evrenini döndürür.
+
+    Args:
+        Yok.
+
+    Returns:
+        {ticker: StockInfo} sözlüğü.
+    """
     return universe_updater.get_universe()
 
 
 def get_bist_100() -> list[str]:
-    """BIST 100 endeks üyelerini döndürür."""
+    """BIST 100 endeks üyelerini döndürür.
+
+    Args:
+        Yok.
+
+    Returns:
+        Ticker listesi.
+    """
     return universe_updater.get_index_members("XU100")
 
 
 def get_bist_30() -> list[str]:
-    """BIST 30 endeks üyelerini döndürür."""
+    """BIST 30 endeks üyelerini döndürür.
+
+    Args:
+        Yok.
+
+    Returns:
+        Ticker listesi.
+    """
     return universe_updater.get_index_members("XU030")
 
 
 def get_bist_50() -> list[str]:
-    """BIST 50 endeks üyelerini döndürür."""
+    """BIST 50 endeks üyelerini döndürür.
+
+    Args:
+        Yok.
+
+    Returns:
+        Ticker listesi.
+    """
     return universe_updater.get_index_members("XU050")
 
 
 def get_all_tickers() -> list[str]:
-    """Tüm ticker listesini döndürür."""
+    """Tüm ticker listesini döndürür.
+
+    Args:
+        Yok.
+
+    Returns:
+        Ticker listesi.
+    """
     return list(universe_updater.get_universe().keys())
 
 
 def get_sector(ticker: str) -> str:
-    """Hissenin sektörünü döndürür."""
+    """Hissenin sektörünü döndürür.
+
+    Args:
+        ticker: Hisse sembolü.
+
+    Returns:
+        Sektör string'i.
+    """
     universe = universe_updater.get_universe()
     info = universe.get(ticker)
     return info.sector if info else "DIGER"

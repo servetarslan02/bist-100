@@ -33,7 +33,14 @@ class QuestDBTickConsumer:
     """
 
     def __init__(self) -> None:
-        """QuestDBTickConsumer örneği oluşturur."""
+        """QuestDBTickConsumer örneği oluşturur.
+
+        Args:
+            Yok.
+
+        Returns:
+            Yok.
+        """
         self._running = False
         self._buffer: list[dict[str, Any]] = []
         self._buffer_size = 100
@@ -53,6 +60,12 @@ class QuestDBTickConsumer:
 
         QuestDB bağlantısını kurar, tabloları oluşturur ve
         NATS'tan tick olaylarını dinlemeye başlar.
+
+        Args:
+            Yok.
+
+        Returns:
+            Yok.
 
         Raises:
             ConnectionError: QuestDB bağlantısı kurulamazsa (retry ile devam eder).
@@ -79,6 +92,12 @@ class QuestDBTickConsumer:
         """Consumer'ı durdurur.
 
         Buffer'daki kalan verileri flush eder ve bağlantıyı kapatır.
+
+        Args:
+            Yok.
+
+        Returns:
+            Yok.
         """
         self._running = False
 
@@ -245,6 +264,9 @@ class QuestDBTickConsumer:
 
     def get_stats(self) -> dict[str, Any]:
         """İstatistikleri döndürür.
+
+        Args:
+            Yok.
 
         Returns:
             Consumer istatistik sözlüğü.

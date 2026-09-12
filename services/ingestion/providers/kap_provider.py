@@ -41,7 +41,14 @@ class KAPProvider:
     }
 
     def __init__(self) -> None:
-        """KAPProvider örneği oluşturur."""
+        """KAPProvider örneği oluşturur.
+
+        Args:
+            Yok.
+
+        Returns:
+            Yok.
+        """
         self._client = get_client(
             "kap",
             timeout=DEFAULT_KAP_TIMEOUT,
@@ -69,14 +76,17 @@ class KAPProvider:
         category: str | None = None,
         limit: int = 50,
     ) -> list[dict[str, Any]]:
-        """KAP açıklamalarını çek (async).
+        """KAP açıklamalarını çeker (async).
 
         Args:
-            from_date: Başlangıç tarihi (YYYY-MM-DD)
-            to_date: Bitiş tarihi (YYYY-MM-DD)
-            ticker: Hisse kodu (opsiyonel)
-            category: Kategori filtresi (opsiyonel)
-            limit: Maksimum sonuç sayısı
+            from_date: Başlangıç tarihi (YYYY-MM-DD).
+            to_date: Bitiş tarihi (YYYY-MM-DD).
+            ticker: Hisse kodu (opsiyonel).
+            category: Kategori filtresi (opsiyonel).
+            limit: Maksimum sonuç sayısı.
+
+        Returns:
+            KAP açıklamaları listesi.
         """
         try:
             params = {"fromDate": from_date or "", "toDate": to_date or "", "limit": str(limit)}
@@ -115,7 +125,14 @@ class KAPProvider:
             return []
 
     async def fetch_company_info(self, ticker: str) -> dict[str, Any] | None:
-        """Şirket bilgisi çek (async)."""
+        """Şirket bilgisi çeker (async).
+
+        Args:
+            ticker: Hisse kodu.
+
+        Returns:
+            Şirket bilgisi sözlüğü veya None.
+        """
         try:
             data = await self._client.get_json(f"{DEFAULT_KAP_API_URL}/company/{ticker}")
             if data:
@@ -135,7 +152,14 @@ class KAPProvider:
             return None
 
     async def fetch_financial_data(self, ticker: str) -> dict[str, Any] | None:
-        """Finansal veri çek (async)."""
+        """Finansal veri çeker (async).
+
+        Args:
+            ticker: Hisse kodu.
+
+        Returns:
+            Finansal veri sözlüğü veya None.
+        """
         try:
             data = await self._client.get_json(f"{DEFAULT_KAP_API_URL}/financial/{ticker}")
             if data:
@@ -162,7 +186,16 @@ class KAPProvider:
         from_date: str | None = None,
         to_date: str | None = None,
     ) -> list[dict[str, Any]]:
-        """Şirket olaylarını çek (async) — temettü, bölünme, bedelsiz."""
+        """Şirket olaylarını çeker (async) — temettü, bölünme, bedelsiz.
+
+        Args:
+            ticker: Hisse kodu (opsiyonel).
+            from_date: Başlangıç tarihi (opsiyonel).
+            to_date: Bitiş tarihi (opsiyonel).
+
+        Returns:
+            Şirket olayları listesi.
+        """
         try:
             params = {"limit": "100"}
             if ticker:
@@ -207,12 +240,27 @@ class KAPProvider:
         ticker: str,
         from_date: str | None = None,
     ) -> list[dict[str, Any]]:
-        """Fiyat olayı niteliğindeki KAP açıklamaları (async)."""
+        """Fiyat olayı niteliğindeki KAP açıklamalarını çeker (async).
+
+        Args:
+            ticker: Hisse kodu.
+            from_date: Başlangıç tarihi (opsiyonel).
+
+        Returns:
+            Fiyat hassasiyetli açıklamalar listesi.
+        """
         all_disclosures = await self.fetch_disclosures(ticker=ticker, from_date=from_date, limit=100)
         return [d for d in all_disclosures if d.get("is_price_sensitive")]
 
     def _is_price_sensitive(self, item: dict) -> bool:
-        """Fiyat olayı niteliğinde mi?"""
+        """Fiyat olayı niteliğinde olup olmadığını kontrol eder.
+
+        Args:
+            item: KAP açıklaması sözlüğü.
+
+        Returns:
+            Fiyat hassasiyetli ise True.
+        """
         category = item.get("category", "").upper()
         title = (item.get("title", "") + " " + item.get("summary", "")).lower()
 
@@ -246,7 +294,14 @@ class KAPProvider:
         return any(kw in title for kw in sensitive_keywords)
 
     def _classify_sentiment(self, item: dict) -> float:
-        """KAP açıklaması sentiment skoru."""
+        """KAP açıklaması sentiment skoru hesaplar.
+
+        Args:
+            item: KAP açıklaması sözlüğü.
+
+        Returns:
+            Sentiment skoru (-1.0 ile 1.0 arası).
+        """
         title = (item.get("title", "") + " " + item.get("summary", "")).lower()
 
         positive = [
@@ -332,7 +387,14 @@ class KAPProvider:
         return round((pos - neg) / total, 3)
 
     def _classify_importance(self, item: dict) -> int:
-        """Önem derecesi (1-5)."""
+        """Önem derecesini sınıflandırır (1-5).
+
+        Args:
+            item: KAP açıklaması sözlüğü.
+
+        Returns:
+            Önem derecesi (1-5).
+        """
         category = item.get("category", "").upper()
 
         if category in ("DIVIDEND", "MERGER", "CAPITAL_MARKETS"):
@@ -344,7 +406,14 @@ class KAPProvider:
         return 2
 
     def _classify_action_type(self, item: dict) -> str | None:
-        """Şirket olayı türünü sınıflandır."""
+        """Şirket olayı türünü sınıflandırır.
+
+        Args:
+            item: KAP açıklaması sözlüğü.
+
+        Returns:
+            Olay türü string'i veya None.
+        """
         title = (item.get("title", "") + " " + item.get("summary", "")).lower()
 
         if any(w in title for w in ["temettü", "kar payı", "dividend"]):
@@ -364,7 +433,14 @@ class KAPProvider:
         return None
 
     def _extract_amount(self, item: dict) -> float | None:
-        """Temettü miktarını çıkar."""
+        """Temettü miktarını çıkarır.
+
+        Args:
+            item: KAP açıklaması sözlüğü.
+
+        Returns:
+            Temettü miktarı veya None.
+        """
         text = item.get("title", "") + " " + item.get("summary", "")
         patterns = [
             r"(\d+[.,]\d+)\s*(?:TL|₺|tl)",
@@ -385,7 +461,14 @@ class KAPProvider:
         return None
 
     def _extract_ratio(self, item: dict) -> float | None:
-        """Bölünme/bedelsiz oranını çıkar (% veya x:y formatı)."""
+        """Bölünme/bedelsiz oranını çıkarır (% veya x:y formatı).
+
+        Args:
+            item: KAP açıklaması sözlüğü.
+
+        Returns:
+            Oran değeri veya None.
+        """
         text = item.get("title", "") + " " + item.get("summary", "")
         patterns = [
             r"%\s*(\d+[.,]?\d*)",
@@ -404,7 +487,17 @@ class KAPProvider:
         return None
 
     def sync_disclosures_to_registry(self, disclosures: list[dict[str, Any]], current_date: str) -> int:
-        """KAP bildirimlerinden VBTS / Tedbir / İşlem durdurma kararlarını ayıklar ve KAPMarketRestrictionRegistry'ye kaydeder."""
+        """KAP bildirimlerinden VBTS / Tedbir / İşlem durdurma kararlarını ayıklar.
+
+        KAPMarketRestrictionRegistry'ye kaydeder.
+
+        Args:
+            disclosures: KAP açıklamaları listesi.
+            current_date: Güncel tarih (YYYY-MM-DD).
+
+        Returns:
+            Kaydedilen kısıtlama sayısı.
+        """
         from services.paper_trading.kap_market_restriction_registry import kap_restriction_registry
 
         registered_count = 0
@@ -454,7 +547,14 @@ class KAPProvider:
         return registered_count
 
     async def close(self) -> None:
-        """HTTP istemcisini kapatır."""
+        """HTTP istemcisini kapatır.
+
+        Args:
+            Yok.
+
+        Returns:
+            Yok.
+        """
         await self._client.close()
 
 

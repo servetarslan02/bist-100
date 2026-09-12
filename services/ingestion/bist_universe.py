@@ -30,15 +30,33 @@ class BISTUniverse:
     """
 
     def __init__(self) -> None:
-        """BIST hisse evreni yöneticisini başlatır."""
+        """BIST hisse evreni yöneticisini başlatır.
+
+        Args:
+            Yok.
+
+        Returns:
+            Yok.
+        """
         self.logger = structlog.get_logger()
         self._updater = universe_updater
 
     def __repr__(self) -> str:
+        """BISTUniverse string temsili.
+
+        Returns:
+            İnsan tarafından okunabilir temsil.
+        """
         return f"<BISTUniverse(total_tickers={len(self.BIST_ALL_TICKERS)}, primary_source='tradingview')>"
 
     def refresh(self) -> None:
         """Hisse evrenini canlı kaynaklardan yeniden tarar.
+
+        Args:
+            Yok.
+
+        Returns:
+            Yok.
 
         Raises:
             RuntimeError: Kaynak taraması başarısız olduğunda.
@@ -53,6 +71,9 @@ class BISTUniverse:
     def BIST_ALL_TICKERS(self) -> list[str]:
         """TÜM BIST hisse sembolleri listesi (600+ hisse).
 
+        Args:
+            Yok.
+
         Returns:
             Hisse sembollerinin listesi.
         """
@@ -63,6 +84,9 @@ class BISTUniverse:
     def BIST_100_TICKERS(self) -> list[str]:
         """BIST 100 endeksine üye hisseler.
 
+        Args:
+            Yok.
+
         Returns:
             BIST 100 hisse sembollerinin listesi.
         """
@@ -71,6 +95,9 @@ class BISTUniverse:
     @property
     def BIST_30_TICKERS(self) -> list[str]:
         """BIST 30 endeksine üye hisseler.
+
+        Args:
+            Yok.
 
         Returns:
             BIST 30 hisse sembollerinin listesi.
@@ -81,6 +108,9 @@ class BISTUniverse:
     def BIST_50_TICKERS(self) -> list[str]:
         """BIST 50 endeksine üye hisseler.
 
+        Args:
+            Yok.
+
         Returns:
             BIST 50 hisse sembollerinin listesi.
         """
@@ -89,6 +119,9 @@ class BISTUniverse:
     @property
     def SECTOR_MAP(self) -> dict[str, str]:
         """Tüm hisselerin sektör haritası.
+
+        Args:
+            Yok.
 
         Returns:
             {ticker: sektör_adi} sözlüğü.
@@ -99,6 +132,9 @@ class BISTUniverse:
     @property
     def COMPANY_NAMES(self) -> dict[str, str]:
         """Tüm hisselerin şirket isimleri.
+
+        Args:
+            Yok.
 
         Returns:
             {ticker: şirket_adi} sözlüğü.
@@ -171,6 +207,9 @@ class BISTUniverse:
     def get_tickers(self) -> list[str]:
         """Tüm hisseleri getirir.
 
+        Args:
+            Yok.
+
         Returns:
             Tüm BIST hisse sembollerinin listesi.
         """
@@ -206,6 +245,9 @@ bist_universe = BISTUniverse()
 def get_bist_universe() -> list[str]:
     """Tüm BIST hisse sembollerini döndürür.
 
+    Args:
+        Yok.
+
     Returns:
         Hisse sembollerinin listesi.
     """
@@ -226,6 +268,9 @@ def get_sector(ticker: str) -> str:
 
 def get_bist_stocks() -> list[str]:
     """Dinamik tüm hisseleri getirir.
+
+    Args:
+        Yok.
 
     Returns:
         Tüm BIST hisse sembollerinin listesi.

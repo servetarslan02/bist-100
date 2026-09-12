@@ -42,7 +42,14 @@ class RealtimeDataProvider:
     """
 
     def __init__(self) -> None:
-        """RealtimeDataProvider örneği oluşturur."""
+        """RealtimeDataProvider örneği oluşturur.
+
+        Args:
+            Yok.
+
+        Returns:
+            Yok.
+        """
         self._running = False
         self._handlers: list[Callable[..., Any]] = []
         self._last_prices: dict[str, float] = {}
@@ -69,6 +76,9 @@ class RealtimeDataProvider:
 
         Args:
             handler: (ticker, price, volume, change_pct) alan fonksiyon.
+
+        Returns:
+            Yok.
         """
         self._handlers.append(handler)
         if len(self._handlers) > DEFAULT_MAX_HANDLERS:
@@ -80,6 +90,9 @@ class RealtimeDataProvider:
         Args:
             tickers: İzlenecek hisse listesi.
             provider: Veri kaynağı ("yfinance" veya "matriks").
+
+        Returns:
+            Yok.
         """
         self._running = True
         self._provider = provider
@@ -187,6 +200,9 @@ class RealtimeDataProvider:
     def get_all_prices(self) -> dict[str, float]:
         """Tüm son fiyatları döndürür.
 
+        Args:
+            Yok.
+
         Returns:
             {ticker: fiyat} sözlüğü.
         """
@@ -194,6 +210,9 @@ class RealtimeDataProvider:
 
     def get_stats(self) -> dict[str, Any]:
         """İstatistikleri döndürür.
+
+        Args:
+            Yok.
 
         Returns:
             Provider istatistik sözlüğü.
@@ -212,7 +231,14 @@ class RealtimeDataProvider:
         }
 
     async def stop(self) -> None:
-        """Veri akışını durdurur."""
+        """Veri akışını durdurur.
+
+        Args:
+            Yok.
+
+        Returns:
+            Yok.
+        """
         self._running = False
         logger.info("Realtime data provider stopped")
 

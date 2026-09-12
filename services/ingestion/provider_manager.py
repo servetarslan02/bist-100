@@ -156,6 +156,9 @@ class ProviderManager:
         Args:
             rate_limiter_instance: Rate limiter örneği.
             circuit_breaker_manager: Circuit breaker yöneticisi.
+
+        Returns:
+            Yok.
         """
         self._providers: dict[str, list[ProviderConfig]] = {}
         self._health: dict[str, ProviderHealth] = {}
@@ -187,6 +190,9 @@ class ProviderManager:
             timeout_s: Çağrı timeout süresi (saniye).
             retry_policy: Özel retry policy (None = varsayılan).
             circuit_breaker_config: Circuit breaker yapılandırması.
+
+        Returns:
+            Yok.
         """
         if data_type not in self._providers:
             self._providers[data_type] = []
@@ -385,6 +391,9 @@ class ProviderManager:
     def get_health(self) -> dict[str, dict[str, Any]]:
         """Tüm provider sağlık durumlarını döndürür.
 
+        Args:
+            Yok.
+
         Returns:
             {provider_adı: sağlık_sözlüğü} yapısı.
         """
@@ -406,6 +415,9 @@ class ProviderManager:
     def get_circuit_breaker_states(self) -> dict[str, dict[str, Any]]:
         """Tüm circuit breaker durumlarını döndürür.
 
+        Args:
+            Yok.
+
         Returns:
             {provider_adı: durum_sözlüğü} yapısı.
         """
@@ -413,6 +425,9 @@ class ProviderManager:
 
     def get_rate_limiter_stats(self) -> dict[str, dict[str, Any]]:
         """Tüm rate limiter istatistiklerini döndürür.
+
+        Args:
+            Yok.
 
         Returns:
             {provider_adı: istatistik_sözlüğü} yapısı.
@@ -422,6 +437,9 @@ class ProviderManager:
     def get_retry_stats(self) -> dict[str, dict[str, Any]]:
         """Tüm retry istatistiklerini döndürür.
 
+        Args:
+            Yok.
+
         Returns:
             {provider_adı: istatistik_sözlüğü} yapısı.
         """
@@ -429,6 +447,9 @@ class ProviderManager:
 
     def get_full_status(self) -> dict[str, Any]:
         """Tam durum raporu döndürür.
+
+        Args:
+            Yok.
 
         Returns:
             Tüm bileşenlerin durum sözlüğü.
@@ -448,6 +469,9 @@ class ProviderManager:
         Args:
             data_type: Veri tipi.
             name: Provider adı.
+
+        Returns:
+            Yok.
         """
         for p in self._providers.get(data_type, []):
             if p.name == name:
@@ -461,6 +485,9 @@ class ProviderManager:
         Args:
             data_type: Veri tipi.
             name: Provider adı.
+
+        Returns:
+            Yok.
         """
         for p in self._providers.get(data_type, []):
             if p.name == name:

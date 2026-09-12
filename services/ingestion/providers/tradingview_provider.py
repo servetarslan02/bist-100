@@ -52,6 +52,9 @@ class TradingViewProvider:
 
         Args:
             timeout: HTTP istekleri için zaman aşımı (saniye).
+
+        Returns:
+            Yok.
         """
         self._timeout = timeout
         self._cache: dict[str, dict[str, Any]] = {}
@@ -76,6 +79,9 @@ class TradingViewProvider:
 
     async def fetch_all_bist_stocks(self) -> dict[str, dict[str, Any]]:
         """Tüm BIST hisselerini tek bir istekte çeker ve sözlük olarak döner.
+
+        Args:
+            Yok.
 
         Returns:
             dict[ticker, dict]: Hisse sembolüne göre yapılandırılmış piyasa verileri.
@@ -178,7 +184,14 @@ class TradingViewProvider:
             return self._cache
 
     def get_cached_stock(self, ticker: str) -> dict[str, Any] | None:
-        """Önbellekten tek bir hissenin verisini döner."""
+        """Önbellekten tek bir hissenin verisini döner.
+
+        Args:
+            ticker: Hisse sembolü.
+
+        Returns:
+            Hisse verisi sözlüğü veya None.
+        """
         return self._cache.get(ticker.strip().upper())
 
 

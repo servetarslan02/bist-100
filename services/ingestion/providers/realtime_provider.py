@@ -93,7 +93,14 @@ class RealTimeDataEngine:
     """
 
     def __init__(self) -> None:
-        """RealTimeDataEngine örneği oluşturur."""
+        """RealTimeDataEngine örneği oluşturur.
+
+        Args:
+            Yok.
+
+        Returns:
+            Yok.
+        """
         self._running = False
         self._handlers: dict[str, list[Callable]] = {}
         self._seen_hashes: set[str] = set()
@@ -116,13 +123,23 @@ class RealTimeDataEngine:
         Args:
             source: Veri kaynağı adı.
             handler: DataEvent alan fonksiyon.
+
+        Returns:
+            Yok.
         """
         if source not in self._handlers:
             self._handlers[source] = []
         self._handlers[source].append(handler)
 
     async def start(self) -> None:
-        """Tüm veri kaynaklarını başlatır."""
+        """Tüm veri kaynaklarını başlatır.
+
+        Args:
+            Yok.
+
+        Returns:
+            Yok.
+        """
         self._running = True
         if aiohttp:
             self._session = aiohttp.ClientSession()
@@ -138,7 +155,14 @@ class RealTimeDataEngine:
         )
 
     async def stop(self) -> None:
-        """Tüm veri kaynaklarını durdurur."""
+        """Tüm veri kaynaklarını durdurur.
+
+        Args:
+            Yok.
+
+        Returns:
+            Yok.
+        """
         self._running = False
         if self._session:
             await self._session.close()
@@ -165,6 +189,9 @@ class RealTimeDataEngine:
 
         Args:
             event: Dağıtılacak olay.
+
+        Returns:
+            Yok.
         """
         if not self._is_new(event):
             return
@@ -184,6 +211,12 @@ class RealTimeDataEngine:
 
         KAP WebSocket/SSE yok ama RSS/API çok sık poll edilebilir.
         Her 30 saniyede bir yeni bildirim kontrolü.
+
+        Args:
+            Yok.
+
+        Returns:
+            Yok.
         """
         last_check = datetime.now(UTC)
 
@@ -228,6 +261,12 @@ class RealTimeDataEngine:
 
         RSS feed'leri pubsub mantığıyla çalışır — yeni haber eklenir eklenmez görünür.
         Her 15 saniyede bir kontrol.
+
+        Args:
+            Yok.
+
+        Returns:
+            Yok.
         """
         feeds = [
             ("https://www.dunya.com/rss/ekonomi.xml", "Dünya"),
@@ -282,6 +321,12 @@ class RealTimeDataEngine:
 
         Ücretsiz kaynaklarla aggressive polling (her 60 saniye).
         Lisanslı feed ile gerçek streaming olur.
+
+        Args:
+            Yok.
+
+        Returns:
+            Yok.
         """
         from ..bist_universe import BIST_STOCKS
 
@@ -336,6 +381,12 @@ class RealTimeDataEngine:
 
         TCMB/TÜİK verileri zaten nadir değişir (günlük/aylık).
         Ama sürpriz veri geldiğinde anında yakalanmalı.
+
+        Args:
+            Yok.
+
+        Returns:
+            Yok.
         """
         while self._running:
             try:

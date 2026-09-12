@@ -35,15 +35,32 @@ Modüller:
 
 # Core pipeline
 from .advanced_monte_carlo import AdvancedMonteCarloEngine
+from .analysis_engines import (  # noqa: E402
+    CorrelationEngine,
+    DataConfidenceEngine,
+    DrawdownEngine,
+    ModelRiskEngine,
+    PortfolioOptimization,
+    PositionRiskEngine,
+    PriceActionEngine,
+    RelativeStrengthEngine,
+    SectorEngine,
+    SupportResistanceEngine,
+    VolumeEngine,
+)
+from .candle_patterns import CandleMetrics, CandlePatternEngine, CandlePatternResult
 
 # Calibration
 from .confidence_calibrator import ConfidenceCalibrator
+from .dynamic_candle_matrix import DynamicCandleMatrix, DynamicPatternMetrics
 
 # Forecasting & Ensemble
 from .ensemble_forecast import EnsembleForecaster
 from .evidence_engine import EvidenceVerificationEngine
 from .factor_engine import FactorEngine
 from .forecasting import ForecastingEngine
+from .forecasting_utils import EventTimelineEngine, NewsDuplicationEngine, NewsImpactEngine
+from .gemini_service import analyze_company_gemini, call_gemini
 from .hmm_regime import HMMRegimeDetector
 from .impact_engine import ImpactEngine
 
@@ -100,6 +117,13 @@ __all__ = [
     "ForecastingEngine",
     "Prediction",
     "MultiHorizonPrediction",
+    # Forecasting Utils
+    "NewsImpactEngine",
+    "NewsDuplicationEngine",
+    "EventTimelineEngine",
+    # Gemini
+    "call_gemini",
+    "analyze_company_gemini",
     # Signal
     "SignalFusionEngine",
     "MLSignalFusion",
@@ -108,6 +132,25 @@ __all__ = [
     # Monte Carlo
     "MonteCarloEngine",
     "AdvancedMonteCarloEngine",
+    # Analysis Engines
+    "PriceActionEngine",
+    "SupportResistanceEngine",
+    "VolumeEngine",
+    "SectorEngine",
+    "RelativeStrengthEngine",
+    "CorrelationEngine",
+    "DrawdownEngine",
+    "PositionRiskEngine",
+    "ModelRiskEngine",
+    "DataConfidenceEngine",
+    "PortfolioOptimization",
+    # Candle Patterns
+    "CandlePatternEngine",
+    "CandleMetrics",
+    "CandlePatternResult",
+    # Dynamic Candle Matrix
+    "DynamicCandleMatrix",
+    "DynamicPatternMetrics",
     # Engines
     "SPECEngine",
     "TradePlanner",

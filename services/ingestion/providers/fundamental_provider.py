@@ -31,7 +31,14 @@ class FundamentalProvider:
     """Şirket finansal verilerini çeker (async)."""
 
     def __init__(self) -> None:
-        """FundamentalProvider örneği oluşturur."""
+        """FundamentalProvider örneği oluşturur.
+
+        Args:
+            Yok.
+
+        Returns:
+            Yok.
+        """
         self._cache: dict[str, dict] = {}
         self._cache_ttl_seconds = DEFAULT_CACHE_TTL_SECONDS
         self._executor = concurrent.futures.ThreadPoolExecutor(max_workers=DEFAULT_MAX_WORKERS)
@@ -487,6 +494,9 @@ class FundamentalProvider:
 
         Args:
             ticker: Belirli bir ticker için cache temizlenir. None = tümü.
+
+        Returns:
+            Yok.
         """
         if ticker:
             self._cache.pop(ticker, None)

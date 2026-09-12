@@ -371,7 +371,14 @@ class NewsProvider:
     }
 
     def __init__(self) -> None:
-        """NewsProvider örneği oluşturur."""
+        """NewsProvider örneği oluşturur.
+
+        Args:
+            Yok.
+
+        Returns:
+            Yok.
+        """
         self._rss_feeds = self._load_rss_feeds()
         logger.info("NewsProvider initialized", feeds=len(self._rss_feeds))
 
@@ -385,6 +392,9 @@ class NewsProvider:
 
     def _load_rss_feeds(self) -> list[str]:
         """RSS feed URL'lerini yükler.
+
+        Args:
+            Yok.
 
         Returns:
             RSS feed URL listesi.

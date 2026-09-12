@@ -88,6 +88,9 @@ class DataValidator:
     def source_weights(self) -> dict[str, float]:
         """Kaynak güvenilirlik ağırlıklarını döndürür.
 
+        Args:
+            Yok.
+
         Returns:
             {kaynak_adı: ağırlık} sözlüğü.
         """
