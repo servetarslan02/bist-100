@@ -1,6 +1,16 @@
-"""ALPHA BIST - Data Ingestion Service (Main Entry Point)"""
+"""ALPHA BIST — Data Ingestion Service (Ana Giriş Noktası)
+
+Piyasa verilerini çoklu kaynaklardan çeker, doğrular ve QuestDB'ye yazar.
+KAP, makro, haber ve sosyal medya döngülerini paralel olarak yönetir.
+
+Kullanım:
+    python -m services.ingestion.main
+    # veya
+    from services.ingestion.main import IngestionService
+"""
 
 import asyncio
+import gc
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -22,10 +32,6 @@ from ..core.event_schema import CanonicalEvent
 from ..core.logging import setup_logging
 from ..core.questdb_client import questdb_client
 from .bist_universe import BIST_INDICES, bist_universe, get_sector
-
-# Dinamik hisse listesi — otomatik keşif aktif (tüm 600+ hisse)
-BIST_STOCKS = bist_universe.get_tickers()
-BIST_ALL = bist_universe.get_tickers()
 from .providers.investing_provider import investing_provider
 from .providers.kap_provider import kap_provider
 from .providers.news_provider import news_provider
@@ -38,10 +44,31 @@ from .questdb_consumer import questdb_tick_consumer
 logger = structlog.get_logger()
 
 
+def _load_bist_stocks() -> list[str]:
+    """BIST hisse listesini güvenli şekilde yükler.
+
+    Returns:
+        Hisse sembolleri listesi. Yüklenemezse boş liste.
+    """
+    try:
+        return bist_universe.get_tickers()
+    except Exception as exc:
+        logger.warning("BIST evren yüklenemedi, boş liste kullanılacak", error=str(exc))
+        return []
+
+
+# Dinamik hisse listesi — güvenli yükleme
+BIST_STOCKS: list[str] = _load_bist_stocks()
+
+
 def is_bist_session_active() -> bool:
-    """BIST seans saatlerini (Hafta içi 09:55 - 18:10 TSİ / UTC+3) kontrol eder."""
+    """BIST seans saatlerini kontrol eder (Hafta içi 09:55 - 18:10 TSİ / UTC+3).
+
+    Returns:
+        True: Seans açık, False: Seans kapalı.
+    """
     now_utc = datetime.now(UTC)
-    if now_utc.weekday() >= 5:  # Cumartesi veya Pazar
+    if now_utc.weekday() >= 5:
         return False
     now_minute = now_utc.hour * 60 + now_utc.minute
     market_open = 6 * 60 + 55  # 06:55 UTC (09:55 TSİ)
@@ -50,38 +77,45 @@ def is_bist_session_active() -> bool:
 
 
 class IngestionService:
-    """Main data ingestion service for ALPHA BIST."""
+    """Ana veri toplama servisi.
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    Piyasa verilerini çoklu kaynaklardan (TradingView, yfinance, KAP, TCMB)
+    çeker, kalite kontrolünden geçirir ve QuestDB'ye yazar.
+    """
+
+    def __init__(self) -> None:
+        """IngestionService örneği oluşturur."""
         self._running = False
-        self._instrument_map: dict[str, int] = {}  # ticker -> instrument_id
+        self._instrument_map: dict[str, int] = {}
+        self._tasks: list[asyncio.Task[None]] = []
 
-    async def start(self) -> Any:
-        """Start the ingestion service."""
+    async def start(self) -> None:
+        """Ingestion servisini başlatır.
+
+        Tüm döngüleri (market, KAP, makro, haber, sosyal) paralel başlatır.
+        Servis durdurulana kadar çalışır.
+
+        Raises:
+            Exception: Veritabanı veya event bus başlatma hatası.
+        """
         setup_logging()
         logger.info("Starting ALPHA BIST Ingestion Service")
 
-        # Otomatik hisse evrenini yenile (başlangıçta)
         await self._refresh_universe()
 
         await init_databases()
         ensure_topics()
 
-        # İnternet izleyiciyi başlat (idempotent)
         if not connectivity_monitor._running:
             await connectivity_monitor.start()
 
-        # Load instrument map from PostgreSQL
         await self._load_instrument_map()
 
         self._running = True
-        logger.info("Ingestion Service started", instruments=len(self._instrument_map), universe_size=len(BIST_ALL))
+        logger.info("Ingestion Service started", instruments=len(self._instrument_map), universe_size=len(BIST_STOCKS))
 
-        # QuestDB tick consumer'ı başlat
         await questdb_tick_consumer.start()
 
-        # Start loops in the background
         t_market = asyncio.create_task(self._market_data_loop())
         t_kap = asyncio.create_task(self._kap_loop())
         t_macro = asyncio.create_task(self._macro_loop())
@@ -89,33 +123,42 @@ class IngestionService:
         t_social = asyncio.create_task(self._social_loop())
         self._tasks = [t_market, t_kap, t_macro, t_news, t_social]
 
-        # Keep the service running
         while self._running:
             await asyncio.sleep(1)
 
-    async def _refresh_universe(self) -> Any:
-        """Hisse evrenini otomatik yenile."""
-        global BIST_STOCKS, BIST_ALL
+    async def _refresh_universe(self) -> None:
+        """Hisse evrenini otomatik yeniler.
+
+        Başarısız olursa önbellekli/statik listeyi kullanır.
+        """
+        global BIST_STOCKS
         try:
             logger.info("Refreshing BIST universe...")
             bist_universe.refresh()
             BIST_STOCKS = bist_universe.get_tickers()
-            BIST_ALL = bist_universe.get_tickers()
             logger.info("BIST universe refreshed", total_stocks=len(BIST_STOCKS))
-        except Exception as e:
-            logger.warning("Universe refresh failed, using cached/static", error=str(e))
+        except Exception as exc:
+            logger.warning("Universe refresh failed, using cached/static", error=str(exc))
 
-    async def stop(self) -> Any:
-        """Stop the ingestion service."""
+    async def stop(self) -> None:
+        """Ingestion servisini durdurur.
+
+        Tüm döngüleri, event bus ve veritabanı bağlantılarını kapatır.
+        """
         self._running = False
+        for task in self._tasks:
+            task.cancel()
         await questdb_tick_consumer.stop()
         await connectivity_monitor.stop()
         await flush_producer()
         await close_databases()
         logger.info("Ingestion Service stopped")
 
-    async def _load_instrument_map(self) -> Any:
-        """Load instrument ticker -> id mapping from PostgreSQL."""
+    async def _load_instrument_map(self) -> None:
+        """PostgreSQL'den instrument ticker → id eşlemini yükler.
+
+        Hiç instrument yoksa önce _seed_instruments ile oluşturur.
+        """
         from ..core.database import pg_fetch
 
         rows = await pg_fetch("""
@@ -127,7 +170,6 @@ class IngestionService:
 
         self._instrument_map = {row["symbol"]: row["id"] for row in rows}
 
-        # If no instruments exist, create them
         if not self._instrument_map:
             await self._seed_instruments()
             rows = await pg_fetch("""
@@ -137,13 +179,15 @@ class IngestionService:
             """)
             self._instrument_map = {row["symbol"]: row["id"] for row in rows}
 
-    async def _seed_instruments(self) -> Any:
-        """Seed initial instrument data into PostgreSQL."""
+    async def _seed_instruments(self) -> None:
+        """Başlangıç instrument verilerini PostgreSQL'e yazar.
+
+        Sektör, şirket ve instrument kayıtlarını oluşturur.
+        """
         from ..core.database import pg_execute
 
         logger.info("Seeding instruments into PostgreSQL")
 
-        # First, ensure sectors exist
         sectors = set(get_sector(t) for t in BIST_STOCKS)
 
         for sector_code in sectors:
@@ -152,34 +196,23 @@ class IngestionService:
                 INSERT INTO sectors (code, name)
                 VALUES ($1, $1)
                 ON CONFLICT (code) DO NOTHING
-            """,
+                """,
                 sector_code,
             )
 
-        # Then, create companies and instruments
         for ticker in BIST_STOCKS:
             sector = get_sector(ticker)
 
-            # Get sector_id
-            await pg_execute(
-                """
-                SELECT id FROM sectors WHERE code = $1
-            """,
-                sector,
-            )
-
-            # Create company
             await pg_execute(
                 """
                 INSERT INTO companies (ticker, name, sector_id, active)
                 VALUES ($1, $1, (SELECT id FROM sectors WHERE code = $2), TRUE)
                 ON CONFLICT (ticker) DO NOTHING
-            """,
+                """,
                 ticker,
                 sector,
             )
 
-            # Create instrument
             await pg_execute(
                 """
                 INSERT INTO instruments (company_id, symbol, instrument_type, exchange, active)
@@ -188,7 +221,7 @@ class IngestionService:
                     $1, 'EQUITY', 'BIST', TRUE
                 )
                 ON CONFLICT (symbol) DO NOTHING
-            """,
+                """,
                 ticker,
             )
 
@@ -198,8 +231,12 @@ class IngestionService:
     # Market Data Loop
     # =====================================================
 
-    async def _market_data_loop(self) -> Any:
-        """Periodically fetch market data from yfinance."""
+    async def _market_data_loop(self) -> None:
+        """Piyasa verilerini periyodik olarak çeker.
+
+        TradingView birincil kaynak, yfinance fallback.
+        Seans içi daha sık, seans dışı daha seyrek çalışır.
+        """
         while self._running:
             try:
                 if not is_bist_session_active():
@@ -207,7 +244,6 @@ class IngestionService:
                     await asyncio.sleep(300)
                     continue
 
-                # İnternet kontrolü — offline ise bekle
                 if not connectivity_monitor.is_online:
                     logger.info("Offline mode, waiting 60s before retry...")
                     await asyncio.sleep(60)
@@ -215,7 +251,7 @@ class IngestionService:
 
                 logger.info("Starting market data fetch cycle")
 
-                # 1. PRIMARY: TradingView Scanner API (Tüm BIST tek pakette ~150ms)
+                # 1. PRIMARY: TradingView Scanner API
                 tv_stocks = await tradingview_provider.fetch_all_bist_stocks()
                 if tv_stocks:
                     logger.info("TradingView primary market feed active", count=len(tv_stocks))
@@ -261,7 +297,6 @@ class IngestionService:
                             )
                             publish_event(event, key=ticker)
 
-                    # Toplu olarak yüksek performanslı QuestDB ILP'ye yaz
                     if ticks_list:
                         try:
                             questdb_client.insert_ticks_batch(ticks_list)
@@ -297,12 +332,12 @@ class IngestionService:
                                             },
                                         )
                                         publish_event(event, key=ticker)
-                            except Exception as e:
-                                logger.warning("Failed to fetch ticker fallback", ticker=ticker, error=str(e))
+                            except Exception as exc:
+                                logger.warning("Failed to fetch ticker fallback", ticker=ticker, error=str(exc))
                                 continue
                         await asyncio.sleep(1)
 
-                # Fetch indices
+                # Endeks verileri
                 for index_symbol, index_name in BIST_INDICES.items():
                     try:
                         idx_data = yfinance_provider.fetch_index(index_symbol)
@@ -320,39 +355,39 @@ class IngestionService:
                             )
                             publish_event(event, key=index_symbol)
                     except Exception:
-                        logger.warning("Caught Exception in _market_data_loop", exc_info=True)
+                        logger.warning("Endeks veri çekme hatası", index=index_symbol, exc_info=True)
 
                 await flush_producer()
-                import gc
-
                 gc.collect()
                 logger.info("Market data fetch cycle completed")
 
-                # Optimum bekleme: Seans içi 4 saniye, Seans dışı / Gece 60 saniye
                 sleep_interval = 10 if is_bist_session_active() else 120
                 await asyncio.sleep(sleep_interval)
 
-            except Exception as e:
-                logger.error("Market data loop error", error=str(e))
+            except Exception as exc:
+                logger.error("Market data loop error", error=str(exc))
                 await asyncio.sleep(60)
 
     # =====================================================
     # KAP Loop
     # =====================================================
 
-    async def _kap_loop(self) -> Any:
-        """Periodically fetch KAP disclosures."""
+    async def _kap_loop(self) -> None:
+        """KAP açıklamalarını periyodik olarak çeker.
+
+        RSS feed birincil, JSON API fallback.
+        """
         while self._running:
             try:
-                # İnternet kontrolü
                 if not connectivity_monitor.is_online:
                     await asyncio.sleep(60)
                     continue
 
                 logger.info("Starting KAP fetch cycle")
 
-                # 1. Official KAP RSS feed (En güvenilir ve hızlı)
-                disclosures = []
+                disclosures: list[dict[str, Any]] = []
+
+                # 1. Official KAP RSS feed
                 try:
                     official_disclosures = await news_provider.fetch_official_kap_disclosures()
                     if official_disclosures:
@@ -371,7 +406,7 @@ class IngestionService:
                 except Exception:
                     logger.debug("KAP RSS fetch fallback notice")
 
-                # 2. JSON API fallback if needed
+                # 2. JSON API fallback
                 if not disclosures:
                     try:
                         from_date = (datetime.now(UTC) - timedelta(hours=1)).strftime("%Y-%m-%d")
@@ -409,30 +444,30 @@ class IngestionService:
                     await flush_producer()
                 logger.info("KAP fetch cycle completed", count=len(disclosures) if disclosures else 0)
 
-                # Optimum bekleme: Seans içi 20 saniye, Seans dışı 60 saniye
                 sleep_interval = 30 if is_bist_session_active() else 120
                 await asyncio.sleep(sleep_interval)
 
-            except Exception as e:
-                logger.error("KAP loop error", error=str(e))
+            except Exception as exc:
+                logger.error("KAP loop error", error=str(exc))
                 await asyncio.sleep(60)
 
     # =====================================================
     # Macro Loop
     # =====================================================
 
-    async def _macro_loop(self) -> Any:
-        """Periodically fetch macro data."""
+    async def _macro_loop(self) -> None:
+        """Makro ekonomik verileri periyodik olarak çeker.
+
+        TCMB, yfinance ve Investing.com kaynaklarını kullanır.
+        """
         while self._running:
             try:
-                # İnternet kontrolü
                 if not connectivity_monitor.is_online:
                     await asyncio.sleep(60)
                     continue
 
                 logger.info("Starting macro data fetch cycle")
 
-                # Fetch macro data from TCMB
                 if settings.tcmb_evds_api_key:
                     tcmb_provider.api_key = settings.tcmb_evds_api_key
                     macro_data = tcmb_provider.fetch_all_macro()
@@ -444,7 +479,6 @@ class IngestionService:
                     )
                     publish_event(event, key="macro")
 
-                # Fetch yfinance macro
                 macro_yf = yfinance_provider.fetch_macro()
 
                 event = CanonicalEvent(
@@ -454,7 +488,6 @@ class IngestionService:
                 )
                 publish_event(event, key="macro_yf")
 
-                # Fetch investing / global macro summary
                 try:
                     global_macro = await investing_provider.fetch_global_macro_summary()
                     if global_macro:
@@ -470,30 +503,30 @@ class IngestionService:
                 await flush_producer()
                 logger.info("Macro data fetch cycle completed")
 
-                # Optimum bekleme: Küresel makro varlıklar için seans içi 30s, seans dışı 60s
                 sleep_interval = 60 if is_bist_session_active() else 120
                 await asyncio.sleep(sleep_interval)
 
-            except Exception as e:
-                logger.error("Macro loop error", error=str(e))
+            except Exception as exc:
+                logger.error("Macro loop error", error=str(exc))
                 await asyncio.sleep(60)
 
     # =====================================================
     # News Loop
     # =====================================================
 
-    async def _news_loop(self) -> Any:
-        """Periodically fetch news."""
+    async def _news_loop(self) -> None:
+        """Finansal haberleri periyodik olarak çeker.
+
+        RSS ve KAP resmi kaynaklarını kullanır.
+        """
         while self._running:
             try:
-                # İnternet kontrolü
                 if not connectivity_monitor.is_online:
                     await asyncio.sleep(60)
                     continue
 
                 logger.info("Starting news fetch cycle")
 
-                # Fetch from RSS
                 rss_articles = await news_provider.fetch_financial_news_rss()
                 if rss_articles:
                     for article in rss_articles:
@@ -504,7 +537,6 @@ class IngestionService:
                         )
                         publish_event(event, key="news_rss")
 
-                # Also fetch official KAP and TCMB news feeds
                 try:
                     official_kap = await news_provider.fetch_official_kap_disclosures()
                     for article in official_kap or []:
@@ -515,35 +547,35 @@ class IngestionService:
                         )
                         publish_event(event, key="news_kap")
                 except Exception:
-                    logger.warning("Caught Exception in _news_loop", exc_info=True)
+                    logger.warning("KAP haber çekme hatası", exc_info=True)
 
                 await flush_producer()
                 logger.info("News fetch cycle completed", count=len(rss_articles) if rss_articles else 0)
 
-                # Optimum bekleme: Finansal haberler için seans içi 60s, seans dışı 180s (3 dk)
                 sleep_interval = 120 if is_bist_session_active() else 300
                 await asyncio.sleep(sleep_interval)
 
-            except Exception as e:
-                logger.error("News loop error", error=str(e))
+            except Exception as exc:
+                logger.error("News loop error", error=str(exc))
                 await asyncio.sleep(60)
 
     # =====================================================
     # Social Media Loop
     # =====================================================
 
-    async def _social_loop(self) -> Any:
-        """Periodically fetch social media data."""
+    async def _social_loop(self) -> None:
+        """Sosyal medya verilerini periyodik olarak çeker.
+
+        X (Twitter) API kullanır.
+        """
         while self._running:
             try:
-                # İnternet kontrolü
                 if not connectivity_monitor.is_online:
                     await asyncio.sleep(300)
                     continue
 
                 logger.info("Starting social media fetch cycle")
 
-                # Fetch from X (Twitter)
                 if hasattr(settings, "x_api_key") and settings.x_api_key:
                     social_provider.x_api_key = settings.x_api_key
                     try:
@@ -556,17 +588,16 @@ class IngestionService:
                             )
                             publish_event(event, key="social")
                     except Exception:
-                        logger.warning("Caught Exception in _social_loop", exc_info=True)
+                        logger.warning("Sosyal medya çekme hatası", exc_info=True)
 
                 await flush_producer()
                 logger.info("Social media fetch cycle completed")
 
-                # Optimum bekleme: Sosyal medya NLP için seans içi 60s, seans dışı 180s (3 dk)
                 sleep_interval = 120 if is_bist_session_active() else 300
                 await asyncio.sleep(sleep_interval)
 
-            except Exception as e:
-                logger.debug("Social loop note", error=str(e))
+            except Exception as exc:
+                logger.debug("Social loop note", error=str(exc))
                 await asyncio.sleep(300)
 
 
@@ -575,12 +606,26 @@ class IngestionService:
 # =====================================================
 
 
-async def _health_server(port: int = 8080) -> Any:
-    """Lightweight health check HTTP server for Docker healthcheck."""
+async def _health_server(port: int = 8080) -> None:
+    """Docker healthcheck için hafif HTTP sunucusu başlatır.
+
+    Args:
+        port: Dinlenecek port numarası.
+
+    Raises:
+        OSError: Port kullanımdaysa.
+    """
     from aiohttp import web
 
-    async def health_handler(request) -> Any:
-        """Otomatik eklendi."""
+    async def health_handler(request: web.Request) -> web.Response:
+        """Health check endpoint.
+
+        Args:
+            request: HTTP isteği.
+
+        Returns:
+            JSON yanıt: {"status": "healthy", "service": "ingestion"}.
+        """
         return web.json_response({"status": "healthy", "service": "ingestion"})
 
     app = web.Application()
@@ -597,9 +642,14 @@ async def _health_server(port: int = 8080) -> Any:
 # =====================================================
 
 
-async def main() -> Any:
-    """Main entry point for the ingestion service."""
-    # Start health server
+async def main() -> None:
+    """Ingestion servisinin ana giriş noktası.
+
+    Health check sunucusunu başlatır, ardından IngestionService'i çalıştırır.
+
+    Raises:
+        Exception: Servis çökerse yeniden yükseltilir.
+    """
     await _health_server()
 
     service = IngestionService()
@@ -607,11 +657,19 @@ async def main() -> Any:
         await service.start()
     except KeyboardInterrupt:
         await service.stop()
-    except Exception as e:
-        logger.error("Ingestion service crashed", error=str(e))
+    except Exception as exc:
+        logger.error("Ingestion service crashed", error=str(exc))
         await service.stop()
         raise
 
 
 if __name__ == "__main__":
     asyncio.run(main())
+
+
+__all__ = [
+    "IngestionService",
+    "is_bist_session_active",
+    "main",
+    "BIST_STOCKS",
+]

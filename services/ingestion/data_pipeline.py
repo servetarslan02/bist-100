@@ -19,7 +19,6 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-import numpy as np
 import polars as pl
 import structlog
 
@@ -30,10 +29,29 @@ from ..features.calculator import FeatureCalculator
 
 logger = structlog.get_logger()
 
+# FeatureEngine büyük harf sütun adları bekler (Close, High, vb.)
+_FEATURE_COLS: dict[str, str] = {
+    "open": "Open",
+    "high": "High",
+    "low": "Low",
+    "close": "Close",
+    "volume": "Volume",
+}
+
 
 @dataclass
 class PipelineResult:
-    """Otomatik eklendi."""
+    """Tek bir hisse için pipeline işlem sonucu.
+
+    Attributes:
+        ticker: Hisse sembolü.
+        accepted: Veri kabul edildi mi.
+        quality_report: Kalite kontrol raporu.
+        features: Hesaplanan özellikler (kabul edildiyse).
+        rejection_reason: Reddetme sebebi (reddedildiyse).
+        processing_time_ms: İşlem süresi (milisaniye).
+    """
+
     ticker: str
     accepted: bool
     quality_report: QualityReport | None
@@ -41,8 +59,19 @@ class PipelineResult:
     rejection_reason: str = ""
     processing_time_ms: float = 0.0
 
+    def __repr__(self) -> str:
+        return (
+            f"PipelineResult(ticker={self.ticker!r}, "
+            f"accepted={self.accepted}, "
+            f"reason={self.rejection_reason!r})"
+        )
+
     def to_dict(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Sonucu sözlüğe dönüştürür.
+
+        Returns:
+            PipelineResult sözlük gösterimi.
+        """
         return {
             "ticker": self.ticker,
             "accepted": self.accepted,
@@ -55,7 +84,18 @@ class PipelineResult:
 
 @dataclass
 class PipelineReport:
-    """Otomatik eklendi."""
+    """Toplu pipeline işlem raporu.
+
+    Attributes:
+        total: Toplam işlenen hisse sayısı.
+        accepted: Kabul edilen hisse sayısı.
+        rejected: Reddedilen hisse sayısı.
+        avg_quality_score: Ortalama kalite puanı.
+        results: Tüm PipelineResult listesi.
+        audit_log: Denetim kayıtları.
+        elapsed_s: Toplam işlem süresi (saniye).
+    """
+
     total: int
     accepted: int
     rejected: int
@@ -64,8 +104,20 @@ class PipelineReport:
     audit_log: list[dict[str, Any]]
     elapsed_s: float
 
+    def __repr__(self) -> str:
+        return (
+            f"PipelineReport(total={self.total}, "
+            f"accepted={self.accepted}, "
+            f"rejected={self.rejected}, "
+            f"avg_quality={self.avg_quality_score:.1f})"
+        )
+
     def to_dict(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Raporu sözlüğe dönüştürür.
+
+        Returns:
+            PipelineReport sözlük gösterimi.
+        """
         return {
             "total": self.total,
             "accepted": self.accepted,
@@ -77,8 +129,12 @@ class PipelineReport:
         }
 
     def _count_rejections(self) -> dict[str, int]:
-        """Otomatik eklendi."""
-        reasons = {}
+        """Reddetme sebeplerini sayar.
+
+        Returns:
+            {sebep: sayı} sözlüğü.
+        """
+        reasons: dict[str, int] = {}
         for r in self.results:
             if not r.accepted and r.rejection_reason:
                 reasons[r.rejection_reason] = reasons.get(r.rejection_reason, 0) + 1
@@ -86,14 +142,27 @@ class PipelineReport:
 
 
 class DataPipeline:
-    """Data Quality Gate ile veri pipeline."""
+    """Data Quality Gate ile veri pipeline.
+
+    Veriyi kalite kontrolünden geçirir, özellik hesaplar
+    ve audit kaydı tutar.
+
+    Args:
+        min_quality_score: Kabul için minimum kalite puanı.
+        require_passing: Kalite kontrol geçme zorunluluğu.
+    """
 
     def __init__(
         self,
         min_quality_score: float = 70.0,
         require_passing: bool = True,
-    ):
-        """Otomatik eklendi."""
+    ) -> None:
+        """DataPipeline örneği oluşturur.
+
+        Args:
+            min_quality_score: Kabul için minimum kalite puanı (0-100).
+            require_passing: Kalite kontrol geçme zorunluluğu.
+        """
         self._dq = DataQualityV2()
         self._calc = FeatureCalculator()
         self._tm = TradabilityMask()
@@ -102,10 +171,17 @@ class DataPipeline:
         self._audit_log: list[dict[str, Any]] = []
 
     def process(self, market_data: dict[str, pl.DataFrame]) -> PipelineReport:
-        """Tüm market verisini işle."""
+        """Tüm market verisini işler.
+
+        Args:
+            market_data: {ticker: DataFrame} sözlüğü.
+
+        Returns:
+            PipelineReport: Toplu işlem raporu.
+        """
         start = time.time()
-        results = []
-        quality_scores = []
+        results: list[PipelineResult] = []
+        quality_scores: list[float] = []
 
         for ticker, df in market_data.items():
             result = self._process_single(ticker, df)
@@ -115,25 +191,34 @@ class DataPipeline:
 
         elapsed = time.time() - start
         accepted = sum(1 for r in results if r.accepted)
+        avg_score = sum(quality_scores) / len(quality_scores) if quality_scores else 0.0
 
         return PipelineReport(
             total=len(results),
             accepted=accepted,
             rejected=len(results) - accepted,
-            avg_quality_score=np.mean(quality_scores) if quality_scores else 0,
+            avg_quality_score=avg_score,
             results=results,
             audit_log=self._audit_log[-100:],
             elapsed_s=elapsed,
         )
 
     def _process_single(self, ticker: str, df: pl.DataFrame) -> PipelineResult:
-        """Tek hisseyi işle."""
+        """Tek bir hisseyi işler.
+
+        Args:
+            ticker: Hisse sembolü.
+            df: OHLCV Polars DataFrame.
+
+        Returns:
+            PipelineResult: İşlem sonucu.
+        """
         start = time.time()
 
         # 1. Data Quality kontrolü
         quality = self._dq.full_quality_check(df, ticker)
 
-        # 2. Quality gate
+        # 2. Quality gate — passed kontrolü
         if self._require_passing and not quality.passed:
             reason = self._get_primary_rejection_reason(quality)
             self._add_audit(ticker, "rejected", reason, quality.quality_score)
@@ -146,6 +231,7 @@ class DataPipeline:
                 processing_time_ms=(time.time() - start) * 1000,
             )
 
+        # 3. Quality gate — minimum puan kontrolü
         if quality.quality_score < self._min_quality_score:
             reason = f"quality_score={quality.quality_score:.0f} < {self._min_quality_score}"
             self._add_audit(ticker, "rejected", reason, quality.quality_score)
@@ -158,16 +244,20 @@ class DataPipeline:
                 processing_time_ms=(time.time() - start) * 1000,
             )
 
-        # 3. Feature hesaplama
+        # 4. Sütun adlarını çöz (FeatureEngine büyük harf bekler)
+        col_map = self._resolve_columns(df)
+
+        # 5. Feature hesaplama
         try:
             mask = self._tm.compute_mask(
                 ticker,
-                df["Open"].to_numpy(),
-                df["High"].to_numpy(),
-                df["Low"].to_numpy(),
-                df["Close"].to_numpy(),
-                df["Volume"].to_numpy(),
+                df[col_map["open"]].to_numpy(),
+                df[col_map["high"]].to_numpy(),
+                df[col_map["low"]].to_numpy(),
+                df[col_map["close"]].to_numpy(),
+                df[col_map["volume"]].to_numpy(),
             )
+            # FeatureEngine büyük harf sütun adları bekler — DataFrame'i doğrudan geç
             features = self._calc.compute_all_features(df, mask=mask.mask, ticker=ticker)
 
             if not features:
@@ -190,19 +280,56 @@ class DataPipeline:
                 processing_time_ms=(time.time() - start) * 1000,
             )
 
-        except Exception as e:
-            self._add_audit(ticker, "error", str(e), quality.quality_score)
+        except Exception as exc:
+            logger.error("Feature hesaplama hatası", ticker=ticker, error=str(exc))
+            self._add_audit(ticker, "error", str(exc), quality.quality_score)
             return PipelineResult(
                 ticker=ticker,
                 accepted=False,
                 quality_report=quality,
                 features=None,
-                rejection_reason=f"feature_error: {e}",
+                rejection_reason=f"feature_error: {exc}",
                 processing_time_ms=(time.time() - start) * 1000,
             )
 
+    def _resolve_columns(self, df: pl.DataFrame) -> dict[str, str]:
+        """DataFrame sütun adlarını büyük/küçük harf uyumuyla çözer.
+
+        FeatureEngine büyük harf (Close, High, vb.) bekler.
+        Bu method, numpy çıkışı için eşleme sağlar.
+
+        Args:
+            df: Polars DataFrame.
+
+        Returns:
+            {küçük_harf_ad: gerçek_sütun_adı} sözlüğü.
+
+        Raises:
+            ValueError: Zorunlu sütun bulunamazsa.
+        """
+        cols_lower = {c.lower(): c for c in df.columns}
+        mapping: dict[str, str] = {}
+        for expected_lower, expected_upper in _FEATURE_COLS.items():
+            # Önce büyük harfi dene, sonra küçük harfi
+            if expected_upper in df.columns:
+                mapping[expected_lower] = expected_upper
+            elif expected_lower in cols_lower:
+                mapping[expected_lower] = cols_lower[expected_lower]
+            else:
+                raise ValueError(
+                    f"DataFrame'de '{expected_upper}' sütunu bulunamıyor. Mevcut: {df.columns}"
+                )
+        return mapping
+
     def _get_primary_rejection_reason(self, quality: QualityReport) -> str:
-        """Birincil reddetme sebebini bul."""
+        """Birincil reddetme sebebini bulur.
+
+        Args:
+            quality: Kalite raporu.
+
+        Returns:
+            Reddetme sebebi string'i.
+        """
         critical = [i for i in quality.issues if i.severity == "CRITICAL"]
         if critical:
             return f"{critical[0].check}: {critical[0].message}"
@@ -211,8 +338,15 @@ class DataPipeline:
             return f"{warnings[0].check}: {warnings[0].message}"
         return "quality_failed"
 
-    def _add_audit(self, ticker: str, action: str, reason: str, quality_score: float) -> Any:
-        """Audit kaydı."""
+    def _add_audit(self, ticker: str, action: str, reason: str, quality_score: float) -> None:
+        """Audit kaydı ekler.
+
+        Args:
+            ticker: Hisse sembolü.
+            action: İşlem türü ("accepted", "rejected", "error").
+            reason: Reddetme sebebi.
+            quality_score: Kalite puanı.
+        """
         self._audit_log.append(
             {
                 "timestamp": datetime.now(UTC).isoformat(),
@@ -228,3 +362,11 @@ class DataPipeline:
 
 # Singleton
 data_pipeline = DataPipeline()
+
+
+__all__ = [
+    "PipelineResult",
+    "PipelineReport",
+    "DataPipeline",
+    "data_pipeline",
+]

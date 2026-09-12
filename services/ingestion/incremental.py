@@ -1,5 +1,3 @@
-from typing import Any
-
 """
 ALPHA BIST — Incremental Fetcher v1.0
 
@@ -19,6 +17,7 @@ Kullanım:
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import structlog
 
@@ -27,36 +26,72 @@ logger = structlog.get_logger()
 
 @dataclass
 class FetchState:
-    """Ticker çekme durumu."""
+    """Ticker çekme durumu.
+
+    Attributes:
+        ticker: Hisse sembolü.
+        last_fetch_time: Son çekme zamanı (epoch).
+        last_fetch_timestamp: Son çekme zamanı (datetime).
+        fetch_count: Toplam çekme sayısı.
+        last_error: Son hata mesajı.
+        last_success: Son çekme başarılı mı.
+    """
 
     ticker: str
-    last_fetch_time: float  # Epoch time
+    last_fetch_time: float
     last_fetch_timestamp: datetime | None = None
     fetch_count: int = 0
     last_error: str | None = None
     last_success: bool = True
 
+    def __repr__(self) -> str:
+        return (
+            f"FetchState(ticker={self.ticker!r}, "
+            f"fetch_count={self.fetch_count}, "
+            f"last_success={self.last_success})"
+        )
+
 
 @dataclass
 class IncrementalStats:
-    """İstatistikler."""
+    """Incremental fetcher istatistikleri.
+
+    Attributes:
+        total_checks: Toplam kontrol sayısı.
+        total_fetches: Toplam çekme sayısı.
+        total_skipped: Atlanan çekme sayısı.
+        total_errors: Hata sayısı.
+    """
 
     total_checks: int = 0
     total_fetches: int = 0
     total_skipped: int = 0
     total_errors: int = 0
 
+    def __repr__(self) -> str:
+        return (
+            f"IncrementalStats(checks={self.total_checks}, "
+            f"fetches={self.total_fetches}, "
+            f"skipped={self.total_skipped})"
+        )
+
 
 class IncrementalFetcher:
-    """
-    Incremental veri çekme.
+    """Incremental veri çekme yöneticisi.
 
     Her ticker için son çekme zamanını takip eder.
     Belirli bir aralık geçmeden tekrar çekmez.
+
+    Args:
+        default_lookback_hours: İlk çekimde geriye dönük bakılacak saat.
     """
 
-    def __init__(self, default_lookback_hours: int = 1):
-        """Otomatik eklendi."""
+    def __init__(self, default_lookback_hours: int = 1) -> None:
+        """IncrementalFetcher örneği oluşturur.
+
+        Args:
+            default_lookback_hours: İlk çekimde geriye dönük bakılacak saat.
+        """
         self._states: dict[str, FetchState] = {}
         self._default_lookback_hours = default_lookback_hours
         self._stats = IncrementalStats()
@@ -66,15 +101,14 @@ class IncrementalFetcher:
         ticker: str,
         min_interval_seconds: int = 60,
     ) -> bool:
-        """
-        Bu ticker'ı şimdi çekmeli mi?
+        """Bu ticker'ı şimdi çekmeli mi kontrol eder.
 
         Args:
-            ticker: Hisse kodu
-            min_interval_seconds: Minimum çekme aralığı (saniye)
+            ticker: Hisse kodu.
+            min_interval_seconds: Minimum çekme aralığı (saniye).
 
         Returns:
-            True: Çekilmeli, False: Atlanmalı
+            True: Çekilmeli, False: Atlanmalı.
         """
         self._stats.total_checks += 1
 
@@ -94,8 +128,14 @@ class IncrementalFetcher:
         ticker: str,
         success: bool = True,
         error: str | None = None,
-    ) -> Any:
-        """Çekme zamanını güncelle."""
+    ) -> None:
+        """Çekme zamanını günceller.
+
+        Args:
+            ticker: Hisse kodu.
+            success: Çekme başarılı mı.
+            error: Hata mesajı (başarısızsa).
+        """
         now = time.time()
         state = self._states.get(ticker)
 
@@ -119,10 +159,15 @@ class IncrementalFetcher:
             self._stats.total_errors += 1
 
     def get_since(self, ticker: str) -> datetime:
-        """
-        Bu ticker için son çekme zamanını döndür.
+        """Bu ticker için son çekme zamanını döndürür.
 
-        Hiç çekilmediyse, default_lookback_hours geriye dön.
+        Hiç çekilmediyse default_lookback_hours geriye döner.
+
+        Args:
+            ticker: Hisse kodu.
+
+        Returns:
+            Son çekme zamanı (datetime).
         """
         state = self._states.get(ticker)
         if state and state.last_fetch_timestamp:
@@ -131,12 +176,23 @@ class IncrementalFetcher:
         return datetime.now(UTC) - timedelta(hours=self._default_lookback_hours)
 
     def get_fetch_count(self, ticker: str) -> int:
-        """Bu ticker'ın kaç kez çekildiği."""
+        """Bu ticker'ın kaç kez çekildiğini döndürür.
+
+        Args:
+            ticker: Hisse kodu.
+
+        Returns:
+            Çekme sayısı.
+        """
         state = self._states.get(ticker)
         return state.fetch_count if state else 0
 
-    def get_all_states(self) -> dict[str, dict]:
-        """Tüm ticker durumları."""
+    def get_all_states(self) -> dict[str, dict[str, Any]]:
+        """Tüm ticker durumlarını döndürür.
+
+        Returns:
+            {ticker: durum_sözlüğü} yapısı.
+        """
         return {
             ticker: {
                 "ticker": ticker,
@@ -149,8 +205,12 @@ class IncrementalFetcher:
             for ticker, state in self._states.items()
         }
 
-    def get_stats(self) -> dict:
-        """İstatistikler."""
+    def get_stats(self) -> dict[str, Any]:
+        """İstatistikleri döndürür.
+
+        Returns:
+            İstatistik sözlüğü.
+        """
         return {
             "total_checks": self._stats.total_checks,
             "total_fetches": self._stats.total_fetches,
@@ -164,17 +224,16 @@ class IncrementalFetcher:
         self,
         max_age_seconds: int = 3600,
     ) -> list[str]:
-        """
-        Belirli süredir çekilmemiş ticker'ları döndür.
+        """Belirli süredir çekilmemiş ticker'ları döndürür.
 
         Args:
-            max_age_seconds: Maksimum yaş (saniye)
+            max_age_seconds: Maksimum yaş (saniye).
 
         Returns:
-            Eski ticker listesi
+            Eski ticker listesi.
         """
         cutoff = time.time() - max_age_seconds
-        stale = []
+        stale: list[str] = []
 
         for ticker, state in self._states.items():
             if state.last_fetch_time < cutoff:
@@ -182,8 +241,12 @@ class IncrementalFetcher:
 
         return stale
 
-    def reset(self, ticker: str | None = None) -> Any:
-        """Sıfırla."""
+    def reset(self, ticker: str | None = None) -> None:
+        """Durumu sıfırlar.
+
+        Args:
+            ticker: Belirli bir ticker sıfırlanacak (None = tümü).
+        """
         if ticker:
             self._states.pop(ticker, None)
         else:
@@ -193,3 +256,11 @@ class IncrementalFetcher:
 
 # Singleton
 incremental_fetcher = IncrementalFetcher()
+
+
+__all__ = [
+    "FetchState",
+    "IncrementalStats",
+    "IncrementalFetcher",
+    "incremental_fetcher",
+]

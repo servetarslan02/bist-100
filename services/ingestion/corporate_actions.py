@@ -5,8 +5,15 @@ Temettü, bölünme, bedelsiz, bedelli, birleşme gibi şirket olaylarını
 fiyat ve portföy geçmişine doğru şekilde yansıtır.
 
 FAZ 1.5: Corporate Actions
+
+Kullanım:
+    from services.ingestion.corporate_actions import corporate_actions
+
+    corporate_actions.load_from_kap(kap_events)
+    adj_price = corporate_actions.adjust_price("THYAO", 250.0, date(2025, 3, 1))
 """
 
+import re
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from enum import StrEnum
@@ -16,59 +23,117 @@ import structlog
 
 logger = structlog.get_logger()
 
+# Temettü çıkarma regex kalıpları
+_DIVIDEND_PATTERNS: list[str] = [
+    r"hisseye\s+(\d+[.,]\d+)\s*(?:TL|₺)",
+    r"(\d+[.,]\d+)\s*(?:TL|₺)\s*/?\s*hisse",
+    r"kar\s+payı\s+(\d+[.,]\d+)",
+]
+
+# Bölünme çıkarma regex kalıpları
+_SPLIT_PATTERNS: list[str] = [
+    r"1[''e]\s*(\d+)",
+    r"(\d+)\s*:\s*1",
+    r"(\d+)\s*kata\s*çıkar",
+]
+
 
 class ActionType(StrEnum):
-    """Otomatik eklendi."""
-    DIVIDEND = "DIVIDEND"  # Temettü
-    STOCK_SPLIT = "STOCK_SPLIT"  # Bölünme
-    BONUS_SHARE = "BONUS_SHARE"  # Bedelsiz sermaye artırımı
-    RIGHTS_ISSUE = "RIGHTS_ISSUE"  # Bedelli sermaye artırımı
-    MERGER = "MERGER"  # Birleşme
-    ACQUISITION = "ACQUISITION"  # Devralma
-    DELISTING = "DELISTING"  # Borsadan çıkış
-    NAME_CHANGE = "NAME_CHANGE"  # İsim değişikliği
+    """Şirket olayı türleri.
+
+    Attributes:
+        DIVIDEND: Temettü (kar payı) dağıtımı.
+        STOCK_SPLIT: Hisse bölünmesi.
+        BONUS_SHARE: Bedelsiz sermaye artırımı.
+        RIGHTS_ISSUE: Bedelli sermaye artırımı.
+        MERGER: Birleşme.
+        ACQUISITION: Devralma.
+        DELISTING: Borsadan çıkış.
+        NAME_CHANGE: İsim değişikliği.
+    """
+
+    DIVIDEND = "DIVIDEND"
+    STOCK_SPLIT = "STOCK_SPLIT"
+    BONUS_SHARE = "BONUS_SHARE"
+    RIGHTS_ISSUE = "RIGHTS_ISSUE"
+    MERGER = "MERGER"
+    ACQUISITION = "ACQUISITION"
+    DELISTING = "DELISTING"
+    NAME_CHANGE = "NAME_CHANGE"
 
 
 @dataclass
 class CorporateAction:
-    """Şirket olayı."""
+    """Şirket olayı veri modeli.
+
+    Attributes:
+        action_id: Benzersiz olay kimliği.
+        ticker: Hisse sembolü.
+        action_type: Olay türü.
+        ex_date: Eski tarih (fiyat düzeltmesi bu tarihte yapılır).
+        record_date: Kayıt tarihi.
+        payment_date: Ödeme tarihi.
+        dividend_per_share: Hisse başına temettü.
+        dividend_currency: Temettü para birimi.
+        split_ratio: Bölünme oranı (ör. 2.0 = 1'e 2).
+        bonus_ratio: Bedelsiz oranı (ör. 0.5 = her 1 hisseye 0.5).
+        rights_ratio: Bedelli oranı (ör. 0.2 = her 5 hisseye 1 yeni).
+        rights_price: Bedelli fiyatı.
+        description: Olay açıklaması.
+        source: Veri kaynağı.
+        is_confirmed: Onaylanmış olay mı.
+        created_at: Oluşturulma zamanı.
+    """
 
     action_id: str
     ticker: str
     action_type: ActionType
-    ex_date: date  # Eski tarih (fiyat düzeltmesi bu tarihte yapılır)
-    record_date: date | None = None  # Kayıt tarihi
-    payment_date: date | None = None  # Ödeme tarihi
-
-    # Temettü
+    ex_date: date
+    record_date: date | None = None
+    payment_date: date | None = None
     dividend_per_share: float = 0.0
     dividend_currency: str = "TRY"
-
-    # Bölünme / Bedelsiz
-    split_ratio: float = 1.0  # ör: 2.0 = 1'e 2 bölünme, 10.0 = 1'e 10
-    bonus_ratio: float = 0.0  # ör: 0.5 = her 1 hisseye 0.5 bedelsiz
-
-    # Bedelli
-    rights_ratio: float = 0.0  # ör: 0.2 = her 5 hisseye 1 yeni
-    rights_price: float = 0.0  # Bedelli fiyat
-
-    # Meta
+    split_ratio: float = 1.0
+    bonus_ratio: float = 0.0
+    rights_ratio: float = 0.0
+    rights_price: float = 0.0
     description: str = ""
     source: str = "KAP"
     is_confirmed: bool = True
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
+    def __repr__(self) -> str:
+        return (
+            f"CorporateAction(ticker={self.ticker!r}, "
+            f"type={self.action_type.value!r}, "
+            f"ex_date={self.ex_date.isoformat()!r})"
+        )
+
 
 class CorporateActionsHandler:
-    """Şirket olaylarını yönetir ve fiyat/portföy düzeltmeleri yapar."""
+    """Şirket olaylarını yönetir ve fiyat/portföy düzeltmeleri yapar.
 
-    def __init__(self):
-        """Otomatik eklendi."""
-        self._actions: dict[str, list[CorporateAction]] = {}  # ticker -> actions
-        self._applied: set = set()  # action_id'leri
+    KAP'tan gelen olayları sınıflandırır, fiyat ve pozisyon
+    düzeltmelerini doğru şekilde uygular.
 
-    def add_action(self, action: CorporateAction) -> Any:
-        """Şirket olayı ekle."""
+    Raises:
+        ValueError: Geçersiz olay verisi yüklendiğinde.
+    """
+
+    def __init__(self) -> None:
+        """CorporateActionsHandler örneği oluşturur."""
+        self._actions: dict[str, list[CorporateAction]] = {}
+        self._applied: set[str] = set()
+
+    def add_action(self, action: CorporateAction) -> None:
+        """Şirket olayı ekler.
+
+        Args:
+            action: Eklenecek CorporateAction örneği.
+
+        Raises:
+            ValueError: Ticker boş olduğunda.
+        """
         if not action.ticker or not action.ticker.strip():
             logger.warning("Corporate action rejected: empty ticker", action_id=action.action_id)
             return
@@ -85,9 +150,21 @@ class CorporateActionsHandler:
         )
 
     def get_actions(
-        self, ticker: str, start_date: date | None = None, end_date: date | None = None
+        self,
+        ticker: str,
+        start_date: date | None = None,
+        end_date: date | None = None,
     ) -> list[CorporateAction]:
-        """Şirket olaylarını getir."""
+        """Şirket olaylarını getirir.
+
+        Args:
+            ticker: Hisse sembolü.
+            start_date: Başlangıç tarihi filtresi.
+            end_date: Bitiş tarihi filtresi.
+
+        Returns:
+            Filtrelenmiş CorporateAction listesi.
+        """
         actions = self._actions.get(ticker, [])
 
         if start_date:
@@ -98,18 +175,17 @@ class CorporateActionsHandler:
         return actions
 
     def adjust_price(self, ticker: str, price: float, price_date: date) -> float:
-        """Geçmiş fiyatı şirket olaylarına göre düzelt.
+        """Geçmiş fiyatı şirket olaylarına göre düzeltir.
 
-        Kritik: Bu fonksiyon backtest'te kullanılır.
-        Fiyat, o tarihteki bilinen olaylara göre düzeltilir.
+        Backtest'te kullanılır. Fiyat, o tarihteki bilinen olaylara göre düzeltilir.
 
         Args:
-            ticker: Hisse kodu
-            price: Düzeltilmemiş fiyat
-            price_date: Fiyat tarihi
+            ticker: Hisse kodu.
+            price: Düzeltilmemiş fiyat.
+            price_date: Fiyat tarihi.
 
         Returns:
-            Düzeltilmiş fiyat
+            Düzeltilmiş fiyat.
         """
         adjusted = price
         actions = self._actions.get(ticker, [])
@@ -121,15 +197,15 @@ class CorporateActionsHandler:
         return round(adjusted, 4)
 
     def adjust_position(self, ticker: str, quantity: int, action: CorporateAction) -> int:
-        """Pozisyon miktarını şirket olayına göre düzelt.
+        """Pozisyon miktarını şirket olayına göre düzeltir.
 
         Args:
-            ticker: Hisse kodu
-            quantity: Mevcut lot sayısı
-            action: Şirket olayı
+            ticker: Hisse kodu.
+            quantity: Mevcut lot sayısı.
+            action: Şirket olayı.
 
         Returns:
-            Düzeltilmiş lot sayısı
+            Düzeltilmiş lot sayısı.
         """
         if action.action_type == ActionType.STOCK_SPLIT:
             if action.split_ratio > 1:
@@ -140,17 +216,21 @@ class CorporateActionsHandler:
                 return int(quantity * (1 + action.bonus_ratio))
 
         elif action.action_type == ActionType.RIGHTS_ISSUE and action.rights_ratio > 0:
-            # Her N hisseye 1 yeni hisse
             new_shares = int(quantity * action.rights_ratio)
             return quantity + new_shares
 
         return quantity
 
     def compute_dividend_income(self, ticker: str, quantity: int, action: CorporateAction) -> float:
-        """Temettü gelirini hesapla.
+        """Temettü gelirini hesaplar.
+
+        Args:
+            ticker: Hisse kodu.
+            quantity: Lot sayısı.
+            action: Temettü olayı.
 
         Returns:
-            Toplam temettü geliri (brüt)
+            Toplam temettü geliri (brüt).
         """
         if action.action_type != ActionType.DIVIDEND:
             return 0.0
@@ -162,46 +242,67 @@ class CorporateActionsHandler:
         ticker: str,
         prices: list[dict[str, Any]],
     ) -> list[dict[str, Any]]:
-        """Geçmiş fiyat serisini şirket olaylarına göre düzelt.
+        """Geçmiş fiyat serisini şirket olaylarına göre düzeltir.
 
-        Backtest'te kullanılır: bugünün bilinen olaylarıyla geçmişi düzelt.
+        Backtest'te kullanılır: bugünün bilinen olaylarıyla geçmişi düzeltir.
+        Her bar bağımsız olarak orijinal değerlerden düzeltilir (compounding yok).
 
         Args:
-            ticker: Hisse kodu
-            prices: [{"date": date, "open": float, "high": float, "low": float, "close": float, "volume": int}, ...]
+            ticker: Hisse kodu.
+            prices: [{"date": date, "open": float, "high": float,
+                      "low": float, "close": float, "volume": int}, ...]
 
         Returns:
-            Düzeltilmiş fiyat serisi
+            Düzeltilmiş fiyat serisi.
         """
         actions = self._actions.get(ticker, [])
         if not actions:
             return prices
 
-        adjusted = []
+        adjusted: list[dict[str, Any]] = []
         for bar in prices:
             bar_date = bar["date"] if isinstance(bar["date"], date) else date.fromisoformat(str(bar["date"]))
 
-            adj_bar = dict(bar)
+            # Orijinal değerleri koru — üst üste düzeltme yapma
+            adj_open = float(bar["open"])
+            adj_high = float(bar["high"])
+            adj_low = float(bar["low"])
+            adj_close = float(bar["close"])
+            adj_volume = int(bar["volume"])
+
             for action in actions:
                 if action.ex_date > bar_date:
-                    # Bu tarihten sonraki olayları düzelt
-                    adj_bar["open"] = self._adjust_single_price(bar["open"], action)
-                    adj_bar["high"] = self._adjust_single_price(bar["high"], action)
-                    adj_bar["low"] = self._adjust_single_price(bar["low"], action)
-                    adj_bar["close"] = self._adjust_single_price(bar["close"], action)
+                    adj_open = self._adjust_single_price(adj_open, action)
+                    adj_high = self._adjust_single_price(adj_high, action)
+                    adj_low = self._adjust_single_price(adj_low, action)
+                    adj_close = self._adjust_single_price(adj_close, action)
 
-                    # Hacim de düzeltilir (bölünme/bedelsiz durumunda)
                     if action.action_type == ActionType.STOCK_SPLIT and action.split_ratio > 1:
-                        adj_bar["volume"] = int(bar["volume"] * action.split_ratio)
+                        adj_volume = int(adj_volume * action.split_ratio)
                     elif action.action_type == ActionType.BONUS_SHARE and action.bonus_ratio > 0:
-                        adj_bar["volume"] = int(bar["volume"] * (1 + action.bonus_ratio))
+                        adj_volume = int(adj_volume * (1 + action.bonus_ratio))
 
-            adjusted.append(adj_bar)
+            adjusted.append({
+                "date": bar["date"],
+                "open": adj_open,
+                "high": adj_high,
+                "low": adj_low,
+                "close": adj_close,
+                "volume": adj_volume,
+            })
 
         return adjusted
 
     def _adjust_single_price(self, price: float, action: CorporateAction) -> float:
-        """Tek bir fiyatı tek bir olaya göre düzelt."""
+        """Tek bir fiyatı tek bir olaya göre düzeltir.
+
+        Args:
+            price: Düzeltilmemiş fiyat.
+            action: Uygulanacak şirket olayı.
+
+        Returns:
+            Düzeltilmiş fiyat.
+        """
         if action.action_type == ActionType.DIVIDEND:
             return max(0, price - action.dividend_per_share)
         elif action.action_type == ActionType.STOCK_SPLIT and action.split_ratio > 1:
@@ -212,8 +313,12 @@ class CorporateActionsHandler:
             return (price + action.rights_price * action.rights_ratio) / (1 + action.rights_ratio)
         return price
 
-    def load_from_kap(self, kap_events: list[dict[str, Any]]) -> Any:
-        """KAP'tan gelen şirket olaylarını yükle."""
+    def load_from_kap(self, kap_events: list[dict[str, Any]]) -> None:
+        """KAP'tan gelen şirket olaylarını yükler.
+
+        Args:
+            kap_events: KAP ham olay listesi.
+        """
         if not kap_events:
             return
 
@@ -232,22 +337,27 @@ class CorporateActionsHandler:
                     source="KAP",
                 )
 
-                # Temettü miktarını çıkar
                 if action_type == ActionType.DIVIDEND:
                     action.dividend_per_share = self._extract_dividend_amount(event)
 
-                # Bölünme oranını çıkar
                 if action_type in (ActionType.STOCK_SPLIT, ActionType.BONUS_SHARE):
                     action.split_ratio = self._extract_split_ratio(event)
 
                 if action.ticker:
                     self.add_action(action)
-            except Exception as e:
-                logger.warning("Failed to process KAP event", error=str(e))
+            except Exception as exc:
+                logger.warning("Failed to process KAP event", error=str(exc))
                 continue
 
-    def _classify_kap_event(self, event: dict) -> ActionType | None:
-        """KAP olayını sınıflandır."""
+    def _classify_kap_event(self, event: dict[str, Any]) -> ActionType | None:
+        """KAP olayını sınıflandırır.
+
+        Args:
+            event: KAP ham olay verisi.
+
+        Returns:
+            ActionType veya sınıflandırılamazsa None.
+        """
         title = event.get("title", "").lower()
         subject = event.get("subject", "").lower()
         text = f"{title} {subject}"
@@ -269,20 +379,18 @@ class CorporateActionsHandler:
 
         return None
 
-    def _extract_dividend_amount(self, event: dict) -> float:
-        """Temettü miktarını KAP açıklamasından çıkar."""
-        import re
+    def _extract_dividend_amount(self, event: dict[str, Any]) -> float:
+        """Temettü miktarını KAP açıklamasından çıkarır.
 
+        Args:
+            event: KAP ham olay verisi.
+
+        Returns:
+            Hisse başına temettü miktarı (bulunamazsa 0.0).
+        """
         text = event.get("title", "") + " " + event.get("summary", "")
 
-        # "hisseye 5,25 TL" veya "5.25 TL/hisse" gibi pattern'ler
-        patterns = [
-            r"hisseye\s+(\d+[.,]\d+)\s*(?:TL|₺)",
-            r"(\d+[.,]\d+)\s*(?:TL|₺)\s*/?\s*hisse",
-            r"kar\s+payı\s+(\d+[.,]\d+)",
-        ]
-
-        for pattern in patterns:
+        for pattern in _DIVIDEND_PATTERNS:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
                 amount_str = match.group(1).replace(",", ".")
@@ -293,20 +401,18 @@ class CorporateActionsHandler:
 
         return 0.0
 
-    def _extract_split_ratio(self, event: dict) -> float:
-        """Bölünme oranını KAP açıklamasından çıkar."""
-        import re
+    def _extract_split_ratio(self, event: dict[str, Any]) -> float:
+        """Bölünme oranını KAP açıklamasından çıkarır.
 
+        Args:
+            event: KAP ham olay verisi.
+
+        Returns:
+            Bölünme oranı (bulunamazsa 1.0).
+        """
         text = event.get("title", "") + " " + event.get("summary", "")
 
-        # "1'e 10" veya "10:1" gibi pattern'ler
-        patterns = [
-            r"1[''e]\s*(\d+)",
-            r"(\d+)\s*:\s*1",
-            r"(\d+)\s*kata\s*çıkar",
-        ]
-
-        for pattern in patterns:
+        for pattern in _SPLIT_PATTERNS:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
                 try:
@@ -317,18 +423,38 @@ class CorporateActionsHandler:
         return 1.0
 
     def _parse_date(self, date_str: str) -> date:
-        """Tarih string'ini date objesine çevir."""
+        """Tarih string'ini date objesine çevirir.
+
+        Args:
+            date_str: Tarih string'i (çeşitli formatlar desteklenir).
+
+        Returns:
+            date objesi.
+
+        Raises:
+            ValueError: Hiçbir formata uymayan ve boş olmayan tarih.
+        """
         if not date_str:
             return date.today()
 
-        for fmt in ["%Y-%m-%d", "%d/%m/%Y", "%d.%m.%Y", "%Y-%m-%dT%H:%M:%S"]:
+        formats = ["%Y-%m-%d", "%d/%m/%Y", "%d.%m.%Y", "%Y-%m-%dT%H:%M:%S"]
+        for fmt in formats:
             try:
                 return datetime.strptime(date_str[:10], fmt[: len(date_str[:10])]).date()
             except ValueError:
                 continue
 
+        logger.warning("Tarih parse edilemedi, bugün kullanılıyor", date_str=date_str)
         return date.today()
 
 
 # Singleton
 corporate_actions = CorporateActionsHandler()
+
+
+__all__ = [
+    "ActionType",
+    "CorporateAction",
+    "CorporateActionsHandler",
+    "corporate_actions",
+]

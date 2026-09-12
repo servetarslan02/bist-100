@@ -35,22 +35,42 @@ logger = structlog.get_logger()
 
 
 class CircuitState(StrEnum):
-    """Circuit breaker durumları."""
+    """Circuit breaker durumları.
 
-    CLOSED = "CLOSED"  # Normal — istekler geçiyor
-    OPEN = "OPEN"  # Açık — istekler engelleniyor
-    HALF_OPEN = "HALF_OPEN"  # Yarı açık — test istekleri geçiyor
+    Attributes:
+        CLOSED: Normal çalışır durum — istekler geçiyor.
+        OPEN: Devre açık — istekler engelleniyor.
+        HALF_OPEN: Yarı açık — test istekleri geçiyor.
+    """
+
+    CLOSED = "CLOSED"
+    OPEN = "OPEN"
+    HALF_OPEN = "HALF_OPEN"
 
 
 @dataclass
 class CircuitStats:
-    """Circuit breaker istatistikleri."""
+    """Circuit breaker istatistikleri.
+
+    Attributes:
+        total_requests: Toplam istek sayısı.
+        total_successes: Toplam başarılı istek.
+        total_failures: Toplam başarısız istek.
+        total_rejected: OPEN iken reddedilen istek sayısı.
+        total_fallbacks: Fallback kullanılan sayısı.
+        consecutive_failures: Ardışık hata sayısı.
+        consecutive_successes: Ardışık başarı sayısı.
+        last_failure_time: Son hata zaman damgası (epoch).
+        last_success_time: Son başarı zaman damgası (epoch).
+        last_state_change: Son durum değişikliği zaman damgası.
+        state_changes: Toplam durum değişikliği sayısı.
+    """
 
     total_requests: int = 0
     total_successes: int = 0
     total_failures: int = 0
-    total_rejected: int = 0  # OPEN iken reddedilen
-    total_fallbacks: int = 0  # Fallback kullanılan
+    total_rejected: int = 0
+    total_fallbacks: int = 0
     consecutive_failures: int = 0
     consecutive_successes: int = 0
     last_failure_time: float | None = None
@@ -58,21 +78,34 @@ class CircuitStats:
     last_state_change: float | None = None
     state_changes: int = 0
 
+    def __repr__(self) -> str:
+        return (
+            f"CircuitStats(requests={self.total_requests}, "
+            f"successes={self.total_successes}, "
+            f"failures={self.total_failures}, "
+            f"rejected={self.total_rejected})"
+        )
+
 
 class CircuitBreakerError(Exception):
-    """Circuit breaker OPEN iken fırlatılır."""
+    """Circuit breaker OPEN iken fırlatılır.
+
+    İstek reddedildiğinde bu istisna yükseltilir.
+    """
 
 
 class CircuitBreaker:
-    """
-    Circuit breaker — provider sağlık kontrolü.
+    """Circuit breaker — provider sağlık kontrolü.
+
+    Provider hatalarını izler, eşik aşıldığında devreyi açar
+    ve otomatik kurtarma mekanizması sağlar.
 
     Args:
-        name: Provider adı (logging için)
-        failure_threshold: OPEN'a geçmek için ardışık hata sayısı
-        recovery_timeout_s: OPEN → HALF_OPEN geçiş süresi (saniye)
-        half_open_max_calls: HALF_OPEN'da izin verilen test istek sayısı
-        success_threshold: HALF_OPEN → CLOSED için ardışık başarı sayısı
+        name: Provider adı (logging için).
+        failure_threshold: OPEN'a geçmek için ardışık hata sayısı.
+        recovery_timeout_s: OPEN → HALF_OPEN geçiş süresi (saniye).
+        half_open_max_calls: HALF_OPEN'da izin verilen test istek sayısı.
+        success_threshold: HALF_OPEN → CLOSED için ardışık başarı sayısı.
     """
 
     def __init__(
@@ -82,8 +115,16 @@ class CircuitBreaker:
         recovery_timeout_s: float = 60.0,
         half_open_max_calls: int = 3,
         success_threshold: int = 2,
-    ):
-        """Otomatik eklendi."""
+    ) -> None:
+        """CircuitBreaker örneği oluşturur.
+
+        Args:
+            name: Provider adı.
+            failure_threshold: OPEN'a geçmek için ardışık hata sayısı.
+            recovery_timeout_s: OPEN → HALF_OPEN geçiş süresi (saniye).
+            half_open_max_calls: HALF_OPEN'da izin verilen test istek sayısı.
+            success_threshold: HALF_OPEN → CLOSED için ardışık başarı sayısı.
+        """
         self.name = name
         self.failure_threshold = failure_threshold
         self.recovery_timeout_s = recovery_timeout_s
@@ -97,15 +138,23 @@ class CircuitBreaker:
 
     @property
     def state(self) -> CircuitState:
-        """Mevcut durum (OPEN timeout kontrolü ile)."""
+        """Mevcut durumu döndürür (OPEN timeout kontrolü ile).
+
+        Returns:
+            Mevcut CircuitState değeri.
+        """
         if self._state == CircuitState.OPEN and self._stats.last_failure_time:
             elapsed = time.time() - self._stats.last_failure_time
             if elapsed >= self.recovery_timeout_s:
                 self._transition(CircuitState.HALF_OPEN)
         return self._state
 
-    def _transition(self, new_state: CircuitState) -> Any:
-        """Durum geçişi."""
+    def _transition(self, new_state: CircuitState) -> None:
+        """Durum geçişi yapar.
+
+        Args:
+            new_state: Geçilecek yeni durum.
+        """
         old_state = self._state
         self._state = new_state
         self._stats.last_state_change = time.time()
@@ -116,12 +165,17 @@ class CircuitBreaker:
             self._stats.consecutive_successes = 0
 
         logger.info(
-            "Circuit breaker state change", name=self.name, old_state=old_state.value, new_state=new_state.value
+            "Circuit breaker state change",
+            name=self.name,
+            old_state=old_state.value,
+            new_state=new_state.value,
         )
 
-    def record_success(self) -> Any:
-        """Başarı kaydet."""
-        # First check state (may trigger OPEN → HALF_OPEN transition)
+    def record_success(self) -> None:
+        """Başarılı istek kaydı yapar.
+
+        HALF_OPEN durumunda eşik aşıldığında CLOSED geçişi tetikler.
+        """
         current = self.state
 
         self._stats.total_requests += 1
@@ -133,9 +187,12 @@ class CircuitBreaker:
         if current == CircuitState.HALF_OPEN and self._stats.consecutive_successes >= self.success_threshold:
             self._transition(CircuitState.CLOSED)
 
-    def record_failure(self) -> Any:
-        """Hata kaydet."""
-        # First check state (may trigger OPEN → HALF_OPEN transition)
+    def record_failure(self) -> None:
+        """Başarısız istek kaydı yapar.
+
+        CLOSED durumunda eşik aşıldığında OPEN geçişi tetikler.
+        HALF_OPEN durumunda hemen OPEN'a döner.
+        """
         current = self.state
 
         self._stats.total_requests += 1
@@ -150,13 +207,17 @@ class CircuitBreaker:
         elif current == CircuitState.HALF_OPEN:
             self._transition(CircuitState.OPEN)
 
-    def record_rejected(self) -> Any:
-        """REDDEDilen istek kaydet (OPEN iken)."""
+    def record_rejected(self) -> None:
+        """OPEN iken reddedilen istek kaydı yapar."""
         self._stats.total_rejected += 1
 
     def can_execute(self) -> bool:
-        """İstek yapılabilir mi?"""
-        current_state = self.state  # Timeout kontrolü tetikler
+        """İstek yapılabilir mi kontrol eder.
+
+        Returns:
+            İstek yapılabilirse True, engellenmişse False.
+        """
+        current_state = self.state
 
         if current_state == CircuitState.CLOSED:
             return True
@@ -171,8 +232,21 @@ class CircuitBreaker:
             return False
         return False
 
-    async def call(self, func: Callable, *args, **kwargs) -> Any:
-        """Async fonksiyonu circuit breaker ile çağır."""
+    async def call(self, func: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
+        """Async fonksiyonu circuit breaker ile çağırır.
+
+        Args:
+            func: Çağrılacak async fonksiyon.
+            *args: Fonksiyon argümanları.
+            **kwargs: Fonksiyon anahtar kelime argümanları.
+
+        Returns:
+            Fonksiyon dönüş değeri.
+
+        Raises:
+            CircuitBreakerError: Devre OPEN iken.
+            Exception: Fonksiyon hata fırlattığında (kayıt yapıldıktan sonra yeniden yükseltilir).
+        """
         if not self.can_execute():
             raise CircuitBreakerError(f"Circuit breaker '{self.name}' is OPEN")
 
@@ -184,11 +258,17 @@ class CircuitBreaker:
             self.record_failure()
             raise
 
-    def protect(self, func: Callable) -> Callable:
-        """Decorator — async fonksiyonu circuit breaker ile sar."""
+    def protect(self, func: Callable[..., Any]) -> Callable[..., Any]:
+        """Decorator — async fonksiyonu circuit breaker ile sarar.
 
-        async def wrapper(*args, **kwargs) -> Any:
-            """Otomatik eklendi."""
+        Args:
+            func: Korunacak async fonksiyon.
+
+        Returns:
+            Circuit breaker ile sarılmış wrapper fonksiyonu.
+        """
+
+        async def wrapper(*args: Any, **kwargs: Any) -> Any:
             return await self.call(func, *args, **kwargs)
 
         wrapper.__name__ = func.__name__
@@ -196,33 +276,65 @@ class CircuitBreaker:
         return wrapper
 
     class _ContextManager:
-        """async with cb.context(): ... kullanımı için."""
+        """async with cb.context(): ... kullanımı için bağlam yöneticisi.
 
-        def __init__(self, cb: "CircuitBreaker"):
-            """Otomatik eklendi."""
+        Args:
+            cb: Üst CircuitBreaker örneği.
+        """
+
+        def __init__(self, cb: "CircuitBreaker") -> None:
             self._cb = cb
 
-        async def __aenter__(self) -> Any:
-            """Otomatik eklendi."""
+        async def __aenter__(self) -> "CircuitBreaker._ContextManager":
+            """Bağlama girer — istek izni kontrol eder.
+
+            Returns:
+                Kendisi (context manager).
+
+            Raises:
+                CircuitBreakerError: Devre OPEN iken.
+            """
             if not self._cb.can_execute():
                 raise CircuitBreakerError(f"Circuit breaker '{self._cb.name}' is OPEN")
             return self
 
-        async def __aexit__(self, exc_type, exc_val, exc_tb) -> Any:
-            """Otomatik eklendi."""
+        async def __aexit__(
+            self,
+            exc_type: type[BaseException] | None,
+            exc_val: BaseException | None,
+            exc_tb: Any,
+        ) -> bool:
+            """Bağlamdan çıkar — başarı/hata kaydı yapar.
+
+            Args:
+                exc_type: Yakalanan istisna tipi (varsa).
+                exc_val: Yakalanan istisna değeri (varsa).
+                exc_tb: Traceback (varsa).
+
+            Returns:
+                False — istisnayı yeniden fırlatır.
+            """
             if exc_type is not None:
                 self._cb.record_failure()
-                return False  # Exception'ı yeniden fırlat
+                return False
             else:
                 self._cb.record_success()
             return False
 
     def context(self) -> "CircuitBreaker._ContextManager":
-        """async with cb.context(): ... kullanımı için."""
+        """async with cb.context(): ... kullanımı için bağlam yöneticisi döndürür.
+
+        Returns:
+            _ContextManager örneği.
+        """
         return self._ContextManager(self)
 
-    def get_state(self) -> dict:
-        """Durum bilgisi (monitoring için)."""
+    def get_state(self) -> dict[str, Any]:
+        """Durum bilgisini döndürür (monitoring için).
+
+        Returns:
+            Durum ve istatistik sözlüğü.
+        """
         return {
             "name": self.name,
             "state": self.state.value,
@@ -243,8 +355,8 @@ class CircuitBreaker:
             else None,
         }
 
-    def reset(self) -> Any:
-        """Sıfırla (test veya manuel recovery için)."""
+    def reset(self) -> None:
+        """Circuit breaker'ı sıfırlar (test veya manuel recovery için)."""
         self._state = CircuitState.CLOSED
         self._stats = CircuitStats()
         self._half_open_calls = 0
@@ -252,10 +364,14 @@ class CircuitBreaker:
 
 
 class CircuitBreakerManager:
-    """Tüm circuit breaker'ları yönetir."""
+    """Tüm circuit breaker'ları yöneten merkezi yönetici.
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    Provider bazlı circuit breaker örneklerini oluşturur,
+    izler ve toplu yönetim sağlar.
+    """
+
+    def __init__(self) -> None:
+        """CircuitBreakerManager örneği oluşturur."""
         self._breakers: dict[str, CircuitBreaker] = {}
 
     def get_or_create(
@@ -264,7 +380,16 @@ class CircuitBreakerManager:
         failure_threshold: int = 5,
         recovery_timeout_s: float = 60.0,
     ) -> CircuitBreaker:
-        """Circuit breaker al veya oluştur."""
+        """Circuit breaker alır veya oluşturur.
+
+        Args:
+            name: Provider adı.
+            failure_threshold: OPEN'a geçmek için ardışık hata sayısı.
+            recovery_timeout_s: OPEN → HALF_OPEN geçiş süresi (saniye).
+
+        Returns:
+            CircuitBreaker örneği.
+        """
         if name not in self._breakers:
             self._breakers[name] = CircuitBreaker(
                 name=name,
@@ -273,12 +398,16 @@ class CircuitBreakerManager:
             )
         return self._breakers[name]
 
-    def get_all_states(self) -> dict:
-        """Tüm circuit breaker durumları."""
+    def get_all_states(self) -> dict[str, dict[str, Any]]:
+        """Tüm circuit breaker durumlarını döndürür.
+
+        Returns:
+            {provider_adı: durum_sözlüğü} yapısı.
+        """
         return {name: cb.get_state() for name, cb in self._breakers.items()}
 
-    def reset_all(self) -> Any:
-        """Tümünü sıfırla."""
+    def reset_all(self) -> None:
+        """Tüm circuit breaker'ları sıfırlar."""
         for cb in self._breakers.values():
             cb.reset()
 
