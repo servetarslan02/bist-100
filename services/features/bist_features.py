@@ -60,13 +60,6 @@ class BISTFeatureDef:
 
     def __repr__(self) -> str:
         """BISTFeatureDef kısa temsili.
-    
-        Returns:
-            Sınıf bilgisi.
-        """
-        return f"BISTFeatureDef()"
-def __repr__(self) -> str:
-        """BISTFeatureDef kısa temsili.
 
         Returns:
             Feature adı ve kategori.

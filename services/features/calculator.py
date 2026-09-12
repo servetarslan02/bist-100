@@ -153,13 +153,6 @@ class FeatureCalculator(FeatureEngine):
 
     def __repr__(self) -> str:
         """FeatureCalculator kısa temsili.
-    
-        Returns:
-            Sınıf bilgisi.
-        """
-        return f"FeatureCalculator()"
-def __repr__(self) -> str:
-        """FeatureCalculator kısa temsili.
 
         Returns:
             Sınıf adı.

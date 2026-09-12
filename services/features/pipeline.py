@@ -37,18 +37,11 @@ class PipelineConfig:
 
     def __repr__(self) -> str:
         """PipelineConfig kısa temsili.
-    
-        Returns:
-            Sınıf bilgisi.
-        """
-        return f"PipelineConfig()"
-def __repr__(self) -> str:
-        """PipelineConfig kısa temsili.
 
         Returns:
-            Pipeline adı ve enabled durumu.
+            Drift eşiği ve drift detection durumu.
         """
-        return f"PipelineConfig({self.name!r}, enabled={self.enabled})"
+        return f"PipelineConfig(drift={self.drift_threshold}, drift_enabled={self.enable_drift_detection})"
 @dataclass
 class PipelineResult:
     """Pipeline çalıştırma sonucu."""
@@ -63,18 +56,11 @@ class PipelineResult:
 
     def __repr__(self) -> str:
         """PipelineResult kısa temsili.
-    
-        Returns:
-            Sınıf bilgisi.
-        """
-        return f"PipelineResult()"
-def __repr__(self) -> str:
-        """PipelineResult kısa temsili.
 
         Returns:
-            Feature sayısı ve success durumu.
+            Ticker ve feature sayısı.
         """
-        return f"PipelineResult(features={len(self.features)}, success={self.success})"
+        return f"PipelineResult(ticker={self.ticker!r}, features={self.feature_count})"
 class FeaturePipeline:
     """End-to-end Feature Pipeline motoru."""
 
@@ -307,16 +293,9 @@ class FeaturePipeline:
 
     def __repr__(self) -> str:
         """FeaturePipeline kısa temsili.
-    
-        Returns:
-            Sınıf bilgisi.
-        """
-        return f"FeaturePipeline()"
-def __repr__(self) -> str:
-        """FeaturePipeline kısa temsili.
 
         Returns:
-            Pipeline adı.
+            Config drift_threshold ve referans istatistik sayısı.
         """
-        return f"FeaturePipeline({self.config.name!r})"
+        return f"FeaturePipeline(drift_threshold={self.config.drift_threshold}, ref_stats={len(self._reference_stats)})"
 feature_pipeline = FeaturePipeline()

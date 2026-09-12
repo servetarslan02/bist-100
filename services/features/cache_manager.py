@@ -229,13 +229,6 @@ class FeatureCacheManager:
 
     def __repr__(self) -> str:
         """FeatureCacheManager kısa temsili.
-    
-        Returns:
-            Sınıf bilgisi.
-        """
-        return f"FeatureCacheManager()"
-def __repr__(self) -> str:
-        """FeatureCacheManager kısa temsili.
 
         Returns:
             Önbellek boyutu ve hit/miss oranı.

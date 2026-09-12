@@ -171,13 +171,6 @@ class FeatureContract:
 
     def __repr__(self) -> str:
         """FeatureContract kısa temsili.
-    
-        Returns:
-            Sınıf bilgisi.
-        """
-        return f"FeatureContract()"
-def __repr__(self) -> str:
-        """FeatureContract kısa temsili.
 
         Returns:
             Feature adı, versiyon ve PIT-safe durumu.
@@ -535,13 +528,6 @@ class FeatureRegistry:
 
 
     def __repr__(self) -> str:
-        """FeatureRegistry kısa temsili.
-    
-        Returns:
-            Sınıf bilgisi.
-        """
-        return f"FeatureRegistry()"
-def __repr__(self) -> str:
         """FeatureRegistry kısa temsili.
 
         Returns:

@@ -1,5 +1,35 @@
-# Seven Motors Feature Engine
-# Core feature motors for BIST quantitative analysis
+"""ALPHA BIST — Seven Motors Feature Engine
+
+BIST nicel analizi için temel feature motorları:
+- RelativeStrengthMotor: Göreceli güç (benchmark karşılaştırma)
+- SeasonalityMotor: Mevsimsellik feature'ları
+- MomentumMotor: Momentum feature'ları
+- VolumeMotor: Hacim feature'ları
+- VolatilityMotor: Volatilite feature'ları
+- MeanReversionMotor: Ortalama geri dönüş
+- MicrostructureMotor: Mikro yapı feature'ları
+- WhyFallingMotor: Çok faktörlü düşüş analizi
+
+Kullanım:
+    from services.features.seven_motors import WhyFallingMotor
+
+    motor = WhyFallingMotor()
+    features = motor.compute(
+        ticker="GARAN",
+        stock_return_5d=-3.5,
+        stock_return_20d=-8.0,
+        market_return_5d=-1.0,
+        market_return_20d=-2.0,
+        sector_return_5d=-1.5,
+        sector_return_20d=-3.0,
+        volume_change=1.5,
+        volume_zscore=2.5,
+        news_sentiment=-0.2,
+        kap_sentiment=0.0,
+        rsi=28.0,
+        atr_pct=4.5,
+    )
+"""
 
 from __future__ import annotations
 
@@ -27,6 +57,21 @@ DEFAULT_HIGH_VOL_ATR: float = 5.0                # Yüksek volatilite ATR eşiğ
 DEFAULT_NEG_SENTIMENT_STRONG: float = -0.5       # Güçlü negatif sentiment eşiği
 DEFAULT_DEEP_DRAWDOWN: float = -15.0             # Derin düşüş eşiği (%)
 DEFAULT_RISK_CAP: float = 100.0                  # Risk skoru üst sınır
+
+# === Düşüş Skor Sabitleri ===
+SCORE_MARKET_SELL_5D: float = -2.0           # Piyasa 5G satış skoru
+SCORE_SECTOR_SELL_5D: float = -5.0           # Sektör 5G satış skoru
+SCORE_TEMPORARY_PANIC: float = -3.0          # Geçici panik skoru
+SCORE_OVERSOLD_BOUNCE: float = -5.0          # Aşırı satım bounce skoru
+SCORE_LOW_VOLUME: float = -8.0               # Düşük hacim skoru
+SCORE_COMPANY_SPECIFIC: float = -1.0         # Şirkete özgü skoru
+SCORE_LIQUIDITY_EVENT: float = -2.0          # Likidite olay skoru
+SCORE_KAP_NEGATIVE: float = -5.0             # KAP negatif sentiment skoru
+SCORE_NEWS_NEGATIVE: float = 2.0             # Haber negatif sentiment skoru
+SCORE_PERMANENT_COMPANY: float = -0.3        # Kalıcı şirket skoru
+SCORE_PERMANENT_LIQUIDITY: float = 30.0      # Kalıcı likidite skoru
+SCORE_HIGH_VOL_CRASH: float = -0.5           # Yüksek volatilite crash skoru
+SCORE_DEEP_DRAWDOWN: float = 5.0             # Derin düşüş skoru
 
 
 class RelativeStrengthMotor:

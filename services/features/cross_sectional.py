@@ -209,13 +209,6 @@ class CrossSectionalEngine:
 
     def __repr__(self) -> str:
         """CrossSectionalEngine kısa temsili.
-    
-        Returns:
-            Sınıf bilgisi.
-        """
-        return f"CrossSectionalEngine()"
-def __repr__(self) -> str:
-        """CrossSectionalEngine kısa temsili.
 
         Returns:
             Sınıf adı.
