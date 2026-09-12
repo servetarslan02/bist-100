@@ -1,5 +1,3 @@
-from typing import Any
-
 """
 ALPHA BIST — gRPC Server v2.0 (Protobuf Native)
 
@@ -38,15 +36,29 @@ from opentelemetry import trace
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.grpc_server")
 
+# Sinyal yönü sabitleri
+_DIRECTION_MAP: dict[str, int] = {"BUY": 0, "SELL": 1, "HOLD": 2}
+
+# Stream bekleme süreleri (saniye) — SSD yazma azaltma
+_DEFAULT_STREAM_INTERVAL_SEC: float = 30.0
+_DEFAULT_PORTFOLIO_STREAM_INTERVAL_SEC: float = 10.0
+
 
 def otel_trace(span_name: str) -> Any:
-    """Decorator to wrap a method in an OTel span."""
+    """OpenTelemetry span ile saran dekoratör.
 
-    def decorator(func) -> Any:
-        """Otomatik eklendi."""
+    Args:
+        span_name: Oluşturulacak span'ın adı.
+
+    Returns:
+        Dekore edilmiş fonksiyon.
+    """
+
+    def decorator(func: Any) -> Any:
+        """Asıl dekoratör fonksiyonu."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs) -> Any:
-            """Otomatik eklendi."""
+        def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
+            """Span içinde fonksiyon çalıştırır."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
 
@@ -55,8 +67,15 @@ def otel_trace(span_name: str) -> Any:
     return decorator
 
 
-def _extract_correlation_from_context(context) -> None:
-    """gRPC context'ten correlation_id'yi çıkar ve context variable'a kaydet."""
+def _extract_correlation_from_context(context: Any) -> None:
+    """gRPC context'ten correlation_id'yi çıkar ve context variable'a kaydet.
+
+    Args:
+        context: gRPC servis context nesnesi.
+
+    Returns:
+        None.
+    """
     try:
         from ..core.distributed_tracing import correlation_id_var
 
@@ -64,22 +83,43 @@ def _extract_correlation_from_context(context) -> None:
         cid = metadata.get("x-correlation-id")
         if cid:
             correlation_id_var.set(cid)
-    except (ImportError, Exception):
-        logger.error("Exception caught", exc_info=True)
+    except ImportError:
+        logger.debug("distributed_tracing modülü bulunamadı")
+    except Exception as e:
+        logger.error("correlation_id çıkarma hatası", error=str(e))
 
 
 class MarketServiceServicer(market_pb2_grpc.MarketServiceServicer if HAS_PROTOBUF else object):
-    """Piyasa verisi gRPC servisi — Protobuf native."""
+    """Piyasa verisi gRPC servisi — Protobuf native.
+
+    Anlık fiyat stream'i ve tek seferlik fiyat sorgusu sağlar.
+    """
+
+    def __repr__(self) -> str:
+        """MarketServiceServicer kısa temsili.
+
+        Returns:
+            Sınıf adı.
+        """
+        return "MarketServiceServicer()"
 
     @otel_trace("grpc.server.StreamTicks")
-    def StreamTicks(self, request, context) -> Any:
-        """Anlık fiyat stream'i (Protobuf binary)."""
+    def StreamTicks(self, request: Any, context: Any) -> Any:
+        """Anlık fiyat stream'i (Protobuf binary).
+
+        Args:
+            request: Ticker listesi içeren istek.
+            context: gRPC servis context'i.
+
+        Returns:
+            Async MarketTick iterator'ı.
+        """
         _extract_correlation_from_context(context)
         tickers = list(request.tickers)
-        logger.info("gRPC StreamTicks started", tickers=tickers)
+        logger.info("gRPC StreamTicks başlatıldı", tickers=tickers)
 
         async def _generate() -> Any:
-            """Otomatik eklendi."""
+            """Market tick'lerini üretir."""
             while True:
                 try:
                     from ..core.redis_helper import get_cached
@@ -97,18 +137,31 @@ class MarketServiceServicer(market_pb2_grpc.MarketServiceServicer if HAS_PROTOBU
                                 ask=float(data.get("ask", 0)),
                                 timestamp=int(time.time() * 1000),
                             )
-                    await asyncio.sleep(30)  # SSD write reduction: 5s → 30s  # SSD write reduction: 1s → 5s  # SSD write reduction: 0.1s → 1s
+                    await asyncio.sleep(_DEFAULT_STREAM_INTERVAL_SEC)
                 except Exception as e:
-                    logger.error("gRPC StreamTicks error", error=str(e))
+                    logger.error("gRPC StreamTicks hatası", error=str(e))
                     break
 
         return _generate()
 
     @otel_trace("grpc.server.GetTick")
-    def GetTick(self, request, context) -> Any:
-        """Tek seferlik fiyat (Protobuf)."""
+    def GetTick(self, request: Any, context: Any) -> Any:
+        """Tek seferlik fiyat sorgusu (Protobuf).
+
+        Args:
+            request: Ticker listesi içeren istek.
+            context: gRPC servis context'i.
+
+        Returns:
+            MarketTick protobuf mesajı.
+        """
         _extract_correlation_from_context(context)
-        ticker = request.tickers[0] if request.tickers else ""
+        tickers = list(request.tickers)
+        if not tickers:
+            logger.warning("GetTick boş ticker listesi")
+            return market_pb2.MarketTick(timestamp=int(time.time() * 1000))
+
+        ticker = tickers[0]
         from ..core.redis_helper import get_cached
 
         data = get_cached(f"price:{ticker}")
@@ -125,16 +178,35 @@ class MarketServiceServicer(market_pb2_grpc.MarketServiceServicer if HAS_PROTOBU
 
 
 class SignalServiceServicer(market_pb2_grpc.SignalServiceServicer if HAS_PROTOBUF else object):
-    """Sinyal gRPC servisi — Protobuf native."""
+    """Sinyal gRPC servisi — Protobuf native.
+
+    Sinyal stream'i ve son sinyalleri sorgulama sağlar.
+    """
+
+    def __repr__(self) -> str:
+        """SignalServiceServicer kısa temsili.
+
+        Returns:
+            Sınıf adı.
+        """
+        return "SignalServiceServicer()"
 
     @otel_trace("grpc.server.StreamSignals")
-    def StreamSignals(self, request, context) -> Any:
-        """Sinyal stream'i (Protobuf binary)."""
+    def StreamSignals(self, request: Any, context: Any) -> Any:
+        """Sinyal stream'i (Protobuf binary).
+
+        Args:
+            request: min_confidence filtresi içeren istek.
+            context: gRPC servis context'i.
+
+        Returns:
+            Async Signal iterator'ı.
+        """
         _extract_correlation_from_context(context)
         min_confidence = request.min_confidence if hasattr(request, "min_confidence") else 0.5
 
         async def _generate() -> Any:
-            """Otomatik eklendi."""
+            """Sinyalleri üretir."""
             while True:
                 try:
                     from ..core.redis_helper import get_cached
@@ -142,39 +214,45 @@ class SignalServiceServicer(market_pb2_grpc.SignalServiceServicer if HAS_PROTOBU
                     signals = get_cached("signals:latest") or []
                     for s in signals:
                         if s.get("confidence", 0) >= min_confidence:
-                            direction_map = {"BUY": 0, "SELL": 1, "HOLD": 2}
                             yield market_pb2.Signal(
                                 ticker=s.get("ticker", ""),
-                                direction=direction_map.get(s.get("direction", "HOLD"), 2),
+                                direction=_DIRECTION_MAP.get(s.get("direction", "HOLD"), 2),
                                 confidence=float(s.get("confidence", 0)),
                                 target_price=float(s.get("target_price", 0)),
                                 stop_loss=float(s.get("stop_loss", 0)),
                                 reason=s.get("reason", ""),
                                 timestamp=int(time.time() * 1000),
                             )
-                    await asyncio.sleep(30)  # SSD write reduction: 5s → 30s  # SSD write reduction: 1s → 5s
+                    await asyncio.sleep(_DEFAULT_STREAM_INTERVAL_SEC)
                 except Exception as e:
-                    logger.error("gRPC StreamSignals error", error=str(e))
+                    logger.error("gRPC StreamSignals hatası", error=str(e))
                     break
 
         return _generate()
 
     @otel_trace("grpc.server.GetRecentSignals")
-    def GetRecentSignals(self, request, context) -> Any:
-        """Son sinyalleri al (Protobuf)."""
+    def GetRecentSignals(self, request: Any, context: Any) -> Any:
+        """Son sinyalleri sorgula (Protobuf).
+
+        Args:
+            request: min_confidence filtresi içeren istek.
+            context: gRPC servis context'i.
+
+        Returns:
+            SignalList protobuf mesajı.
+        """
         _extract_correlation_from_context(context)
         from ..core.redis_helper import get_cached
 
         signals = get_cached("signals:latest") or []
         min_conf = request.min_confidence if hasattr(request, "min_confidence") else 0.5
-        direction_map = {"BUY": 0, "SELL": 1, "HOLD": 2}
         proto_signals = []
         for s in signals:
             if s.get("confidence", 0) >= min_conf:
                 proto_signals.append(
                     market_pb2.Signal(
                         ticker=s.get("ticker", ""),
-                        direction=direction_map.get(s.get("direction", "HOLD"), 2),
+                        direction=_DIRECTION_MAP.get(s.get("direction", "HOLD"), 2),
                         confidence=float(s.get("confidence", 0)),
                         target_price=float(s.get("target_price", 0)),
                         stop_loss=float(s.get("stop_loss", 0)),
@@ -186,15 +264,34 @@ class SignalServiceServicer(market_pb2_grpc.SignalServiceServicer if HAS_PROTOBU
 
 
 class PortfolioServiceServicer(market_pb2_grpc.PortfolioServiceServicer if HAS_PROTOBUF else object):
-    """Portföy gRPC servisi — Protobuf native."""
+    """Portföy gRPC servisi — Protobuf native.
+
+    Portföy durumu stream'i ve anlık portföy sorgusu sağlar.
+    """
+
+    def __repr__(self) -> str:
+        """PortfolioServiceServicer kısa temsili.
+
+        Returns:
+            Sınıf adı.
+        """
+        return "PortfolioServiceServicer()"
 
     @otel_trace("grpc.server.StreamPortfolio")
-    def StreamPortfolio(self, request, context) -> Any:
-        """Portföy durumu stream'i (Protobuf binary)."""
+    def StreamPortfolio(self, request: Any, context: Any) -> Any:
+        """Portföy durumu stream'i (Protobuf binary).
+
+        Args:
+            request: Boş istek.
+            context: gRPC servis context'i.
+
+        Returns:
+            Async PortfolioState iterator'ı.
+        """
         _extract_correlation_from_context(context)
 
         async def _generate() -> Any:
-            """Otomatik eklendi."""
+            """Portföy durumunu üretir."""
             while True:
                 try:
                     from ..core.redis_helper import get_cached
@@ -221,16 +318,24 @@ class PortfolioServiceServicer(market_pb2_grpc.PortfolioServiceServicer if HAS_P
                             positions=positions,
                             timestamp=int(time.time() * 1000),
                         )
-                    await asyncio.sleep(10)  # SSD write reduction: 2s → 10s
+                    await asyncio.sleep(_DEFAULT_PORTFOLIO_STREAM_INTERVAL_SEC)
                 except Exception as e:
-                    logger.error("gRPC StreamPortfolio error", error=str(e))
+                    logger.error("gRPC StreamPortfolio hatası", error=str(e))
                     break
 
         return _generate()
 
     @otel_trace("grpc.server.GetPortfolio")
-    def GetPortfolio(self, request, context) -> Any:
-        """Anlık portföy durumu (Protobuf)."""
+    def GetPortfolio(self, request: Any, context: Any) -> Any:
+        """Anlık portföy durumu sorgusu (Protobuf).
+
+        Args:
+            request: Boş istek.
+            context: gRPC servis context'i.
+
+        Returns:
+            PortfolioState protobuf mesajı.
+        """
         _extract_correlation_from_context(context)
         from ..core.redis_helper import get_cached
 
@@ -251,21 +356,41 @@ class PortfolioServiceServicer(market_pb2_grpc.PortfolioServiceServicer if HAS_P
             total_value=float(pf.get("total_value", 0)),
             cash=float(pf.get("cash", 0)),
             daily_pnl=float(pf.get("daily_pnl", 0)),
+            daily_pnl_pct=float(pf.get("daily_pnl_pct", 0)),
             positions=positions,
             timestamp=int(time.time() * 1000),
         )
 
 
 class RiskServiceServicer(market_pb2_grpc.RiskServiceServicer if HAS_PROTOBUF else object):
-    """Risk gRPC servisi — Protobuf native."""
+    """Risk gRPC servisi — Protobuf native.
+
+    Risk metrikleri stream'i ve anlık risk sorgusu sağlar.
+    """
+
+    def __repr__(self) -> str:
+        """RiskServiceServicer kısa temsili.
+
+        Returns:
+            Sınıf adı.
+        """
+        return "RiskServiceServicer()"
 
     @otel_trace("grpc.server.StreamRisk")
-    def StreamRisk(self, request, context) -> Any:
-        """Risk metrikleri stream'i (Protobuf binary)."""
+    def StreamRisk(self, request: Any, context: Any) -> Any:
+        """Risk metrikleri stream'i (Protobuf binary).
+
+        Args:
+            request: Boş istek.
+            context: gRPC servis context'i.
+
+        Returns:
+            Async RiskMetrics iterator'ı.
+        """
         _extract_correlation_from_context(context)
 
         async def _generate() -> Any:
-            """Otomatik eklendi."""
+            """Risk metriklerini üretir."""
             while True:
                 try:
                     from ..core.redis_helper import get_cached
@@ -281,16 +406,24 @@ class RiskServiceServicer(market_pb2_grpc.RiskServiceServicer if HAS_PROTOBUF el
                             beta=float(risk.get("beta", 0)),
                             timestamp=int(time.time() * 1000),
                         )
-                    await asyncio.sleep(30)  # SSD write reduction: 5s → 30s
+                    await asyncio.sleep(_DEFAULT_STREAM_INTERVAL_SEC)
                 except Exception as e:
-                    logger.error("gRPC StreamRisk error", error=str(e))
+                    logger.error("gRPC StreamRisk hatası", error=str(e))
                     break
 
         return _generate()
 
     @otel_trace("grpc.server.GetRisk")
-    def GetRisk(self, request, context) -> Any:
-        """Anlık risk durumu (Protobuf)."""
+    def GetRisk(self, request: Any, context: Any) -> Any:
+        """Anlık risk durumu sorgusu (Protobuf).
+
+        Args:
+            request: Boş istek.
+            context: gRPC servis context'i.
+
+        Returns:
+            RiskMetrics protobuf mesajı.
+        """
         _extract_correlation_from_context(context)
         from ..core.redis_helper import get_cached
 
@@ -307,12 +440,19 @@ class RiskServiceServicer(market_pb2_grpc.RiskServiceServicer if HAS_PROTOBUF el
 
 
 async def start_grpc_server(host: str = "0.0.0.0", port: int = 50051) -> Any:
-    """gRPC sunucusunu başlat — tüm servisleri register eder.
+    """gRPC sunucusunu başlatır — tüm servisleri register eder.
 
-    Best Practices:
-    - Health check servisi (gRPC health checking protocol)
-    - Reflection servisi (grpcurl ile test edilebilir)
-    - Graceful shutdown
+    Health check, reflection ve mTLS desteği ile kurumsal seviye sunucu.
+
+    Args:
+        host: Sunucu adresi. Varsayılan "0.0.0.0".
+        port: Sunucu portu. Varsayılan 50051.
+
+    Returns:
+        gRPC sunucu nesnesi veya None (grpcio/protobuf yoksa).
+
+    Raises:
+        Yok — eksik bağımlılıklar warning ile loglanır.
     """
     if not HAS_GRPC:
         logger.warning("gRPC not available (grpcio not installed)")
@@ -400,10 +540,19 @@ async def start_grpc_server(host: str = "0.0.0.0", port: int = 50051) -> Any:
 
 if __name__ == "__main__":
 
-    async def main() -> Any:
-        """Otomatik eklendi."""
+    async def main() -> None:
+        """gRPC sunucusunu başlatır ve çalıştırır."""
         server = await start_grpc_server()
         if server:
             await server.wait_for_termination()
 
     asyncio.run(main())
+
+
+__all__: list[str] = [
+    "MarketServiceServicer",
+    "SignalServiceServicer",
+    "PortfolioServiceServicer",
+    "RiskServiceServicer",
+    "start_grpc_server",
+]
