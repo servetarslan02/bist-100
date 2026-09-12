@@ -9,7 +9,7 @@ Conflict detection ve quality scoring.
 
 Kullanım:
     reconciler = SourceReconciler()
-    result = await reconciler.reconcile_price("THYAO", {
+    result = reconciler.reconcile_price("THYAO", {
         "yfinance": 308.50,
         "matriks": 308.50,
         "bist_official": 308.50,
@@ -24,19 +24,40 @@ import structlog
 
 logger = structlog.get_logger()
 
+# Kalite skoru çarpanları
+_QTY_SINGLE_SOURCE: float = 0.6
+_QTY_TWO_SOURCES: float = 0.8
+_QTY_DEV_HIGH: float = 0.5
+_QTY_DEV_MED: float = 0.7
+_QTY_DEV_LOW: float = 0.9
+_QTY_CONFLICT_PENALTY: float = 0.6
+
 
 @dataclass
 class ReconciliationResult:
-    """Uzlaştırma sonucu."""
+    """Uzlaştırma sonucu.
+
+    Attributes:
+        ticker: Hisse sembolü.
+        canonical_price: Uzlaştırılmış fiyat.
+        source: "reconciled" veya tek kaynak adı.
+        conflict: Kaynaklar arası çakışma var mı.
+        quality_score: Kalite puanı (0.0-1.0).
+        max_deviation_pct: Maksimum sapma yüzdesi.
+        sources: {kaynak: fiyat} sözlüğü.
+        deviations: {kaynak: sapma_%} sözlüğü.
+        warnings: Uyarı mesajları.
+        timestamp: Sonuç zaman damgası.
+    """
 
     ticker: str
     canonical_price: float
-    source: str  # "reconciled" veya tek kaynak adı
-    conflict: bool  # Kaynaklar arası çakışma var mı
-    quality_score: float  # 0-1
-    max_deviation_pct: float  # Maksimum sapma %
-    sources: dict[str, float] = field(default_factory=dict)  # source → price
-    deviations: dict[str, float] = field(default_factory=dict)  # source → deviation %
+    source: str
+    conflict: bool
+    quality_score: float
+    max_deviation_pct: float
+    sources: dict[str, float] = field(default_factory=dict)
+    deviations: dict[str, float] = field(default_factory=dict)
     warnings: list[str] = field(default_factory=list)
     timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
@@ -49,19 +70,21 @@ class ReconciliationResult:
 
 
 class SourceReconciler:
-    """
-    Kaynaklar arası fiyat uzlaştırma.
+    """Kaynaklar arası fiyat uzlaştırıcı.
+
+    Çoklu kaynaktan gelen fiyatları ağırlıklı ortalama ile
+    birleştirir, çakışma tespiti yapar ve kalite skoru hesaplar.
 
     Kaynak güvenilirlik ağırlıkları:
     - bist_official: 1.00 (en güvenilir)
+    - kap: 0.95
     - matriks: 0.90
     - yfinance: 0.85
     - investing: 0.70
     - social: 0.30
     """
 
-    # Kaynak güvenilirlik ağırlıkları
-    SOURCE_WEIGHTS = {
+    SOURCE_WEIGHTS: dict[str, float] = {
         "bist_official": 1.00,
         "kap": 0.95,
         "matriks": 0.90,
@@ -71,26 +94,26 @@ class SourceReconciler:
         "news": 0.50,
         "social": 0.30,
     }
+    """Kaynak güvenilirlik ağırlıkları (0.0-1.0)."""
 
-    # Maksimum kabul edilebilir sapma (%)
-    DEFAULT_MAX_DEVIATION_PCT = 0.5
+    DEFAULT_MAX_DEVIATION_PCT: float = 0.5
+    """Varsayılan maksimum kabul edilebilir sapma (%)."""
 
-    async def reconcile_price(
+    def reconcile_price(
         self,
         ticker: str,
         prices: dict[str, float],
         max_deviation_pct: float | None = None,
     ) -> ReconciliationResult:
-        """
-        Çoklu kaynaktan fiyatı uzlaştır.
+        """Çoklu kaynaktan fiyatı uzlaştırır.
 
         Args:
-            ticker: Hisse kodu
-            prices: {source_name: price} sözlüğü
-            max_deviation_pct: Maksimum kabul edilebilir sapma %
+            ticker: Hisse kodu.
+            prices: {kaynak_adı: fiyat} sözlüğü.
+            max_deviation_pct: Maksimum kabul edilebilir sapma %.
 
         Returns:
-            ReconciliationResult
+            ReconciliationResult: Uzlaştırma sonucu.
         """
         if not prices:
             return ReconciliationResult(
@@ -100,7 +123,7 @@ class SourceReconciler:
                 conflict=False,
                 quality_score=0.0,
                 max_deviation_pct=0.0,
-                warnings=["No price data from any source"],
+                warnings=["Hiçbir kaynaktan fiyat verisi yok"],
             )
 
         max_dev = max_deviation_pct or self.DEFAULT_MAX_DEVIATION_PCT
@@ -113,17 +136,17 @@ class SourceReconciler:
                 canonical_price=round(price, 2),
                 source=source,
                 conflict=False,
-                quality_score=0.6,  # Tek kaynak = düşük güven
+                quality_score=_QTY_SINGLE_SOURCE,
                 max_deviation_pct=0.0,
                 sources=prices,
-                warnings=["Single source — no cross-validation"],
+                warnings=["Tek kaynak — çapraz doğrulama yok"],
             )
 
         # Ağırlıklı canonical price
         canonical = self._compute_canonical_price(prices)
 
         # Sapmaları hesapla
-        deviations = {}
+        deviations: dict[str, float] = {}
         for source, price in prices.items():
             if price > 0 and canonical > 0:
                 deviation = abs(price - canonical) / canonical * 100
@@ -136,11 +159,11 @@ class SourceReconciler:
         quality = self._compute_quality_score(prices, deviations, conflict)
 
         # Uyarılar
-        warnings = []
+        warnings: list[str] = []
         if conflict:
             for source, dev in deviations.items():
                 if dev > max_dev:
-                    warnings.append(f"{source}: {dev:.2f}% deviation from canonical")
+                    warnings.append(f"{source}: %{dev:.2f} sapma (canonical'dan)")
 
         return ReconciliationResult(
             ticker=ticker,
@@ -154,22 +177,21 @@ class SourceReconciler:
             warnings=warnings,
         )
 
-    async def reconcile_batch(
+    def reconcile_batch(
         self,
         data: dict[str, dict[str, float]],
     ) -> dict[str, ReconciliationResult]:
-        """
-        Toplu uzlaştırma.
+        """Toplu uzlaştırma yapar.
 
         Args:
-            data: {ticker: {source: price}} sözlüğü
+            data: {ticker: {kaynak: fiyat}} sözlüğü.
 
         Returns:
-            {ticker: ReconciliationResult} sözlüğü
+            {ticker: ReconciliationResult} sözlüğü.
         """
-        results = {}
+        results: dict[str, ReconciliationResult] = {}
         for ticker, prices in data.items():
-            results[ticker] = await self.reconcile_price(ticker, prices)
+            results[ticker] = self.reconcile_price(ticker, prices)
         return results
 
     def _compute_canonical_price(self, prices: dict[str, float]) -> float:
@@ -181,8 +203,8 @@ class SourceReconciler:
         Returns:
             Ağırlıklı canonical fiyat.
         """
-        total_weight = 0
-        weighted_sum = 0
+        total_weight = 0.0
+        weighted_sum = 0.0
 
         for source, price in prices.items():
             if price > 0:
@@ -190,7 +212,7 @@ class SourceReconciler:
                 weighted_sum += price * weight
                 total_weight += weight
 
-        return weighted_sum / total_weight if total_weight > 0 else 0
+        return weighted_sum / total_weight if total_weight > 0 else 0.0
 
     def _compute_quality_score(
         self,
@@ -213,23 +235,22 @@ class SourceReconciler:
         # Kaynak sayısına göre
         source_count = len(prices)
         if source_count == 1:
-            score *= 0.6
+            score *= _QTY_SINGLE_SOURCE
         elif source_count == 2:
-            score *= 0.8
-        # 3+ kaynak = tam güven
+            score *= _QTY_TWO_SOURCES
 
         # Sapmaya göre
         max_dev = max(deviations.values()) if deviations else 0
         if max_dev > 1.0:
-            score *= 0.5
+            score *= _QTY_DEV_HIGH
         elif max_dev > 0.5:
-            score *= 0.7
+            score *= _QTY_DEV_MED
         elif max_dev > 0.1:
-            score *= 0.9
+            score *= _QTY_DEV_LOW
 
         # Çakışma varsa
         if conflict:
-            score *= 0.6
+            score *= _QTY_CONFLICT_PENALTY
 
         return score
 
@@ -237,12 +258,20 @@ class SourceReconciler:
         self,
         results: dict[str, ReconciliationResult],
     ) -> dict[str, Any]:
-        """Kalite raporu."""
+        """Toplu kalite raporu oluşturur.
+
+        Args:
+            results: {ticker: ReconciliationResult} sözlüğü.
+
+        Returns:
+            Kalite raporu: total_tickers, consistent, conflicts, consistency_rate,
+            avg_quality_score, warnings.
+        """
         total = len(results)
         consistent = sum(1 for r in results.values() if not r.conflict)
         avg_quality = sum(r.quality_score for r in results.values()) / total if total > 0 else 0
 
-        all_warnings = []
+        all_warnings: list[str] = []
         for r in results.values():
             all_warnings.extend(r.warnings)
 

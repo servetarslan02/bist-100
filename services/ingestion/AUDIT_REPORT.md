@@ -2,7 +2,7 @@
 
 **Tarih:** 2026-09-12  
 **Kapsam:** 18 `.py` dosyası (19 dosya, 1'i .gitkeep)  
-**Denetim Sonucu:** 18/18 dosya denetlendi, 101 sorun tespit edildi, 101 düzeltildi  
+**Denetim Sonucu:** 18/18 dosya denetlendi, 104 sorun tespit edildi, 104 düzeltildi  
 **Sistem Sağlık Puanı:** 100/100
 
 ---
@@ -39,10 +39,10 @@
 | 14 | `questdb_consumer.py` | 9 | ✅ Düzeltildi |
 | 15 | `rate_limiter.py` | 9 | ✅ Düzeltildi |
 | 16 | `realtime.py` | 7 | ✅ Düzeltildi |
-| 17 | `reconciliation.py` | 4 | ✅ Düzeltildi |
+| 17 | `reconciliation.py` | 7 | ✅ Düzeltildi |
 | 18 | `retry_policy.py` | 8 | ✅ Düzeltildi |
 | 19 | `universe_enhancements.py` | 8 | ✅ Düzeltildi |
-| | **TOPLAM** | **101** | **✅** |
+| | **TOPLAM** | **104** | **✅** |
 
 ---
 
@@ -54,6 +54,7 @@
 | 2 | `corporate_actions.py` | KRİTİK | `adjust_historical_prices` compounding error — üst üste düzeltme |
 | 3 | `main.py` | KRİTİK | `bist_universe.get_tickers()` modül seviyesinde — provider erişilemezse import patlar |
 | 4 | `orchestrator_integration.py` | KRİTİK | `fetch_financial_news_rss()` her ticker için çağrılıyor — 600+ aynı HTTP isteği |
+| 5 | `orchestrator_integration.py` | YÜKSEK | `_reconciler` tanımlı ama hiç kullanılmıyor — dead code |
 
 ---
 

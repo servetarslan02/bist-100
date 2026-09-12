@@ -32,7 +32,6 @@ from .providers.news_provider import news_provider
 from .providers.social_provider import social_provider
 from .providers.yfinance_provider import yfinance_provider
 from .rate_limiter import create_default_rate_limiter
-from .reconciliation import SourceReconciler
 
 logger = structlog.get_logger()
 
@@ -129,7 +128,6 @@ class IngestionOrchestrator:
         # Resilience katmanları
         self._cb_manager = CircuitBreakerManager()
         self._rate_limiter = create_default_rate_limiter()
-        self._reconciler = SourceReconciler()
         self._pit = PointInTimeValidator()
         self._dedup = EventDeduplicator()
         self._incremental = IncrementalFetcher()
