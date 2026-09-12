@@ -19,18 +19,46 @@ import structlog
 
 logger = structlog.get_logger()
 
+# Varsayılan sabitler
+DEFAULT_CACHE_TTL_SECONDS: int = 3600
+DEFAULT_MAX_WORKERS: int = 4
+DEFAULT_SYNC_TIMEOUT: int = 30
+DEFAULT_TRADINGVIEW_TIMEOUT: float = 10.0
+DEFAULT_YFINANCE_TIMEOUT: int = 20
+
 
 class FundamentalProvider:
     """Şirket finansal verilerini çeker (async)."""
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """FundamentalProvider örneği oluşturur."""
         self._cache: dict[str, dict] = {}
-        self._cache_ttl_seconds = 3600  # 1 saat cache
-        self._executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
+        self._cache_ttl_seconds = DEFAULT_CACHE_TTL_SECONDS
+        self._executor = concurrent.futures.ThreadPoolExecutor(max_workers=DEFAULT_MAX_WORKERS)
 
-    async def _run_sync(self, func, *args, timeout: int = 30, **kwargs) -> Any:
-        """Blocking fonksiyonu async olarak çalıştır."""
+    def __repr__(self) -> str:
+        """FundamentalProvider string temsili.
+
+        Returns:
+            İnsan tarafından okunabilir temsil.
+        """
+        return (
+            f"FundamentalProvider(primary='tradingview', "
+            f"backups=['kap', 'yfinance'], cache_size={len(self._cache)})"
+        )
+
+    async def _run_sync(self, func: Any, *args: Any, timeout: int = DEFAULT_SYNC_TIMEOUT, **kwargs: Any) -> Any:
+        """Blocking fonksiyonu async olarak çalıştırır.
+
+        Args:
+            func: Çalıştırılacak fonksiyon.
+            *args: Fonksiyon argümanları.
+            timeout: Zaman aşımı (saniye).
+            **kwargs: Fonksiyon anahtar kelime argümanları.
+
+        Returns:
+            Fonksiyon sonucu veya None (zaman aşımında).
+        """
         loop = asyncio.get_event_loop()
         try:
             return await asyncio.wait_for(
@@ -41,9 +69,6 @@ class FundamentalProvider:
             logger.warning("Fundamental fetch timeout", timeout=timeout)
             return None
 
-    def __repr__(self) -> str:
-        return f"<FundamentalProvider(primary='tradingview', backups=['kap', 'yfinance'], cache_size={len(self._cache)})>"
-
     async def fetch_fundamentals(self, ticker: str) -> dict[str, Any] | None:
         """Ana fundamental veri çekme fonksiyonu (async).
 
@@ -51,6 +76,12 @@ class FundamentalProvider:
         1. BİRİNCİL: TradingView Scanner API (Canlı rasyolar, çarpanlar ve finansallar)
         2. YEDEK 1: KAP (Resmi finansal tablolar ve çeyreklik bilançolar)
         3. YEDEK 2: yfinance (Alternatif global yedek)
+
+        Args:
+            ticker: Hisse sembolü.
+
+        Returns:
+            Finansal veri sözlüğü veya None.
         """
         # Cache kontrolü
         cached = self._cache.get(ticker)
@@ -87,7 +118,14 @@ class FundamentalProvider:
         return None
 
     async def _fetch_from_tradingview(self, ticker: str) -> dict[str, Any] | None:
-        """TradingView Scanner API üzerinden hissenin birincil temel analiz rasyolarını çeker (async)."""
+        """TradingView Scanner API üzerinden temel analiz rasyolarını çeker (async).
+
+        Args:
+            ticker: Hisse sembolü.
+
+        Returns:
+            Finansal veri sözlüğü veya None.
+        """
         sym = ticker.upper().replace(".IS", "").strip()
         cols = [
             "name",
@@ -119,7 +157,7 @@ class FundamentalProvider:
         try:
             import httpx
 
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with httpx.AsyncClient(timeout=DEFAULT_TRADINGVIEW_TIMEOUT) as client:
                 resp = await client.post("https://scanner.tradingview.com/turkey/scan", json=payload, headers=headers)
                 if resp.status_code == 200:
                     data = resp.json()
@@ -162,16 +200,27 @@ class FundamentalProvider:
                             "quick_ratio": None,
                         }
         except Exception as exc:
-            logger.debug("TradingView fundamental fetch error", ticker=sym, error=str(exc))
+            logger.warning("TradingView fundamental fetch error", ticker=sym, error=str(exc))
         return None
 
     async def _fetch_from_yfinance(self, ticker: str) -> dict[str, Any] | None:
-        """yfinance'dan finansal veri çek (async)."""
+        """yfinance'dan finansal veri çeker (async).
+
+        Args:
+            ticker: Hisse sembolü.
+
+        Returns:
+            Finansal veri sözlüğü veya None.
+        """
         try:
             import yfinance as yf
 
-            def _fetch() -> Any:
-                """Otomatik eklendi."""
+            def _fetch() -> dict[str, Any] | None:
+                """yfinance Ticker ile veri çeker.
+
+                Returns:
+                    Finansal veri sözlüğü veya None.
+                """
                 yf_ticker = f"{ticker}.IS"
                 t = yf.Ticker(yf_ticker)
                 info = t.info
@@ -229,7 +278,7 @@ class FundamentalProvider:
                     "two_hundred_day_avg": info.get("twoHundredDayAverage"),
                 }
 
-            result = await self._run_sync(_fetch, timeout=20)
+            result = await self._run_sync(_fetch, timeout=DEFAULT_YFINANCE_TIMEOUT)
 
             # FCF yield hesapla
             if result and result.get("free_cash_flow") and result.get("market_cap"):
@@ -239,35 +288,54 @@ class FundamentalProvider:
             return result
 
         except Exception as e:
-            logger.debug("yfinance fundamental fetch failed", ticker=ticker, error=str(e))
+            logger.warning("yfinance fundamental fetch failed", ticker=ticker, error=str(e))
             return None
 
     async def _fetch_from_kap(self, ticker: str) -> dict[str, Any] | None:
-        """KAP'tan finansal veri çek (async)."""
+        """KAP'tan finansal veri çeker (async).
+
+        Args:
+            ticker: Hisse sembolü.
+
+        Returns:
+            Finansal veri sözlüğü veya None.
+        """
         try:
             from .kap_provider import kap_provider
 
             return await kap_provider.fetch_financial_data(ticker)
         except Exception as e:
-            logger.debug("KAP fundamental fetch failed", ticker=ticker, error=str(e))
+            logger.warning("KAP fundamental fetch failed", ticker=ticker, error=str(e))
             return None
 
     async def fetch_quarterly_financials(self, ticker: str, periods: int = 8) -> list[dict] | None:
-        """Çeyreklik finansal veri çek (async)."""
+        """Çeyreklik finansal veri çeker (async).
+
+        Args:
+            ticker: Hisse sembolü.
+            periods: Çekilecek dönem sayısı.
+
+        Returns:
+            Dönemlik finansal veri listesi veya None.
+        """
         try:
             import yfinance as yf
 
-            def _fetch() -> Any:
-                """Otomatik eklendi."""
+            def _fetch() -> list[dict] | None:
+                """Çeyreklik finansal tabloyu çeker.
+
+                Returns:
+                    Dönemlik veri listesi veya None.
+                """
                 yf_ticker = f"{ticker}.IS"
                 t = yf.Ticker(yf_ticker)
                 qf = t.quarterly_financials
                 if qf is None or qf.empty:
                     return None
 
-                results = []
+                results: list[dict] = []
                 for col in qf.columns[:periods]:
-                    period_data = {
+                    period_data: dict[str, Any] = {
                         "period": col.strftime("%Y-%m-%d") if hasattr(col, "strftime") else str(col),
                         "ticker": ticker,
                     }
@@ -278,66 +346,95 @@ class FundamentalProvider:
                     results.append(period_data)
                 return results
 
-            return await self._run_sync(_fetch, timeout=20)
+            return await self._run_sync(_fetch, timeout=DEFAULT_YFINANCE_TIMEOUT)
 
         except Exception as e:
-            logger.debug("Quarterly financials fetch failed", ticker=ticker, error=str(e))
+            logger.warning("Quarterly financials fetch failed", ticker=ticker, error=str(e))
             return None
 
     async def fetch_balance_sheet(self, ticker: str) -> dict[str, Any] | None:
-        """Güncel bilanço verisi çek (async)."""
+        """Güncel bilanço verisi çeker (async).
+
+        Args:
+            ticker: Hisse sembolü.
+
+        Returns:
+            Bilanço verisi sözlüğü veya None.
+        """
         try:
             import yfinance as yf
 
-            def _fetch() -> Any:
-                """Otomatik eklendi."""
+            def _fetch() -> dict[str, Any] | None:
+                """Güncel bilançoyu çeker.
+
+                Returns:
+                    Bilanço verisi sözlüğü veya None.
+                """
                 yf_ticker = f"{ticker}.IS"
                 t = yf.Ticker(yf_ticker)
                 bs = t.balance_sheet
                 if bs is None or bs.empty:
                     return None
                 latest = bs.iloc[:, 0]
-                result = {"ticker": ticker, "period": str(bs.columns[0])}
+                result: dict[str, Any] = {"ticker": ticker, "period": str(bs.columns[0])}
                 for idx in bs.index:
                     val = latest.get(idx)
                     if val is not None and str(val) != "nan":
                         result[idx.lower().replace(" ", "_")] = float(val)
                 return result
 
-            return await self._run_sync(_fetch, timeout=20)
+            return await self._run_sync(_fetch, timeout=DEFAULT_YFINANCE_TIMEOUT)
 
         except Exception as e:
-            logger.debug("Balance sheet fetch failed", ticker=ticker, error=str(e))
+            logger.warning("Balance sheet fetch failed", ticker=ticker, error=str(e))
             return None
 
     async def fetch_cash_flow(self, ticker: str) -> dict[str, Any] | None:
-        """Nakit akış tablosu çek (async)."""
+        """Nakit akış tablosu çeker (async).
+
+        Args:
+            ticker: Hisse sembolü.
+
+        Returns:
+            Nakit akış verisi sözlüğü veya None.
+        """
         try:
             import yfinance as yf
 
-            def _fetch() -> Any:
-                """Otomatik eklendi."""
+            def _fetch() -> dict[str, Any] | None:
+                """Nakit akış tablosunu çeker.
+
+                Returns:
+                    Nakit akış verisi sözlüğü veya None.
+                """
                 yf_ticker = f"{ticker}.IS"
                 t = yf.Ticker(yf_ticker)
                 cf = t.cashflow
                 if cf is None or cf.empty:
                     return None
                 latest = cf.iloc[:, 0]
-                result = {"ticker": ticker, "period": str(cf.columns[0])}
+                result: dict[str, Any] = {"ticker": ticker, "period": str(cf.columns[0])}
                 for idx in cf.index:
                     val = latest.get(idx)
                     if val is not None and str(val) != "nan":
                         result[idx.lower().replace(" ", "_")] = float(val)
                 return result
 
-            return await self._run_sync(_fetch, timeout=20)
+            return await self._run_sync(_fetch, timeout=DEFAULT_YFINANCE_TIMEOUT)
 
         except Exception as e:
-            logger.debug("Cash flow fetch failed", ticker=ticker, error=str(e))
+            logger.warning("Cash flow fetch failed", ticker=ticker, error=str(e))
             return None
 
     async def get_valuation_summary(self, ticker: str) -> dict[str, Any] | None:
-        """Değerleme özeti oluştur (async)."""
+        """Değerleme özeti oluşturur (async).
+
+        Args:
+            ticker: Hisse sembolü.
+
+        Returns:
+            Değerleme özeti sözlüğü veya None.
+        """
         fund = await self.fetch_fundamentals(ticker)
         if not fund:
             return None
@@ -346,7 +443,7 @@ class FundamentalProvider:
         if not price or price <= 0:
             return None
 
-        summary = {
+        summary: dict[str, Any] = {
             "ticker": ticker,
             "price": price,
             "fetch_date": fund.get("fetch_date"),
@@ -385,8 +482,12 @@ class FundamentalProvider:
 
         return summary
 
-    def clear_cache(self, ticker: str | None = None) -> Any:
-        """Cache temizle."""
+    def clear_cache(self, ticker: str | None = None) -> None:
+        """Cache temizler.
+
+        Args:
+            ticker: Belirli bir ticker için cache temizlenir. None = tümü.
+        """
         if ticker:
             self._cache.pop(ticker, None)
         else:
@@ -395,3 +496,6 @@ class FundamentalProvider:
 
 # Singleton
 fundamental_provider = FundamentalProvider()
+
+
+__all__ = ["FundamentalProvider", "fundamental_provider"]
