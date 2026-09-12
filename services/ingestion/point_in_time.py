@@ -240,6 +240,9 @@ class PointInTimeValidator:
             data_type: Veri tipi.
             delay: Gecikme süresi.
             description: İnsan tarafından okunabilir açıklama.
+
+        Returns:
+            Yok.
         """
         self.DATA_DELAYS[data_type] = PITConfig(
             data_type=data_type,

@@ -104,6 +104,9 @@ class HTTPStatusError(Exception):
         Args:
             status_code: HTTP durum kodu.
             message: Hata mesajı.
+
+        Returns:
+            Yok.
         """
         self.status_code = status_code
         self.message = message
@@ -124,6 +127,9 @@ class RetryExhaustedError(Exception):
         Args:
             attempts: Toplam deneme sayısı.
             last_error: Son yakalanan hata.
+
+        Returns:
+            Yok.
         """
         self.attempts = attempts
         self.last_error = last_error
@@ -166,6 +172,9 @@ class RetryPolicy:
             jitter_range: Jitter aralığı.
             retryable_exceptions: Retry yapılabilir exception tipleri.
             non_retryable_exceptions: Retry yapılamaz exception tipleri.
+
+        Returns:
+            Yok.
         """
         self.config = RetryConfig(
             max_attempts=max_attempts,
@@ -359,6 +368,9 @@ class RetryPolicy:
 
     def get_stats(self) -> dict[str, Any]:
         """İstatistikleri döndürür.
+
+        Args:
+            Yok.
 
         Returns:
             Retry istatistik sözlüğü.
