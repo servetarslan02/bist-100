@@ -1,11 +1,20 @@
-from typing import Any
-
 """
 ALPHA BIST — Ingestion Service v2.0
 
-Data ingestion pipeline: veri çekme, doğrulama, düzeltme, publish.
-Tüm resilience katmanları ile korumalı.
+Veri çekme hattı: veri çekme, doğrulama, düzeltme ve yayınlama.
+Tüm dayanıklılık (resilience) katmanları ile korumalı.
+
+Kullanım:
+    from services.ingestion import (
+        CircuitBreaker, RateLimiter, RetryPolicy,
+        ProviderManager, get_orchestrator,
+    )
+
+Raises:
+    ImportError: Alt modüllerden biri eksik olduğunda.
 """
+
+from typing import Any
 
 # Core resilience
 from .circuit_breaker import CircuitBreaker, CircuitBreakerError, CircuitBreakerManager, circuit_breaker_manager
@@ -29,7 +38,14 @@ from .retry_policy import HTTPStatusError, RetryExhaustedError, RetryPolicy, get
 
 
 def get_orchestrator() -> Any:
-    """Lazy import — sadece gerektiğinde yüklenir."""
+    """Gecikmeli (lazy) orchestrator yükleyici — sadece gerektiğinde import edilir.
+
+    Returns:
+        IngestionOrchestrator: Hazır orchestrator örneği.
+
+    Raises:
+        ImportError: orchestrator_integration modülü bulunamazsa.
+    """
     from .orchestrator_integration import IngestionOrchestrator, ingestion_orchestrator
 
     return ingestion_orchestrator
