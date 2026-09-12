@@ -125,7 +125,7 @@ class BISTProvider:
                         "volume": data.get("volume", 0),
                     }
             except Exception as e:
-                logger.debug("BIST sector index failed", symbol=symbol, error=str(e))
+                logger.warning("BIST sektör endeksi çekme hatası", symbol=symbol, error=str(e))
 
         return results
 

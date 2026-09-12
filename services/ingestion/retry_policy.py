@@ -83,11 +83,11 @@ class RetryStats:
         )
 
 
-# Retryable HTTP status codes
-RETRYABLE_STATUS_CODES: set[int] = {429, 500, 502, 503, 504}
+# Retryable HTTP durum kodları
+DEFAULT_RETRYABLE_STATUS_CODES: set[int] = {429, 500, 502, 503, 504}
 
-# Non-retryable HTTP status codes
-NON_RETRYABLE_STATUS_CODES: set[int] = {400, 401, 403, 404, 405}
+# Non-retryable HTTP durum kodları
+DEFAULT_NON_RETRYABLE_STATUS_CODES: set[int] = {400, 401, 403, 404, 405}
 
 
 class HTTPStatusError(Exception):
@@ -202,9 +202,9 @@ class RetryPolicy:
                 return False
 
         if isinstance(error, HTTPStatusError):
-            if error.status_code in NON_RETRYABLE_STATUS_CODES:
+            if error.status_code in DEFAULT_NON_RETRYABLE_STATUS_CODES:
                 return False
-            if error.status_code in RETRYABLE_STATUS_CODES:
+            if error.status_code in DEFAULT_RETRYABLE_STATUS_CODES:
                 return True
 
         return any(isinstance(error, exc_type) for exc_type in self.retryable_exceptions)
@@ -376,7 +376,7 @@ class RetryPolicy:
 
 
 # BIST'e özgü retry policy'ler
-BIST_RETRY_POLICIES: dict[str, RetryPolicy] = {
+DEFAULT_BIST_RETRY_POLICIES: dict[str, RetryPolicy] = {
     "yfinance": RetryPolicy(max_attempts=3, base_delay_s=1.0, max_delay_s=60.0),
     "kap": RetryPolicy(max_attempts=3, base_delay_s=2.0, max_delay_s=60.0),
     "tcmb": RetryPolicy(max_attempts=3, base_delay_s=2.0, max_delay_s=60.0),
@@ -400,7 +400,7 @@ def get_retry_policy(provider: str) -> RetryPolicy:
     Returns:
         RetryPolicy örneği (bilinmeyen provider için varsayılan).
     """
-    return BIST_RETRY_POLICIES.get(provider, DEFAULT_RETRY_POLICY)
+    return DEFAULT_BIST_RETRY_POLICIES.get(provider, DEFAULT_RETRY_POLICY)
 
 
 __all__ = [
@@ -409,9 +409,9 @@ __all__ = [
     "HTTPStatusError",
     "RetryExhaustedError",
     "RetryPolicy",
-    "RETRYABLE_STATUS_CODES",
-    "NON_RETRYABLE_STATUS_CODES",
-    "BIST_RETRY_POLICIES",
+    "DEFAULT_RETRYABLE_STATUS_CODES",
+    "DEFAULT_NON_RETRYABLE_STATUS_CODES",
+    "DEFAULT_BIST_RETRY_POLICIES",
     "get_retry_policy",
     "DEFAULT_RETRY_POLICY",
 ]

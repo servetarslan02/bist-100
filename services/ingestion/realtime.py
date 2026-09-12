@@ -141,7 +141,7 @@ class RealtimeDataProvider:
                                     except Exception as exc:
                                         logger.warning("Handler error", ticker=ticker, error=str(exc))
                         except Exception as exc:
-                            logger.debug("Ticker processing skipped", error=str(exc), ticker=ticker)
+                            logger.warning("Ticker işleme hatası", error=str(exc), ticker=ticker)
 
                     await asyncio.sleep(DEFAULT_CHUNK_DELAY_SECONDS)
 
