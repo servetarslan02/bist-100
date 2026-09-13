@@ -39,7 +39,7 @@ DEFAULT_DXY_STRONG: float = 105.0
 
 # Yahoo Finance sembolleri
 DEFAULT_YAHOO_SYMBOLS: dict[str, str] = {
-    "USDTRY": "TRY=X",
+    "USDTRY": "USDTRY=X",
     "EURTRY": "EURTRY=X",
     "VIX": "^VIX",
     "SP500": "^GSPC",
@@ -136,16 +136,27 @@ class MacroProvider:
             """
             try:
                 def _get() -> dict[str, Any]:
-                    """Yahoo Finance Ticker bilgisini çeker.
+                    """Yahoo Finance Ticker bilgisini çeker (fast_info öncelikli).
 
                     Returns:
                         Fiyat ve değişim bilgisi sözlüğü.
                     """
                     t = yf.Ticker(symbol)
-                    info = t.info
+                    fi = t.fast_info
+                    last = getattr(fi, "last_price", None) or getattr(fi, "previous_close", None)
+                    prev = getattr(fi, "previous_close", last)
+                    chg: float = 0.0
+                    if prev and last:
+                        chg = round(float(((last - prev) / prev) * 100), 2)
+
+                    if last is None:
+                        info = getattr(t, "info", {}) or {}
+                        last = info.get("regularMarketPrice") or info.get("previousClose")
+                        chg = float(info.get("regularMarketChangePercent") or 0.0)
+
                     return {
-                        "price": info.get("regularMarketPrice", 0),
-                        "change_pct": info.get("regularMarketChangePercent", 0),
+                        "price": round(float(last), 4) if last is not None else None,
+                        "change_pct": round(float(chg), 2),
                         "source": "yahoo",
                         "timestamp": datetime.now(UTC).isoformat(),
                     }

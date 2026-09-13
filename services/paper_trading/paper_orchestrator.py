@@ -654,6 +654,9 @@ class PaperTradingOrchestrator:
             sector=sector,
             data_quality_ok=data_quality_ok,
             model_version_valid=(signal.get("model_version") == self._champion_version),
+            market_regime=signal.get("market_regime", ""),
+            index_trend_bullish=signal.get("index_trend_bullish"),
+            index_returns_5d=signal.get("index_returns_5d"),  # YENİ: 5g XU100 getirileri — volatilite spike kalkanı için
         )
         if not self.risk_gate.is_trade_allowed(risk_checks):
             reason = self.risk_gate.get_block_reason(risk_checks)

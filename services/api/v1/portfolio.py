@@ -260,10 +260,18 @@ async def performance_metrics(
         report = paper_orchestrator.get_full_report()
         perf = report.get("performance_metrics", {})
         if not perf or "error" in perf:
-            raise HTTPException(
-                status_code=503,
-                detail="Performans metrikleri hesaplanamadı. Yeterli işlem verisi yok.",
-            )
+            return {
+                "sharpe_ratio": 0.0,
+                "max_drawdown": 0.0,
+                "win_rate": 0.0,
+                "avg_holding_days": 0.0,
+                "total_trades": 0,
+                "profit_factor": 0.0,
+                "calmar_ratio": 0.0,
+                "status": "insufficient_data",
+                "message": "Henüz yeterli işlem verisi yok. Canlı/sanal emirler gerçekleştikçe metrikler güncellenecektir.",
+                "timestamp": datetime.now(UTC).isoformat(),
+            }
         return {
             **perf,
             "sharpe_ratio": perf.get("sharpe", perf.get("sharpe_ratio", 0.0)),

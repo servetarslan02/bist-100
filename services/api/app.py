@@ -207,8 +207,6 @@ async def lifespan(app: FastAPI) -> Any:
 
 def create_app() -> FastAPI:
     """FastAPI uygulamasını oluştur ve yapılandır."""
-    from fastapi.responses import ORJSONResponse
-
     app = FastAPI(
         title="ALPHA BIST API",
         description="BIST Market Intelligence & Quant Engine — 92 endpoint, 10 WebSocket kanalı",
@@ -216,7 +214,6 @@ def create_app() -> FastAPI:
         docs_url="/docs",
         redoc_url="/redoc",
         openapi_url="/openapi.json",
-        default_response_class=ORJSONResponse,
         lifespan=lifespan,
     )
 

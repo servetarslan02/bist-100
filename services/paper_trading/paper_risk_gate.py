@@ -40,6 +40,8 @@ class PaperRiskGate:
         daily_loss_limit_pct: float = 5.0,
         liquidity_min_volume: int = 100_000,
         data_quality_min_stocks: int = 50,
+        portfolio_dd_shield_pct: float = 15.0,
+        vol_spike_shield_pct: float = 40.0,
     ):
         """PaperRiskGate risk kapısı denetleyicisini başlatır.
 
@@ -52,6 +54,8 @@ class PaperRiskGate:
             daily_loss_limit_pct: Günlük izin verilen maksimum kayıp yüzdesi (varsayılan %5).
             liquidity_min_volume: İşlem görecek hisse için aranan asgari günlük hacim.
             data_quality_min_stocks: Veri kalitesi denetiminde aranan asgari hisse sayısı.
+            portfolio_dd_shield_pct: Portföy zirve değerinden bu kadar düşünce yeni alım durdurulur (%15).
+            vol_spike_shield_pct: 5 günlük endeks volatilitesi (annualized) bu eşiği geçince yeni alım durdurulur (%40).
         """
         self.max_position_pct = max_position_pct
         self.max_sector_pct = max_sector_pct
@@ -61,18 +65,22 @@ class PaperRiskGate:
         self.daily_loss_limit_pct = daily_loss_limit_pct
         self.liquidity_min_volume = liquidity_min_volume
         self.data_quality_min_stocks = data_quality_min_stocks
+        self.portfolio_dd_shield_pct = portfolio_dd_shield_pct
+        self.vol_spike_shield_pct = vol_spike_shield_pct
 
         self._kill_switch_active = False
         self._kill_switch_reason = ""
         self._consecutive_errors = 0
         self._max_consecutive_errors = 3
+        self._portfolio_peak_value: float = 0.0  # Portfoy drawdown kalkani icin
 
     def __repr__(self) -> str:
         """Sınıfın metinsel temsilini döndürür."""
         return (
             f"PaperRiskGate(kill_switch={self._kill_switch_active}, "
             f"max_pos={self.max_position_pct}%, max_sector={self.max_sector_pct}%, "
-            f"kill_dd={self.kill_switch_drawdown_pct}%)"
+            f"kill_dd={self.kill_switch_drawdown_pct}%, "
+            f"dd_shield={self.portfolio_dd_shield_pct}%, vol_shield={self.vol_spike_shield_pct}%)"
         )
 
     def is_kill_switch_active(self) -> bool:
@@ -99,6 +107,9 @@ class PaperRiskGate:
         sector: str = "",
         data_quality_ok: bool = True,
         model_version_valid: bool = True,
+        market_regime: str = "",
+        index_trend_bullish: bool | None = None,
+        index_returns_5d: list[float] | None = None,
     ) -> list[dict[str, Any]]:
         """Tum risk check'lerini calistir."""
         checks = []
@@ -111,6 +122,15 @@ class PaperRiskGate:
 
         # === 2. MODEL VALIDITY ===
         checks.append(self._check_model_validity(model_version_valid))
+
+        # === 2.1. MARKET REGIME & INDEX SHIELD (ENDEKS REJİM KALKANI) ===
+        checks.append(self._check_market_regime(side, market_regime, index_trend_bullish))
+
+        # === 2.2. PORTFOY DRAWDOWN KALKANI (YENİ) ===
+        checks.append(self._check_portfolio_drawdown_shield(portfolio, side))
+
+        # === 2.3. VOLATİLİTE SPİKE KALKANI (YENİ) ===
+        checks.append(self._check_vol_spike_shield(side, index_returns_5d))
 
         # === 3. POSITION SIZE ===
         checks.append(self._check_position_size(portfolio, ticker, side, quantity, price))
@@ -179,8 +199,179 @@ class PaperRiskGate:
             }
         return {"check_name": "model_validity", "result": "PASS", "details": "OK", "severity": "INFO"}
 
+    def _check_market_regime(
+        self, side: str, market_regime: str, index_trend_bullish: bool | None
+    ) -> dict[str, Any]:
+        """Endeks rejimini ve ana piyasa trendini denetler.
+
+        Ayı piyasasında (XU100 < SMA200 veya BEAR/CRISIS rejimi) yeni ALIM (BUY) emirlerini
+        kesin olarak engeller ve portföyü Nakit Kalkanı (Cash Shield) moduna alır.
+        Pozisyon azaltma veya stop çıkışları için SATIŞ (SELL) emirlerine izin verilir.
+        """
+        if side == "SELL":
+            return {
+                "check_name": "market_regime_shield",
+                "result": "PASS",
+                "details": "SELL side — risk azaltma/çıkış serbest",
+                "severity": "INFO",
+            }
+
+        regime_upper = (market_regime or "").upper()
+        is_bear_regime = regime_upper in ("BEAR", "CRISIS", "RISK_OFF", "BEAR_TREND", "PANIC")
+        is_below_sma200 = (index_trend_bullish is False)
+
+        if is_bear_regime or is_below_sma200:
+            reason = []
+            if is_bear_regime:
+                reason.append(f"Ayı Rejimi ({regime_upper})")
+            if is_below_sma200:
+                reason.append("Endeks SMA200 Altında (Trend Negatif)")
+            reason_str = " & ".join(reason)
+
+            logger.warning(
+                "Risk gate CASH SHIELD: Alım emri reddedildi",
+                regime=regime_upper,
+                index_trend_bullish=index_trend_bullish,
+                reason=reason_str,
+            )
+            return {
+                "check_name": "market_regime_shield",
+                "result": "NO_TRADE",
+                "details": f"Nakit Kalkanı Aktif ({reason_str}) — Ayı piyasasında yeni alım yasak",
+                "severity": "BLOCK",
+            }
+
+        return {
+            "check_name": "market_regime_shield",
+            "result": "PASS",
+            "details": f"Piyasa rejimi uygun ({regime_upper or 'BULL/NEUTRAL'})",
+            "severity": "INFO",
+        }
+
+    def _check_portfolio_drawdown_shield(
+        self, portfolio, side: str
+    ) -> dict[str, Any]:
+        """Portfoy drawdown kalkani: Zirve degerinden portfolio_dd_shield_pct dusunce yeni alim durdurur.
+
+        Bu kalkan 2023 gibi yillarda portfoy kayip yaparken yeni pozisyon acilmasini engeller.
+        Endeks BULL gorunsede portfoy zirve degerinden bu kadar geri cekildiyse yeni alim yasaktir.
+        SELL emirlerine dokunmaz.
+
+        Args:
+            portfolio: Guncel portfoy nesnesi.
+            side: Islem yonu ('BUY' veya 'SELL').
+
+        Returns:
+            Risk check sonuc sozlugu.
+        """
+        if side == "SELL":
+            return {
+                "check_name": "portfolio_dd_shield",
+                "result": "PASS",
+                "details": "SELL side — cikis serbest",
+                "severity": "INFO",
+            }
+
+        current_value = portfolio.get_total_value()
+        if current_value <= 0:
+            return {"check_name": "portfolio_dd_shield", "result": "PASS", "details": "Portfolio bos", "severity": "INFO"}
+
+        # Zirve guncelle
+        if current_value > self._portfolio_peak_value:
+            self._portfolio_peak_value = current_value
+
+        if self._portfolio_peak_value <= 0:
+            return {"check_name": "portfolio_dd_shield", "result": "PASS", "details": "Henuz zirve yok", "severity": "INFO"}
+
+        dd_pct = (1.0 - current_value / self._portfolio_peak_value) * 100.0
+        if dd_pct >= self.portfolio_dd_shield_pct:
+            logger.warning(
+                "Portfoy drawdown kalkani aktif — yeni alim durduruldu",
+                drawdown_pct=round(dd_pct, 2),
+                peak=round(self._portfolio_peak_value, 0),
+                current=round(current_value, 0),
+                threshold_pct=self.portfolio_dd_shield_pct,
+            )
+            return {
+                "check_name": "portfolio_dd_shield",
+                "result": "NO_TRADE",
+                "details": f"Portfoy zirve degerinden -%{dd_pct:.1f} geriledi (esik: -%{self.portfolio_dd_shield_pct}%) — yeni alim durduruldu",
+                "severity": "BLOCK",
+            }
+        return {
+            "check_name": "portfolio_dd_shield",
+            "result": "PASS",
+            "details": f"Portfoy zirveden -%{dd_pct:.1f}% (esik -%{self.portfolio_dd_shield_pct}% altinda)",
+            "severity": "INFO",
+        }
+
+    def _check_vol_spike_shield(
+        self, side: str, index_returns_5d: list[float] | None
+    ) -> dict[str, Any]:
+        """Volatilite spike kalkani: 5 gunluk endeks volatilitesi kritik esigi asinca yeni alimi durdurur.
+
+        Bu kalkan darbe, kriz, faiz soku gibi ani volatilite artislarinda tetiklenir.
+        index_returns_5d son 5 gunluk XU100 gunluk getiri listesidir.
+        SELL emirlerine dokunmaz.
+
+        Args:
+            side: Islem yonu.
+            index_returns_5d: Son 5 gunluk XU100 gunluk getiri oranlari (float listesi, ornek [-0.02, 0.01, ...]).
+
+        Returns:
+            Risk check sonuc sozlugu.
+        """
+        if side == "SELL":
+            return {
+                "check_name": "vol_spike_shield",
+                "result": "PASS",
+                "details": "SELL side — cikis serbest",
+                "severity": "INFO",
+            }
+
+        if not index_returns_5d or len(index_returns_5d) < 3:
+            return {"check_name": "vol_spike_shield", "result": "PASS", "details": "Yeterli veri yok", "severity": "INFO"}
+
+        import math
+        rets = list(index_returns_5d[-5:])
+        n = len(rets)
+        mean_r = sum(rets) / n
+        variance = sum((r - mean_r) ** 2 for r in rets) / max(n - 1, 1)
+        std_r = math.sqrt(variance)
+        vol_annualized = std_r * math.sqrt(252) * 100.0
+
+        if vol_annualized >= self.vol_spike_shield_pct:
+            logger.warning(
+                "Volatilite spike kalkani aktif — yeni alim durduruldu",
+                vol_5d_annualized=round(vol_annualized, 1),
+                threshold_pct=self.vol_spike_shield_pct,
+            )
+            return {
+                "check_name": "vol_spike_shield",
+                "result": "NO_TRADE",
+                "details": f"5g endeks volatilitesi %{vol_annualized:.1f} (annualized) > esik %{self.vol_spike_shield_pct} — kriz kalkani aktif",
+                "severity": "BLOCK",
+            }
+        return {
+            "check_name": "vol_spike_shield",
+            "result": "PASS",
+            "details": f"5g vol %{vol_annualized:.1f} < esik %{self.vol_spike_shield_pct}",
+            "severity": "INFO",
+        }
+
+    def reset_portfolio_peak(self, new_peak: float = 0.0) -> None:
+        """Portfoy drawdown kalkani icin zirve degerini sifirlar (test/reset amacli).
+
+        Args:
+            new_peak: Yeni zirve degeri (varsayilan 0 = otomatik guncelleme).
+        """
+        self._portfolio_peak_value = new_peak
+        logger.info("Portfoy zirve degeri sifirlandi", new_peak=new_peak)
+
+
     def _check_position_size(self, portfolio, ticker: str, side: str, quantity: int, price: float) -> dict[str, Any]:
         """Yeni hisse alımının tek hisse tavan yüzdesini aşıp aşmadığını denetler."""
+
         if side == "SELL":
             return {
                 "check_name": "position_size",

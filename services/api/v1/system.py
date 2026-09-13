@@ -557,11 +557,12 @@ async def get_db_performance(user=Depends(get_current_user), _=Depends(check_rat
 
         # Tablo boyutları
         tables = await pg_fetch("""
-            SELECT tablename,
-                   pg_size_pretty(pg_total_relation_size('public.'||tablename)) as total_size,
+            SELECT relname AS tablename,
+                   pg_size_pretty(pg_total_relation_size(relid)) as total_size,
                    n_live_tup as row_count, n_dead_tup as dead_rows
             FROM pg_stat_user_tables
-            ORDER BY pg_total_relation_size('public.'||tablename) DESC LIMIT 15
+            WHERE schemaname = 'public'
+            ORDER BY pg_total_relation_size(relid) DESC LIMIT 15
         """)
         result["table_sizes"] = [dict(t) for t in tables]
 
@@ -655,7 +656,7 @@ async def get_system_alerts(user=Depends(get_current_user), _=Depends(check_rate
     try:
         from ...ingestion.providers.news_provider import news_provider
 
-        kap_news = news_provider.fetch_official_kap_disclosures()[:3]
+        kap_news = (await news_provider.fetch_official_kap_disclosures())[:3]
         for idx, kn in enumerate(kap_news):
             k_title = kn.get("title", "")
             k_ticker = kn.get("ticker", "")

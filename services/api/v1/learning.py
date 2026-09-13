@@ -524,3 +524,56 @@ async def champion_challenger(
             status_code=500,
             detail=f"Champion/Challenger durumu alınamadı: {exc}",
         ) from exc
+
+
+@router.get("/strategy-diagnosis")
+async def strategy_diagnosis(
+    last_n_days: int = Query(30, ge=1, le=365),
+    user=Depends(get_current_user),
+    _=Depends(check_rate_limit),
+) -> dict[str, Any]:
+    """StrategyDiagnostician tarafından yapılan hata teşhisi, karşıolgusal What-If simülasyonları, sektör karantinaları ve parametre optimizasyon raporunu döndürür."""
+    try:
+        from ...learning.strategy_diagnostician import strategy_diagnostician
+
+        rep = strategy_diagnostician.get_diagnosis_report(last_n_days=last_n_days)
+        return {
+            "status": "success",
+            "report": rep,
+            "summary_count": len(rep.get("summaries", [])),
+            "param_change_counts": rep.get("param_change_counts", []),
+            "what_if_simulations": rep.get("what_if_simulations", []),
+            "quarantined_sectors": rep.get("quarantined_sectors", []),
+            "sector_diagnostics": rep.get("sector_diagnostics", []),
+            "checkpoints": rep.get("checkpoints", []),
+        }
+    except Exception as exc:
+        logger.error("strategy_diagnosis_api_hatasi: hata=%s", exc)
+        raise HTTPException(status_code=500, detail=f"Teşhis raporu alınamadı: {exc}") from exc
+
+
+@router.get("/active-params")
+async def active_strategy_params(
+    user=Depends(get_current_user),
+    _=Depends(check_rate_limit),
+) -> dict[str, Any]:
+    """Sistemde şu an aktif olarak çalışan ve StrategyDiagnostician tarafından güncellenen parametreleri döndürür."""
+    try:
+        from ...learning.frozen_strategy_engine import FROZEN_PARAMS
+
+        return {
+            "status": "success",
+            "active_params": FROZEN_PARAMS,
+            "hard_stop_pct": FROZEN_PARAMS.get("hard_stop_pct"),
+            "trailing_atr_mult": FROZEN_PARAMS.get("trailing_atr_mult"),
+            "min_hold_days": FROZEN_PARAMS.get("min_hold_days"),
+            "max_hold_days": FROZEN_PARAMS.get("max_hold_days"),
+            "min_score": FROZEN_PARAMS.get("min_score"),
+            "max_alloc_pct": FROZEN_PARAMS.get("max_alloc_pct"),
+            "min_cash_buffer_pct": FROZEN_PARAMS.get("min_cash_buffer_pct"),
+            "take_profit_rr_mult": FROZEN_PARAMS.get("take_profit_rr_mult"),
+        }
+    except Exception as exc:
+        logger.error("active_params_api_hatasi: hata=%s", exc)
+        raise HTTPException(status_code=500, detail=f"Aktif parametreler alınamadı: {exc}") from exc
+

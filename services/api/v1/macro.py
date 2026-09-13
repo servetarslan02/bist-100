@@ -3,17 +3,15 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 import time
 from datetime import UTC, datetime
 from typing import Any
 
+import structlog
 import yfinance as yf
 from fastapi import APIRouter, Depends, HTTPException
 
 from ..dependencies import check_rate_limit, get_current_user
-
-import structlog
 
 logger = structlog.get_logger(__name__)
 
@@ -89,6 +87,14 @@ def _fetch_live_macro_data() -> dict[str, Any]:
             result["gold_change_pct"] = result["gold_ounce_change_pct"]
         if "brent_crude_change_pct" in result:
             result["brent_change_pct"] = result["brent_crude_change_pct"]
+
+        # Geriye dönük uyumluluk ve dashboard / doğrulama scriptleri için nesne eşlemesi
+        result["USDTRY"] = {"price": result.get("usd_try"), "change_pct": result.get("usd_try_change_pct", 0.0)}
+        result["EURTRY"] = {"price": result.get("eur_try"), "change_pct": result.get("eur_try_change_pct", 0.0)}
+        result["DXY"] = {"price": result.get("dxy"), "change_pct": result.get("dxy_change_pct", 0.0)}
+        result["BRENT"] = {"price": result.get("brent_crude"), "change_pct": result.get("brent_crude_change_pct", 0.0)}
+        result["GOLD"] = {"price": result.get("gold_ounce"), "change_pct": result.get("gold_ounce_change_pct", 0.0)}
+        result["VIX"] = {"price": result.get("vix"), "change_pct": result.get("vix_change_pct", 0.0)}
 
         # UI Mapping & Dinamik Rejim Yorumu
         brent_v = result.get("brent_crude", 85.0)

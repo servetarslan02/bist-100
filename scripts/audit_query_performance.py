@@ -126,6 +126,7 @@ async def get_table_stats(conn) -> Any:
             last_analyze,
             last_autoanalyze
         FROM pg_stat_user_tables
+        WHERE schemaname = 'public'
         ORDER BY n_dead_tup DESC
         LIMIT 30
         """
@@ -169,7 +170,8 @@ async def get_missing_indexes(conn) -> Any:
                 ELSE 0
             END as seq_scan_ratio
         FROM pg_stat_user_tables
-        WHERE n_live_tup > 10000
+        WHERE schemaname = 'public'
+            AND n_live_tup > 10000
             AND seq_scan > 100
         ORDER BY seq_tup_read DESC
         LIMIT 20

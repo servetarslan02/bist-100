@@ -19,7 +19,7 @@ iki aşamalı günlük işlem akışını yönetir:
 from __future__ import annotations
 
 import asyncio
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta, timezone
 from typing import Any
 
 import orjson
@@ -42,6 +42,10 @@ DEFAULT_MIN_EXIT_SCORE: float = 45.0
 DEFAULT_INVESTABLE_POOL_FLOOR: float = 0.10
 DEFAULT_SCAN_LIMIT: int = 50
 DEFAULT_LOOKBACK_DAYS: int = 60
+
+
+from services.learning.frozen_strategy_engine import FROZEN_PARAMS
+from services.learning.strategy_diagnostician import strategy_diagnostician
 
 
 async def get_last_rebalance_date() -> date | None:
@@ -163,34 +167,94 @@ async def run_eod_signal_cycle(target_date: str | None = None, force_rebalance: 
             limits = regime_limits.get_limits(current_regime_str)
             max_slots = getattr(limits, "max_positions", 30)
 
+            # FROZEN_PARAMS'tan öğrenilmiş dinamik rejim bazlı giriş eşiği
+            regime_map = {
+                "BULL": "BULL_TREND",
+                "BEAR": "BEAR_MARKET",
+                "SIDEWAYS": "SIDEWAYS_RANGE",
+                "HIGH_VOLATILITY": "HIGH_VOLATILITY",
+                "LOW_VOLATILITY": "LOW_VOLATILITY",
+            }
+            r_target = regime_map.get(current_regime_str, current_regime_str)
+            raw_min_score = (
+                FROZEN_PARAMS.get("min_score", {}).get(r_target)
+                or FROZEN_PARAMS.get("min_score", {}).get(current_regime_str)
+            )
+            if raw_min_score is not None:
+                dynamic_min_score = raw_min_score * 100.0 if raw_min_score <= 1.0 else raw_min_score
+            else:
+                dynamic_min_score = DEFAULT_MIN_SCORE_THRESHOLD
+
             # 1. Seçici Giriş Eşiği (Hurdle Rate): İlla 24-30 dolmak zorunda değil, sadece kalite kriterini geçenler
+            # Kurumsal Seviye: Sektör Karantina Filtresi (Model Körlüğü Yaşanan Sektörler Engellenir)
+            quarantined_sectors = strategy_diagnostician.get_quarantined_sectors()
+            if quarantined_sectors:
+                logger.warning("Aktif karantinadaki sektorler tespit edildi", karantinadaki_sektorler=list(quarantined_sectors))
+
             qualified_candidates = []
             for p in valid_preds:
+                ticker = p.get("ticker", "")
+                ticker_sector = bist_universe.get_ticker_sector(ticker)
+                if ticker_sector in quarantined_sectors:
+                    logger.warning("Aday elendi -- Sektor karantinada (Model Korlugu Korumasi)", ticker=ticker, sektor=ticker_sector)
+                    continue
+
                 sc = float(p.get("score", 0.0))
                 exp_ret = float(p.get("expected_return_pct", 15.0))
-                # Kalite eşiği: Pozitif getiri beklentisi ve güçlü model skoru
-                if exp_ret > 0 and sc >= DEFAULT_MIN_SCORE_THRESHOLD:
+                # Kalite eşiği: Pozitif getiri beklentisi ve dinamik öğrenilen model skoru
+                if exp_ret > 0 and sc >= dynamic_min_score:
                     qualified_candidates.append(p)
                 if len(qualified_candidates) >= max_slots:
                     break
 
             if not qualified_candidates:
-                qualified_candidates = valid_preds[: min(10, max_slots)]
+                # Karantinada olmayanlardan fallback seç
+                non_quar_preds = [p for p in valid_preds if bist_universe.get_ticker_sector(p.get("ticker", "")) not in quarantined_sectors]
+                qualified_candidates = non_quar_preds[: min(10, max_slots)] if non_quar_preds else valid_preds[: min(10, max_slots)]
 
             top_rank_map = {item["ticker"]: idx + 1 for idx, item in enumerate(qualified_candidates)}
 
-            # 2. Münferit Satış Mantığı (Individual Degradation Exit):
-            # Sırf listede birkaç sıra geriledi diye satılmaz; ciddi bozulma veya stop aranır
+            # 2. Münferit Satış & Stop Mantığı (FROZEN_PARAMS ile tam senkronize):
+            hard_stop_val = float(FROZEN_PARAMS.get("hard_stop_pct", -6.5))
+            min_hold_val = int(FROZEN_PARAMS.get("min_hold_days", 12))
+            max_hold_val = int(FROZEN_PARAMS.get("max_hold_days", 65))
+            pos_dict_by_ticker = {p["ticker"]: p for p in paper_orchestrator.portfolio.get_all_positions()}
+
             exit_signals = []
             for ticker in current_positions:
+                pos_info = pos_dict_by_ticker.get(ticker, {})
                 pos_pred = next((p for p in preds if p.get("ticker") == ticker), None)
-                should_exit = False
-                exit_reason = ""
+                pnl_pct = float(pos_info.get("unrealized_pnl_pct", 0.0))
 
-                if pos_pred is None:
+                entry_date_str = str(pos_info.get("entry_date") or pos_info.get("created_at") or "")[:10]
+                days_held = 0
+                if len(entry_date_str) == 10:
+                    try:
+                        days_held = (today_dt - date.fromisoformat(entry_date_str)).days
+                    except Exception:
+                        days_held = 0
+
+                peak_gain_pct = max(float(pos_info.get("peak_pnl_pct", pnl_pct)), pnl_pct)
+                atr_pct = float(pos_pred.get("atr_pct", 3.5)) if pos_pred else 3.5
+                trailing_mult = float(FROZEN_PARAMS.get("trailing_atr_mult", 2.5))
+                atr_buffer_pct = max(float(FROZEN_PARAMS.get("min_atr_pct", 4.5)), atr_pct * trailing_mult)
+
+                if pnl_pct <= hard_stop_val:
+                    should_exit = True
+                    exit_reason = "HARD_STOP"
+                elif peak_gain_pct >= float(FROZEN_PARAMS.get("breakeven_trigger_pct", 8.0)) and pnl_pct <= float(FROZEN_PARAMS.get("breakeven_lock_pct", 1.0)):
+                    should_exit = True
+                    exit_reason = "BREAKEVEN_PROTECTION"
+                elif peak_gain_pct >= float(FROZEN_PARAMS.get("take_profit_activation_pct", 12.0)) and pnl_pct <= (peak_gain_pct - atr_buffer_pct):
+                    should_exit = True
+                    exit_reason = "ATR_TRAILING_PROFIT"
+                elif days_held >= max_hold_val and peak_gain_pct < 8.0:
+                    should_exit = True
+                    exit_reason = "MAX_HOLD"
+                elif pos_pred is None:
                     should_exit = True
                     exit_reason = "UNIVERSE_REMOVAL"
-                else:
+                elif days_held >= min_hold_val:
                     pos_score = float(pos_pred.get("score", 0.0))
                     pos_rank = top_rank_map.get(ticker, 999)
                     if pos_score < DEFAULT_MIN_EXIT_SCORE or pos_rank > (max_slots * 1.8):
@@ -198,7 +262,7 @@ async def run_eod_signal_cycle(target_date: str | None = None, force_rebalance: 
                         exit_reason = "ALPHA_DECAY"
 
                 if should_exit:
-                    logger.info("Individual position exit triggered", ticker=ticker, reason=exit_reason)
+                    logger.info("Position exit triggered", ticker=ticker, reason=exit_reason, pnl_pct=pnl_pct, days_held=days_held)
                     exit_signals.append(
                         {
                             "ticker": ticker,
@@ -209,63 +273,97 @@ async def run_eod_signal_cycle(target_date: str | None = None, force_rebalance: 
                             "model_version": paper_orchestrator._champion_version,
                             "target_weight": 0.0,
                             "sector": bist_universe.get_ticker_sector(ticker),
+                            "reason": exit_reason,
+                            "exit_reason": exit_reason,
                         }
                     )
 
             # 3. Dinamik Portföy Ağırlıklandırması (Conviction & Return Weighted Sizing):
-            # KULLANICI KURALI: Bir hisse en fazla %20 (0.20), en az için kriter yoktur (0.00 serbest).
+            # FROZEN_PARAMS'tan öğrenilen dinamik pozisyon tavanı ve nakit kalkanı
+            dynamic_max_cap = float(FROZEN_PARAMS.get("max_alloc_pct", DEFAULT_MAX_POSITION_CAP))
+            dynamic_cash_buffer = float(FROZEN_PARAMS.get("min_cash_buffer_pct", limits.min_cash_pct))
+            effective_min_cash = max(limits.min_cash_pct, dynamic_cash_buffer)
+
             new_entries = [p for p in qualified_candidates if p["ticker"] not in current_positions]
             entry_signals = []
 
             if new_entries:
-                investable_pool = max(DEFAULT_INVESTABLE_POOL_FLOOR, 1.0 - limits.min_cash_pct)  # Örn: %92
+                investable_pool = max(DEFAULT_INVESTABLE_POOL_FLOOR, 1.0 - effective_min_cash)
                 # Güçlü Conviction Skew: En çok yükselmesi beklenen ve güvenilen hisseye %15-20, alt sıralara %0.5-2 verilir
                 raw_weights = []
                 for idx, p in enumerate(new_entries):
                     sc = max(1.0, float(p.get("score", 50.0)))
                     exp_r = max(5.0, float(p.get("expected_return_pct", 15.0))) / 100.0
-                    rank_multiplier = max(0.05, (len(new_entries) - idx) / len(new_entries))
-                    factor = ((sc / 50.0) ** 2) * (1.0 + exp_r * 2.0) * (rank_multiplier**1.8)
-                    raw_weights.append(factor)
+                    conviction = (sc / 100.0) * exp_r
+                    raw_weights.append(conviction)
 
-                tot_factor = sum(raw_weights) if sum(raw_weights) > 0 else len(new_entries)
-                max_pos_cap = min(DEFAULT_MAX_POSITION_CAP, limits.max_position_pct)  # KULLANICI KURALI: En fazla %20
-                min_pos_floor = DEFAULT_MIN_POSITION_FLOOR  # KULLANICI KURALI: En az için kriter yoktur
+                sum_weights = sum(raw_weights) if sum(raw_weights) > 0 else 1.0
+                norm_weights = [w / sum_weights for w in raw_weights]
 
-                for idx, (p, raw_f) in enumerate(zip(new_entries, raw_weights, strict=False)):
-                    ideal_weight = (raw_f / tot_factor) * investable_pool
-                    bounded_weight = round(min(max_pos_cap, max(min_pos_floor, ideal_weight)), 4)
-
+                # Cap & Flow: Hiçbir hisse dynamic_max_cap tavanını aşamaz
+                for p, nw in zip(new_entries, norm_weights, strict=False):
+                    allocated_weight = min(dynamic_max_cap, nw * investable_pool)
                     entry_signals.append(
                         {
                             "ticker": p["ticker"],
-                            "direction": "LONG",
-                            "rank": idx + 1,
-                            "score": float(p.get("score", 100.0 - idx)),
-                            "confidence": float(p.get("confidence", 0.90)),
+                            "direction": "BUY",
+                            "rank": top_rank_map.get(p["ticker"], 99),
+                            "score": float(p.get("score", 50.0)),
+                            "confidence": float(p.get("confidence", 0.70)),
                             "model_version": paper_orchestrator._champion_version,
-                            "target_weight": bounded_weight,
+                            "target_weight": allocated_weight,
                             "sector": bist_universe.get_ticker_sector(p["ticker"]),
                         }
                     )
 
+            # Rebalance sinyallerini birleştir: Önce Çıkışlar, Sonra Girişler
             queued_signals = exit_signals + entry_signals
+            logger.info("Compiled dynamic portfolio signals", exits=len(exit_signals), entries=len(entry_signals))
 
-            # Sinyalleri sabah açılışı için bekleyen emir olarak kaydet
-            paper_orchestrator.queue_pending_signals(queued_signals, today_str)
+            # Sinyalleri StateStore'a PENDING olarak kaydet (Sabah Açılışında Yürütülecek)
+            if queued_signals:
+                paper_orchestrator.store.save_pending_signals(queued_signals)
+                logger.info("Queued signals stored for morning execution", count=len(queued_signals))
 
-            # DB log kaydı
-            top_tickers = [item["ticker"] for item in qualified_candidates]
+        # DB Takas/Portföy Log Kaydı
+        if paper_orchestrator.portfolio:
             try:
                 await pg_execute(
-                    "INSERT INTO paper_trade_portfolio (target_date, tickers, is_cash_regime, is_rebalance) VALUES ($1, $2, $3, $4)",
-                    today_dt,
-                    orjson.dumps(top_tickers).decode(),
-                    False,
-                    True,
+                    """
+                    INSERT INTO paper_trade_portfolio (
+                        total_equity, cash, positions_count, is_rebalance, metadata, created_at
+                    ) VALUES ($1, $2, $3, $4, $5, $6)
+                    """,
+                    paper_orchestrator.portfolio.get_total_value(),
+                    paper_orchestrator.portfolio.cash,
+                    len(current_positions),
+                    needs_rebalance,
+                    orjson.dumps(mtm_summary).decode("utf-8"),
+                    datetime.now(UTC),
                 )
             except Exception as e:
                 logger.error("DB Record Error", error=str(e))
+
+    # ============================================================
+    # STRATEJI TESHIS DONGUSU — Kapali Geri Bildirim
+    # Tamamlanan islemleri analiz edip FROZEN_PARAMS i otomatik gunceller.
+    # ============================================================
+    try:
+        raw_trades = paper_orchestrator.portfolio.get_trades() or paper_orchestrator.portfolio._trades
+        completed_trades = [t.__dict__ if hasattr(t, "__dict__") else dict(t) for t in raw_trades]
+        diag_result = strategy_diagnostician.run_daily_diagnosis(
+            trades=completed_trades,
+            current_params=FROZEN_PARAMS,
+            equity_curve=list(paper_orchestrator.portfolio.get_equity_curve() or paper_orchestrator.portfolio._equity_curve),
+            date=today_str,
+        )
+        if diag_result.get("change_count", 0) > 0:
+            logger.info(
+                "StrategyDiagnostician parametre guncellemesi yapti",
+                degisiklikler=diag_result.get("changes"),
+            )
+    except Exception as _diag_exc:
+        logger.warning("StrategyDiagnostician calistirilamadi", hata=str(_diag_exc))
 
     return {
         "status": "COMPLETED",

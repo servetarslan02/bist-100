@@ -133,9 +133,18 @@ def extract_point_in_time_features(df: pl.DataFrame) -> pl.DataFrame:
     feats = feats.with_columns((feats["target_5d_ret"] > 0).cast(pl.Int32).alias("target_5d_bin"))
     feats = feats.with_columns(close.alias("close"))
 
-    # Date sütunu varsa koru
+    # Tarih ve fiyat sütunlarını koru
+    if "timestamp" in df.columns:
+        feats = feats.with_columns(df["timestamp"].alias("timestamp"))
+    elif "Date" in df.columns:
+        feats = feats.with_columns(df["Date"].alias("timestamp"))
+
     if "Date" in df.columns:
         feats = feats.with_columns(df["Date"])
+
+    for col in ("Open", "High", "Low", "Close", "Volume"):
+        if col in df.columns:
+            feats = feats.with_columns(df[col].alias(col))
 
     return feats.drop_nulls(subset=["roc_20d", "volatility_20d"])
 

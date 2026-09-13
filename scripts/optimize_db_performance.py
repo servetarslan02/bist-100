@@ -33,9 +33,10 @@ async def analyze_tables() -> Any:
     async with pool.acquire() as conn:
         # Kullanıcı tablolarını bul
         tables = await conn.fetch("""
-            SELECT schemaname, tablename
+            SELECT schemaname, relname as tablename
             FROM pg_stat_user_tables
-            ORDER BY tablename
+            WHERE schemaname = 'public'
+            ORDER BY relname
         """)
 
         logger.info(f"\n📊 {len(tables)} tablo ANALYZ ediliyor...")
@@ -64,7 +65,7 @@ async def vacuum_tables() -> Any:
                      ELSE 0
                 END as dead_pct
             FROM pg_stat_user_tables
-            WHERE n_dead_tup > 1000
+            WHERE schemaname = 'public' AND n_dead_tup > 1000
             ORDER BY n_dead_tup DESC
             LIMIT 20
         """)
@@ -149,14 +150,15 @@ async def show_table_sizes() -> Any:
     async with pool.acquire() as conn:
         tables = await conn.fetch("""
             SELECT
-                tablename,
-                pg_size_pretty(pg_total_relation_size('public.'||tablename)) as total_size,
-                pg_size_pretty(pg_relation_size('public.'||tablename)) as table_size,
-                pg_size_pretty(pg_indexes_size('public.'||tablename)) as index_size,
+                relname as tablename,
+                pg_size_pretty(pg_total_relation_size(relid)) as total_size,
+                pg_size_pretty(pg_relation_size(relid)) as table_size,
+                pg_size_pretty(pg_indexes_size(relid)) as index_size,
                 n_live_tup as row_count,
                 n_dead_tup as dead_rows
             FROM pg_stat_user_tables
-            ORDER BY pg_total_relation_size('public.'||tablename) DESC
+            WHERE schemaname = 'public'
+            ORDER BY pg_total_relation_size(relid) DESC
             LIMIT 30
         """)
 
@@ -177,12 +179,13 @@ async def show_index_usage() -> Any:
     async with pool.acquire() as conn:
         indexes = await conn.fetch("""
             SELECT
-                tablename,
-                indexname,
+                relname as tablename,
+                indexrelname as indexname,
                 idx_scan as scans,
                 idx_tup_read as tuples_read,
                 pg_size_pretty(pg_relation_size(indexrelid)) as size
             FROM pg_stat_user_indexes
+            WHERE schemaname = 'public'
             ORDER BY idx_scan ASC
             LIMIT 30
         """)

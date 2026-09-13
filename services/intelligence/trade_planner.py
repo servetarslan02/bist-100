@@ -237,6 +237,12 @@ class TradePlanner:
     ) -> tuple[str, str, str]:
         """Al/Sat/Karar belirle."""
 
+        # 0. ENDEKS REJİM KALKANI: Ayı piyasasında yeni alım engellenir
+        regime_upper = (regime or "").upper()
+        if regime_upper in ("BEAR", "CRISIS", "RISK_OFF", "BEAR_TREND", "PANIC"):
+            # Ayı piyasasında nakitte bekle, hisse alma
+            return "HOLD", "HIGH", "LONG"
+
         mom20 = features.get("momentum_20d", 0)
         rsi = features.get("rsi_14", 50)
         vol_z = features.get("volume_zscore", 0)
@@ -297,7 +303,7 @@ class TradePlanner:
         return round(entry, 2), "LIMIT"
 
     def _determine_targets(self, price: float, features: dict, spec_score: float) -> tuple[float, float, float]:
-        """Hedef fiyatlar belirle."""
+        """Dinamik hedef fiyatlar belirle (Sınırsız trend potansiyeli - Let Profits Run)."""
 
         atr_raw = features.get("atr_14")
         atr_pct_raw = features.get("atr_pct")
@@ -306,37 +312,36 @@ class TradePlanner:
         elif atr_pct_raw is not None and atr_pct_raw > 0:
             atr = price * atr_pct_raw / 100.0
         else:
-            atr = price * 0.015
+            atr = price * 0.02
         bb_upper = features.get("bb_upper", price * 1.05)
-        features.get("sma_20", price)
         mom20 = features.get("momentum_20d", 0)
 
-        # ATR bazlı hedefler
-        target1 = price + atr * 1.5  # Kısa vade: 1.5x ATR
-        target2 = price + atr * 3.0  # Orta vade: 3x ATR
-        target3 = price + atr * 5.0  # Uzun vade: 5x ATR
+        # Hedefler:
+        # Target 1: Kısa vade ilk hedef / Break-even seviyesi (2.0x ATR)
+        target1 = price + atr * 2.0
+        # Target 2: Orta vade trend koşucusu (4.0x ATR)
+        target2 = price + atr * 4.0
+        # Target 3: Açık uçlu mega trend (8.0x ATR veya momentum genişlemesi)
+        target3 = price + atr * 8.0
 
-        # BB üst bandı referans
         if target1 < bb_upper:
             target1 = bb_upper
 
-        # Momentum bazlı ayarlama
+        # Güçlü momentumda üst hedefleri serbest bırak
         if mom20 > 10:
-            # Scale the projected move, not the entire price.  Multiplying
-            # target2 directly makes a 6% target on a 100 TL share become
-            # 127.2 TL instead of 107.2 TL.
-            target2 = price + (target2 - price) * 1.2
-            target3 = price + (target3 - price) * 1.3
+            target2 = price + (target2 - price) * 1.3
+            target3 = price + (target3 - price) * 1.6
 
-        # SPEC skoru yüksekse hedefleri artır
+        # SPEC skoru yüksekse hedefleri genişlet
         if spec_score > 80:
-            target1 = price + (target1 - price) * 1.1
-            target2 = price + (target2 - price) * 1.2
+            target1 = price + (target1 - price) * 1.15
+            target2 = price + (target2 - price) * 1.35
+            target3 = price + (target3 - price) * 1.8
 
         return round(target1, 2), round(target2, 2), round(target3, 2)
 
     def _determine_stop_loss(self, price: float, features: dict, action: str) -> tuple[float, str]:
-        """Stop loss belirle."""
+        """Stop loss belirle (Piyasa gürültüsüne dayanıklı dinamik volatilite stopu)."""
 
         atr_raw = features.get("atr_14")
         atr_pct_raw = features.get("atr_pct")
@@ -345,27 +350,23 @@ class TradePlanner:
         elif atr_pct_raw is not None and atr_pct_raw > 0:
             atr = price * atr_pct_raw / 100.0
         else:
-            atr = price * 0.015
+            atr = price * 0.02
         bb_lower = features.get("bb_lower", price * 0.95)
-        features.get("near_20d_low", 0)
 
-        # ATR bazlı stop
-        stop_atr = price - atr * 2.0
+        # ATR bazlı dinamik stop (2.5x ATR ile BIST dalgalanmasına tolerans)
+        stop_atr = price - atr * 2.5
 
         # BB alt bandı stop
         stop_bb = bb_lower * 0.98
 
-        # Destek seviyesi stop
-        stop_support = price * 0.95  # %5 altı
+        # En yakın olanı seç (aşırı dar olmamak kaydıyla)
+        stop = max(stop_atr, stop_bb)
 
-        # En yakın olanı seç
-        stop = max(stop_atr, stop_bb, stop_support)
-
-        # Maksimum %7 zarar
-        max_stop = price * 0.93
+        # Maksimum %8-10 zarar limiti (whipsaw önleme)
+        max_stop = price * 0.92
         stop = max(stop, max_stop)
 
-        return round(stop, 2), "ATR"
+        return round(stop, 2), "DYNAMIC_ATR"
 
     def _calculate_expectations(
         self, entry: float, target: float, stop: float, action: str

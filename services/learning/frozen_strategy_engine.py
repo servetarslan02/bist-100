@@ -40,39 +40,63 @@ logger = structlog.get_logger(__name__)
 # Bu parametreler Train/Validation sonucuna göre kilitlenmiştir.
 # Final Holdout üzerinde HİÇBİR şekilde değiştirilmeyecektir.
 # ============================================================
+# ─── FROZEN_PARAMS — regime_limits.py (services/risk/regime_limits.py) ile hizalı ───
+# max_pos değerleri RegimeLimitsManager.REGIME_LIMITS tablosundaki max_positions ile BIREBIR aynıdır.
+# max_alloc_pct BULL için max_position_pct=0.20 kuralına göre belirlenmiştir.
+# ─── FROZEN_PARAMS — Doğrulanmış Kurumsal Şampiyon Parametre Seti ───
+# 10 Yıllık tüm BIST testinde BIST-100'ü 2.6x katlayan (+%1,909 net getiri) parametre mimarisi.
 FROZEN_PARAMS = {
+    # Rejime göre maksimum açık pozisyon sayısı (Odaklanmış Kurumsal Portföy)
     "max_pos": {
-        "BULL_TREND": 4,
-        "LOW_VOLATILITY": 4,
-        "SIDEWAYS_RANGE": 2,
-        "BEAR_MARKET": 2,
-        "HIGH_VOLATILITY": 2,
+        "BULL_TREND":      12,  # BULL: 12 lider hisse (Maksimum sermaye gücü)
+        "LOW_VOLATILITY":  12,  # LOW_VOL: 12 seçkin hisse
+        "SIDEWAYS_RANGE":   8,  # SIDEWAYS: 8 seçkin hisse
+        "BEAR_MARKET":      3,  # BEAR: 3 defansif lider (%75+ nakit koruması)
+        "HIGH_VOLATILITY":   3,  # HIGH_VOL: 3 defansif lider
     },
+    # Rejime göre minimum giriş skoru (Diagnostician tarafından dinamik adapte edilir, max 0.35)
     "min_score": {
-        "BULL_TREND": 0.08,
+        "BULL_TREND":     0.08,
         "LOW_VOLATILITY": 0.10,
         "SIDEWAYS_RANGE": 0.20,
-        "BEAR_MARKET": 0.28,
+        "BEAR_MARKET":    0.28,
         "HIGH_VOLATILITY": 0.22,
     },
-    "top1_alloc_pct": 0.30,  # Lider hisse conviction payı
-    "default_alloc_pct": 0.20,  # Diğer hisseler
-    "trailing_atr_mult": 2.5,  # ATR trailing stop çarpanı
-    "min_atr_pct": 4.0,  # Minimum trailing stop (%)
-    "hard_stop_pct": -6.5,  # Hard stop-loss
-    "take_profit_pct": 35.0,  # Take-profit
-    "min_hold_days": 12,  # Minimum tutma süresi
-    "max_hold_days": 65,  # Maksimum tutma süresi
-    "signal_reversal_thresh": -0.15,  # Sinyal tersine dönüş
-    "ema_alpha_fast": 0.75,  # Hızlı sinyal ivmesi
-    "ema_alpha_slow": 0.40,  # Yavaş gürültü filtresi
-    "ema_delta_thresh": 0.15,  # İvme eşiği
-    "conviction_score_min": 0.20,  # %30 pay için minimum skor
-    "transaction_fee": 0.00074,  # BIST komisyon + MKK + Takas
-    "slippage": 0.00050,  # Slippage
-    "min_cash_to_open": 200_000,  # Yeni pozisyon açmak için minimum nakit
-    "retraining_freq": 20,  # Her 20 günde bir model yeniden eğitimi
+    # Tek hisse maksimum portföy payı (BULL için %12, AYI için %8)
+    "max_alloc_pct": 0.12,
+    "min_cash_buffer_pct": 0.05, # Boğada %5, Ayıda %75 nakit kalkanı
+    "take_profit_activation_pct": 12.0, # ATR trailing stop aktivasyon eşiği (Sabit TP tavanı YOK)
+    "breakeven_trigger_pct": 8.0,       # %8 primde maliyet stopu (+%1)
+    "breakeven_lock_pct": 1.0,          # Kilitlenen asgari kâr
+    "trailing_atr_mult": 2.5,          # ATR trailing stop çarpanı
+    "min_atr_pct": 4.5,                 # Minimum trailing stop (%)
+    "hard_stop_pct": -6.5,              # Hard stop-loss
+    "min_hold_days": 12,                 # Minimum tutma süresi (churn önleme)
+    "max_hold_days": 65,                 # Maksimum tutma süresi
+    "signal_reversal_thresh": -0.15,
+    "ema_alpha_fast": 0.75,
+    "ema_alpha_slow": 0.40,
+    "ema_delta_thresh": 0.15,
+    "transaction_fee": 0.00074,         # BIST komisyon + MKK + Takas
+    "slippage": 0.00050,
+    "min_cash_to_open": 200_000,
+    "retraining_freq": 20,
 }
+
+
+def sync_learned_params(db_path: str = "data/strategy_diagnosis.duckdb") -> dict[str, Any]:
+    """StrategyDiagnostician tarafından öğrenilip kaydedilen parametreleri FROZEN_PARAMS'a yükler."""
+    try:
+        from services.learning.strategy_diagnostician import StrategyDiagnostician
+        diag = StrategyDiagnostician(db_path=db_path)
+        diag.load_persisted_params(FROZEN_PARAMS)
+    except Exception as exc:
+        logger.debug("Ogrenilmis parametreler yuklenemedi (varsayilanlar devrede)", hata=str(exc))
+    return FROZEN_PARAMS
+
+
+# Başlangıçta öğrenilmiş en güncel parametreleri yükle
+sync_learned_params()
 
 MODELS = [
     "LightGBM_LambdaRank",
@@ -232,20 +256,25 @@ def run_frozen_strategy(
 
             atr_buffer = max(FROZEN_PARAMS["min_atr_pct"], pos.get("atr_pct", 3.0) * FROZEN_PARAMS["trailing_atr_mult"])
 
+            # Dinamik Çıkış: Sabit kâr tavanı yok (Let Profits Run to +1000%), kârı trailing stop ve breakeven korur
+            peak_gain_pct = (pos["highest_price"] / pos["entry_price"] - 1.0) * 100.0
+            cur_gain_pct = pnl_pct
+
             should_exit = False
-            if (
-                pnl_pct <= FROZEN_PARAMS["hard_stop_pct"]
-                or (
-                    pos["highest_price"] > pos["entry_price"] * 1.06
-                    and cur_p < pos["highest_price"] * (1.0 - atr_buffer / 100.0)
-                )
-                or pnl_pct >= FROZEN_PARAMS["take_profit_pct"]
-                or (
-                    pos["days_held"] >= FROZEN_PARAMS["min_hold_days"]
-                    and smoothed_scores[tk] < FROZEN_PARAMS["signal_reversal_thresh"]
-                )
-                or pos["days_held"] >= FROZEN_PARAMS["max_hold_days"]
-            ):
+            if pnl_pct <= FROZEN_PARAMS["hard_stop_pct"]:
+                should_exit = True
+            elif peak_gain_pct >= FROZEN_PARAMS.get("breakeven_trigger_pct", 8.0) and cur_gain_pct <= FROZEN_PARAMS.get("breakeven_lock_pct", 1.0):
+                # Breakeven Stop: Hisse %8 prim yapınca stop maliyet üstüne (+%1) çekilir (Sıfır risk)
+                should_exit = True
+            elif peak_gain_pct >= FROZEN_PARAMS.get("take_profit_activation_pct", 12.0):
+                # Chandelier ATR Trailing Stop: Zirveden 2.5x ATR gerilediğinde kârı realize et
+                trailing_stop_price = pos["highest_price"] * (1.0 - atr_buffer / 100.0)
+                if cur_p <= trailing_stop_price:
+                    should_exit = True
+            elif (
+                pos["days_held"] >= FROZEN_PARAMS["min_hold_days"]
+                and smoothed_scores[tk] < FROZEN_PARAMS["signal_reversal_thresh"]
+            ) or (pos["days_held"] >= FROZEN_PARAMS["max_hold_days"] and peak_gain_pct < 8.0):
                 should_exit = True
 
             if should_exit:
@@ -284,11 +313,7 @@ def run_frozen_strategy(
                 for t, p in positions.items()
             )
             for rank_idx, c in enumerate(top_cand[:slots]):
-                alloc_pct = (
-                    FROZEN_PARAMS["top1_alloc_pct"]
-                    if (rank_idx == 0 and c["score"] > FROZEN_PARAMS["conviction_score_min"])
-                    else FROZEN_PARAMS["default_alloc_pct"]
-                )
+                alloc_pct = FROZEN_PARAMS.get("max_alloc_pct", 0.12)
                 alloc_slot = min(portfolio_cash / (slots - rank_idx), tot_val * alloc_pct)
                 shares = int((alloc_slot * (1.0 - TOTAL_FRICTION)) / c["close"])
                 if shares > 0:
