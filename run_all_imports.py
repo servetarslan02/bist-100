@@ -139,7 +139,7 @@ ALL_MODULES = [
     "services.alternative.social",
     "services.alternative.jobs",
     "services.alternative.credit_card",
-    "services.alternative.satellite",
+    "services.alternative.satellite_adapter",
     # Macro (7)
     "services.macro.tcmb",
     "services.macro.inflation",
