@@ -124,44 +124,77 @@ def calculate_bist_anomalies(
         raise TypeError("stock parametresi None olamaz")
     if not isinstance(stock, dict):
         raise TypeError(f"stock dict olmalı, alınan tip: {type(stock).__name__}")
-    if market_data is not None:
-        logger.info("bist_anomalies_market_data_ignored", reason="reserved for future use")
-
     anomalies: dict[str, float] = {}
+
+    # Piyasa Koşullandırma Çarpanları (Market Conditioning Factors)
+    fx_multiplier = 1.0
+    inf_multiplier = 1.0
+    liq_multiplier = 1.0
+    index_excess_mom = 0.0
+    foreign_flow_bonus = 0.0
+
+    if market_data and isinstance(market_data, dict):
+        # 1. Döviz Şoku Koşullandırması: USDTRY yükseliyorsa ihracatçı primi artar
+        fx_change = _safe_float(market_data.get("usdtry_change") or market_data.get("fx_change"), default=0.0)
+        if fx_change > 0:
+            fx_multiplier = 1.0 + min(1.0, fx_change / 5.0)
+
+        # 2. Enflasyon Rejimi Koşullandırması: Yüksek enflasyonda fiyatlama gücü primi
+        market_cpi = _safe_float(market_data.get("inflation_rate") or market_data.get("cpi_annual"), default=0.0)
+        if market_cpi > 30.0:
+            inf_multiplier = 1.0 + min(1.0, (market_cpi - 30.0) / 70.0)
+
+        # 3. Piyasa Likidite Sıkışıklığı: Piyasa hacmi düştüğünde likit olmayan hisselere iskonto
+        market_vol = _safe_float(market_data.get("market_volume") or market_data.get("total_turnover"), default=0.0)
+        benchmark_vol = _safe_float(market_data.get("avg_market_volume"), default=50_000_000_000.0)
+        if 0 < market_vol < benchmark_vol:
+            liq_multiplier = 1.0 + min(0.5, (benchmark_vol - market_vol) / benchmark_vol)
+
+        # 4. Endekse Göre Göreli Sektör Momentumu (Saf Alfa Ayrışması)
+        index_ret = _safe_float(market_data.get("bist100_return") or market_data.get("index_return"), default=0.0)
+        index_excess_mom = index_ret
+
+        # 5. Yabancı Yatırımcı Akış Momentumu
+        foreign_inflow = _safe_float(market_data.get("foreign_net_flow") or market_data.get("foreign_flow_million_usd"), default=0.0)
+        if foreign_inflow > 0:
+            foreign_flow_bonus = min(0.3, foreign_inflow / 1000.0)
 
     # 1. Temettü anomalisi
     div_yield = _safe_float(stock.get("dividend_yield"), default=0.0, name="dividend_yield")
-    anomalies["dividend_yield"] = min(max(div_yield / _DIVISOR_DIVIDEND, 0.0), 1.0)
+    anomalies["dividend_yield"] = round(min(max(div_yield / _DIVISOR_DIVIDEND, 0.0), 1.0), 4)
 
-    # 2. Likidite anomalisi
+    # 2. Likidite anomalisi (Piyasa likidite sıkışıklığı ile dinamik ölçekli)
     avg_vol = _safe_float(stock.get("avg_volume"), default=0.0, name="avg_volume")
-    anomalies["liquidity_premium"] = 1.0 - min(avg_vol / _DIVISOR_VOLUME, 1.0)
+    raw_liq = 1.0 - min(avg_vol / _DIVISOR_VOLUME, 1.0)
+    anomalies["liquidity_premium"] = round(min(1.0, raw_liq * liq_multiplier), 4)
 
-    # 3. Kur hassasiyeti
-    # Pozitif beta = USDTRY artarken hisse de artar (ihracatçı → tercih edilen)
-    # Negatif beta = USDTRY artarken hisse düşer (ithalatçı → riskli)
+    # 3. Kur hassasiyeti (Piyasa döviz kuru şok rejimi ile dinamik ölçekli)
     fx_beta = _safe_float(stock.get("usdtry_beta"), default=0.0, name="usdtry_beta")
-    anomalies["fx_sensitivity"] = min(max(fx_beta / _DIVISOR_BETA, 0.0), 1.0)
+    raw_fx = min(max(fx_beta / _DIVISOR_BETA, 0.0), 1.0)
+    anomalies["fx_sensitivity"] = round(min(1.0, raw_fx * fx_multiplier), 4)
 
-    # 4. Enflasyon hassasiyeti — pozitif beta = enflasyon hedge
+    # 4. Enflasyon hassasiyeti (Piyasa makro enflasyon seviyesi ile dinamik ölçekli)
     inf_beta = _safe_float(stock.get("inflation_beta"), default=0.0, name="inflation_beta")
-    anomalies["inflation_sensitivity"] = min(max(inf_beta / _DIVISOR_BETA, 0.0), 1.0)
+    raw_inf = min(max(inf_beta / _DIVISOR_BETA, 0.0), 1.0)
+    anomalies["inflation_sensitivity"] = round(min(1.0, raw_inf * inf_multiplier), 4)
 
     # 5. Faiz hassasiyeti — negatif beta = faiz artarken düşer (riskli)
     rate_beta = _safe_float(stock.get("rate_beta"), default=0.0, name="rate_beta")
-    anomalies["rate_sensitivity"] = min(max(-rate_beta / _DIVISOR_BETA, 0.0), 1.0)
+    anomalies["rate_sensitivity"] = round(min(max(-rate_beta / _DIVISOR_BETA, 0.0), 1.0), 4)
 
-    # 6. Sektör momentum
+    # 6. Sektör momentum (Endeks getirisinden arındırılmış bağıl sektör gücü)
     sector_mom = _safe_float(stock.get("sector_momentum"), default=0.0, name="sector_momentum")
-    anomalies["sector_momentum"] = min(max(sector_mom / _DIVISOR_MOMENTUM, -1.0), 1.0)
+    excess_sec_mom = sector_mom - index_excess_mom
+    anomalies["sector_momentum"] = round(min(max(excess_sec_mom / _DIVISOR_MOMENTUM, -1.0), 1.0), 4)
 
     # 7. KAP sentiment
     kap_sent = _safe_float(stock.get("kap_sentiment"), default=0.0, name="kap_sentiment")
-    anomalies["kap_sentiment"] = min(max(kap_sent, -1.0), 1.0)
+    anomalies["kap_sentiment"] = round(min(max(kap_sent, -1.0), 1.0), 4)
 
-    # 8. Yabancı yatırımcı
+    # 8. Yabancı yatırımcı (Akış bonusu ile desteklenmiş)
     foreign = _safe_float(stock.get("foreign_ownership"), default=0.0, name="foreign_ownership")
-    anomalies["foreign_ownership"] = min(foreign / _DIVISOR_FOREIGN, 1.0)
+    raw_foreign = min(foreign / _DIVISOR_FOREIGN, 1.0)
+    anomalies["foreign_ownership"] = round(min(1.0, raw_foreign + foreign_flow_bonus), 4)
 
     return anomalies
 

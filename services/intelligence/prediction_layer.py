@@ -181,27 +181,64 @@ def compute_multi_horizon_predictions(
     )
 
 
-def _rule_based_prediction(ticker: str, features: dict, horizon: int) -> Prediction:
-    """Rule-based fallback prediction."""
-    momentum = features.get("momentum_20d", 0)
-    rsi = features.get("rsi_14", 50)
+def _rule_based_prediction(ticker: str, features: dict[str, Any], horizon: int) -> Prediction:
+    """Kurumsal düzeyde çok faktörlü kural tabanlı tahmin motoru.
 
-    base = momentum * 0.3
-    if rsi > 70:
-        base -= 1.0
-    elif rsi < 30:
-        base += 1.0
+    Trend (EMA), Momentum, RSI ortalamaya dönüş, Hacim teyidi ve Volatilite ölçeklemesi kullanır.
+    """
+    # 1. Momentum ve Trend
+    momentum_20d = float(features.get("momentum_20d", 0.0))
+    momentum_5d = float(features.get("momentum_5d", 0.0))
+    trend_momentum = 0.60 * momentum_20d + 0.40 * momentum_5d
 
-    predicted = base * np.sqrt(horizon / 20)
-    conf = max(0.2, 0.5 - abs(predicted) / 20)
+    # EMA Trend Farkı
+    ema_gap = 0.0
+    ema_20 = features.get("ema_20")
+    ema_50 = features.get("ema_50")
+    if ema_20 is not None and ema_50 is not None and float(ema_50) > 0:
+        ema_gap = (float(ema_20) - float(ema_50)) / float(ema_50) * 100.0
+
+    # 2. RSI Ortalamaya Dönüş (Mean-Reversion) Düzeltmesi
+    rsi = float(features.get("rsi_14", 50.0))
+    # 50'den sapma: 70 üzerinde negatif düzeltme, 30 altında pozitif tepki beklentisi
+    mean_reversion_adj = (50.0 - rsi) * 0.05
+
+    # 3. Hacim Teyidi (Volume Confirmation)
+    vol_ratio = float(features.get("volume_ratio_20d") or features.get("volume_surge", 1.0))
+    vol_confirm = min(1.5, max(0.6, vol_ratio))
+
+    # 4. Temel Ham Tahmin Sentezi
+    raw_signal = (trend_momentum * 0.25) + (ema_gap * 0.35) + mean_reversion_adj
+
+    # Hacim destekliyorsa sinyali güçlendir, zayıfsa sönümle
+    confirmed_signal = raw_signal * vol_confirm
+
+    # Ufuk (Horizon) zaman kökü ölçeklemesi: 20 günlük bazdan ufka genişlet
+    predicted_return = confirmed_signal * np.sqrt(horizon / 20.0)
+
+    # 5. Model Mutabakatı ve Güven Skoru
+    signals_agree = sum([
+        1 if trend_momentum > 0 else -1,
+        1 if ema_gap > 0 else -1,
+        1 if (rsi > 50) else -1,
+    ])
+    agreement_ratio = abs(signals_agree) / 3.0  # 0.33 ile 1.0 arası
+
+    # Güven: Sinyal mutabakatı ve volatiliteye bağlı dinamik hesaplama
+    vol_20d = float(features.get("volatility_20d", 25.0))
+    vol_penalty = min(0.3, vol_20d / 100.0)
+    base_conf = 0.40 + (agreement_ratio * 0.35) - vol_penalty
+    calibrated_conf = float(np.clip(base_conf, 0.20, 0.85))
 
     return compute_prediction(
         ticker=ticker,
-        ml_prediction=predicted,
-        ml_confidence=conf,
+        ml_prediction=round(float(predicted_return), 4),
+        ml_confidence=round(calibrated_conf, 4),
         features=features,
         horizon=horizon,
-        model_source="rule_based",
+        model_source="rule_based_quant",
+        calibrated_confidence=round(calibrated_conf, 4),
+        model_agreement=round(agreement_ratio, 4),
     )
 
 
