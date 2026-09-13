@@ -129,6 +129,58 @@ def compute_inflation_features(inflation_data: dict[str, Any]) -> dict[str, floa
     return features
 
 
+def compute_subindex_pressure_score(subindices: dict[str, float]) -> dict[str, float]:
+    """TÜİK TÜFE harcama grupları ağırlıklarıyla alt kalem baskı ve hizmet yapışkanlık skorunu hesaplar.
+
+    TÜFE Sepet Ağırlıkları (TCMB / TÜİK güncel sepet dağılımı referansı):
+    - Gıda ve Alkolsüz İçecekler: %25.0
+    - Ulaştırma: %16.0
+    - Konut ve Kira: %14.5
+    - Lokanta ve Oteller (Hizmet): %8.0
+    - Ev Eşyası: %7.5
+    - Giyim ve Ayakkabı: %6.5
+    - Çeşitli Mal ve Hizmetler: %5.0
+    - Diğer Gruplar: %17.5
+
+    Args:
+        subindices: Alt kalem yıllık veya aylık yüzde değişimleri sözlüğü.
+
+    Returns:
+        dict[str, float]: Ağırlıklı katkı toplamı, hizmet yapışkanlık skoru ve gıda-ulaştırma baskı oranı.
+    """
+    weights = {
+        "food": 0.250,
+        "transport": 0.160,
+        "housing": 0.145,
+        "hotels_restaurants": 0.080,
+        "furnishing": 0.075,
+        "clothing": 0.065,
+        "other": 0.225,
+    }
+
+    weighted_sum = 0.0
+    total_weight = 0.0
+
+    for key, weight in weights.items():
+        val = subindices.get(key)
+        if val is not None:
+            weighted_sum += float(val) * weight
+            total_weight += weight
+
+    weighted_cpi = (weighted_sum / total_weight) if total_weight > 0 else 0.0
+
+    # Hizmet enflasyonu yapışkanlık proxy'si (Konut + Lokanta/Otel ağırlıklı oranı)
+    service_items = [subindices.get("housing"), subindices.get("hotels_restaurants")]
+    valid_services = [float(v) for v in service_items if v is not None]
+    service_rigidity = float(sum(valid_services) / len(valid_services)) if valid_services else 0.0
+
+    return {
+        "subindex_weighted_rate": round(weighted_cpi, 2),
+        "service_rigidity_score": round(service_rigidity, 2),
+        "subindex_coverage_pct": round(total_weight * 100.0, 1),
+    }
+
+
 __all__ = [
     "DEFAULT_INF_REGIME_HYPER",
     "DEFAULT_INF_REGIME_VERY_HIGH",
@@ -137,6 +189,7 @@ __all__ = [
     "DEFAULT_INF_SURPRISE_THRESHOLD",
     "DEFAULT_INF_TREND_THRESHOLD",
     "compute_inflation_features",
+    "compute_subindex_pressure_score",
 ]
 
 

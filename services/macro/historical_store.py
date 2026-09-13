@@ -11,6 +11,7 @@ KURAL: Backtest'te sadece o tarihte bilinen veriyi kullan.
 """
 
 import os
+import threading
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -48,16 +49,18 @@ class MacroHistoricalStore:
         Args:
             storage_path: Veri dosyası saklama yolu (varsayılan: "data/macro_historical.json").
         """
+        self._lock = threading.Lock()
         self._storage_path = storage_path
-        self._data: dict[str, dict[str, list[dict]]] = {}  # indicator → {date → [values]}
+        self._data: dict[str, dict[str, list[dict[str, Any]]]] = {}  # indicator → {date → [values]}
         self._load()
 
     def __repr__(self) -> str:
         """Tarihsel makro veri deposu okunabilir string temsili."""
-        return (
-            f"MacroHistoricalStore(storage_path='{self._storage_path}', "
-            f"indicators={len(self._data)})"
-        )
+        with self._lock:
+            return (
+                f"MacroHistoricalStore(storage_path='{self._storage_path}', "
+                f"indicators={len(self._data)})"
+            )
 
     def save(
         self,
@@ -65,7 +68,7 @@ class MacroHistoricalStore:
         indicator: str,
         value: float,
         source: str = "unknown",
-    ) -> Any:
+    ) -> None:
         """Makro veri kaydet.
 
         Args:
@@ -74,20 +77,22 @@ class MacroHistoricalStore:
             value: Değer
             source: Veri kaynağı
         """
-        if indicator not in self._data:
-            self._data[indicator] = {}
-
-        if date not in self._data[indicator]:
-            self._data[indicator][date] = []
-
         entry = {
             "value": value,
             "source": source,
             "timestamp": datetime.now(UTC).isoformat(),
         }
 
-        self._data[indicator][date].append(entry)
-        # _save() zaten debounce ile çağrılıyor, burada gereksiz
+        with self._lock:
+            if indicator not in self._data:
+                self._data[indicator] = {}
+
+            if date not in self._data[indicator]:
+                self._data[indicator][date] = []
+
+            self._data[indicator][date].append(entry)
+
+        self._save()
         logger.debug("Macro data saved", indicator=indicator, date=date, value=value)
 
     def get(
@@ -182,48 +187,55 @@ class MacroHistoricalStore:
         self,
         indicator: str,
         data: list[dict[str, Any]],
-    ) -> Any:
+    ) -> int:
         """Toplu veri yükleme (backfill).
 
         Args:
             indicator: Gösterge adı
             data: [{"date": "YYYY-MM-DD", "value": float, "source": str}]
+
+        Returns:
+            int: Kaydedilen veri noktası adedi.
         """
         count = 0
         for entry in data:
             self.save(
                 date=entry["date"],
                 indicator=indicator,
-                value=entry["value"],
+                value=float(entry["value"]),
                 source=entry.get("source", "backfill"),
             )
             count += 1
 
         logger.info("Backfill completed", indicator=indicator, count=count)
+        return count
 
     def get_available_indicators(self) -> list[str]:
         """Mevcut göstergeleri listele."""
-        return list(self._data.keys())
+        with self._lock:
+            return list(self._data.keys())
 
-    def get_date_range(self, indicator: str) -> dict[str, str] | None:
+    def get_date_range(self, indicator: str) -> dict[str, Any] | None:
         """Göstergenin tarih aralığını döndür."""
-        indicator_data = self._data.get(indicator, {})
+        with self._lock:
+            indicator_data = self._data.get(indicator, {})
 
-        if not indicator_data:
-            return None
+            if not indicator_data:
+                return None
 
-        dates = sorted(indicator_data.keys())
-        return {
-            "indicator": indicator,
-            "start_date": dates[0],
-            "end_date": dates[-1],
-            "total_points": len(dates),
-        }
+            dates = sorted(indicator_data.keys())
+            return {
+                "indicator": indicator,
+                "start_date": dates[0],
+                "end_date": dates[-1],
+                "total_points": len(dates),
+            }
 
     def get_report(self) -> dict[str, Any]:
         """Rapor."""
-        indicators = self.get_available_indicators()
-        total_points = sum(sum(len(entries) for entries in ind_data.values()) for ind_data in self._data.values())
+        with self._lock:
+            indicators = list(self._data.keys())
+            total_points = sum(sum(len(entries) for entries in ind_data.values()) for ind_data in self._data.values())
 
         return {
             "indicators": len(indicators),
@@ -234,26 +246,34 @@ class MacroHistoricalStore:
 
     # ===================== PERSISTENCE =====================
 
-    def _load(self) -> Any:
+    def _load(self) -> None:
         """Veriyi dosyadan yükle."""
         if os.path.exists(self._storage_path):
             try:
-                with open(self._storage_path) as f:
-                    self._data = orjson.loads(f.read())
+                with open(self._storage_path, "rb") as f:
+                    content = f.read()
+                    if content:
+                        self._data = orjson.loads(content)
                 logger.info("Historical store loaded", indicators=len(self._data), path=self._storage_path)
             except Exception as e:
                 logger.error("Failed to load historical store", error=str(e))
                 self._data = {}
 
-    def _save(self) -> Any:
+    def _save(self) -> None:
         """Veriyi dosyaya kaydet (debounced — SSD dostu)."""
         from services.core.debounce import should_save
         if not should_save("historical_store", 120):
             return
+        self.flush()
+
+    def flush(self) -> None:
+        """Tüm önbelleği doğrudan disk dosyasına yazar."""
         try:
             os.makedirs(os.path.dirname(self._storage_path), exist_ok=True)
-            with open(self._storage_path, "w") as f:
-                f.write(orjson.dumps(self._data, option=orjson.OPT_INDENT_2).decode())
+            with self._lock:
+                raw_bytes = orjson.dumps(self._data, option=orjson.OPT_INDENT_2)
+            with open(self._storage_path, "wb") as f:
+                f.write(raw_bytes)
         except Exception as e:
             logger.error("Failed to save historical store", error=str(e))
 

@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
+import numpy as np
 import structlog
 
 from services.macro.config.macro_config import macro_config
@@ -290,6 +291,55 @@ class MacroStressTest:
 
         return sorted(results, key=lambda r: r.total_impact_pct)
 
+    def run_monte_carlo_stress_test(
+        self,
+        portfolio: dict[str, Any],
+        n_simulations: int = 1000,
+        seed: int = 42,
+    ) -> dict[str, float]:
+        """Tarihsel makro şok kovaryansından türetilen Monte Carlo simülasyonu ile portföy stres VaR ve CVaR hesaplar.
+
+        Args:
+            portfolio: Portföy pozisyon ve büyüklük sözlüğü.
+            n_simulations: Monte Carlo simülasyon tekrar sayısı (varsayılan: 1000).
+            seed: Rastgelelik tohumu (deterministik testler için).
+
+        Returns:
+            dict[str, float]: VaR %95, VaR %99, CVaR (Expected Shortfall) ve simüle edilmiş istatistikler.
+        """
+        rng = np.random.default_rng(seed)
+        macro_factors = ["usdtry", "interest_rate", "vix", "oil", "global", "inflation", "bist"]
+        volatilities = np.array([0.012, 0.005, 0.045, 0.022, 0.015, 0.008, 0.018])
+        p = len(macro_factors)
+        corr_matrix = np.eye(p)
+        corr_matrix[2, 6] = corr_matrix[6, 2] = -0.45
+        corr_matrix[0, 4] = corr_matrix[4, 0] = -0.35
+        corr_matrix[0, 2] = corr_matrix[2, 0] = 0.40
+        cov_matrix = np.outer(volatilities, volatilities) * corr_matrix
+
+        sim_shocks = rng.multivariate_normal(mean=np.zeros(p), cov=cov_matrix, size=n_simulations)
+
+        portfolio_returns = []
+        for i in range(n_simulations):
+            shocks_dict = {f"{macro_factors[j]}_change": float(sim_shocks[i, j]) for j in range(p)}
+            res = self._run_scenario(portfolio, "MC_STRESS", shocks_dict)
+            portfolio_returns.append(res.total_impact_pct)
+
+        rets = np.array(portfolio_returns)
+        var_95 = float(np.percentile(rets, 5))
+        var_99 = float(np.percentile(rets, 1))
+        cvar_95 = float(np.mean(rets[rets <= var_95])) if np.any(rets <= var_95) else var_95
+
+        return {
+            "stress_var_95_pct": round(var_95, 2),
+            "stress_var_99_pct": round(var_99, 2),
+            "stress_cvar_95_pct": round(cvar_95, 2),
+            "mean_simulated_impact_pct": round(float(np.mean(rets)), 2),
+            "worst_simulated_impact_pct": round(float(np.min(rets)), 2),
+            "best_simulated_impact_pct": round(float(np.max(rets)), 2),
+            "n_simulations": float(n_simulations),
+        }
+
     def get_report(
         self,
         portfolio: dict[str, Any],
@@ -317,6 +367,7 @@ class MacroStressTest:
                 }
                 for r in results
             ],
+            "monte_carlo_stress": self.run_monte_carlo_stress_test(portfolio),
         }
 
     # ===================== INTERNAL =====================
@@ -326,7 +377,7 @@ class MacroStressTest:
         portfolio: dict[str, Any],
         scenario: str,
         shocks: dict[str, float],
-        description: str = None,
+        description: str | None = None,
     ) -> StressTestResult:
         """Senaryo çalıştır."""
         if description is None:

@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -242,7 +243,14 @@ class MacroFactorDecomposition:
 
         # Residual
         residual = total_return - total_explained
-        residual_pct = residual / abs(total_return) if total_return != 0 else 0
+        residual_pct = residual / abs(total_return) if abs(total_return) > 1e-6 else 0.0
+
+        # Açıklanan oran (R² ve varyans rasyosu esasıyla sınırlandırılmış)
+        if abs(total_return) > 1e-6:
+            raw_explained_pct = (total_explained / total_return) * 100.0
+            bounded_explained = float(np.clip(raw_explained_pct, -100.0, 100.0))
+        else:
+            bounded_explained = 0.0
 
         # En büyük faktör
         if contributions:
@@ -258,7 +266,7 @@ class MacroFactorDecomposition:
             factor_contributions=contributions,
             residual=round(residual, 4),
             residual_pct=round(residual_pct * 100, 2),
-            explained_pct=round((1 - abs(residual_pct)) * 100, 2),
+            explained_pct=round(bounded_explained, 2),
             top_factor=top_factor,
             timestamp=datetime.now(UTC).isoformat(),
         )
@@ -296,6 +304,12 @@ class MacroFactorDecomposition:
         features["factor_positive_count"] = float(pos_count)
         features["factor_negative_count"] = float(neg_count)
         features["factor_net_direction"] = 1.0 if pos_count > neg_count else (-1.0 if neg_count > pos_count else 0.0)
+
+        # En pozitif ve en negatif katkı büyüklükleri
+        contrib_values = [c.contribution for c in result.factor_contributions]
+        if contrib_values:
+            features["factor_max_boost"] = round(max(contrib_values), 4)
+            features["factor_max_drag"] = round(min(contrib_values), 4)
 
         return features
 

@@ -10,12 +10,14 @@ Dinamik sektör-macro hassasiyet — rolling korelasyon:
 KURAL: Sabit hassasiyet yok — her şey rolling korelasyon.
 """
 
+import threading
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
 import numpy as np
 import structlog
+from scipy import stats
 
 logger = structlog.get_logger()
 
@@ -124,6 +126,7 @@ class DynamicSensitivityEngine:
             window: Rolling korelasyon pencere boyutu (gün).
             min_observations: Hesaplama için gereken minimum gözlem sayısı.
         """
+        self._lock = threading.Lock()
         self._window = window
         self._min_observations = min_observations
 
@@ -140,45 +143,48 @@ class DynamicSensitivityEngine:
 
     def __repr__(self) -> str:
         """Dinamik hassasiyet motoru okunabilir string temsili."""
-        return (
-            f"DynamicSensitivityEngine(window={self._window}, "
-            f"min_obs={self._min_observations}, "
-            f"overrides={len(self._company_overrides)}, "
-            f"cached_sectors={len(self._sensitivity_cache)})"
-        )
+        with self._lock:
+            return (
+                f"DynamicSensitivityEngine(window={self._window}, "
+                f"min_obs={self._min_observations}, "
+                f"overrides={len(self._company_overrides)}, "
+                f"cached_sectors={len(self._sensitivity_cache)})"
+            )
 
-    def update(self, sector_returns: dict[str, float], macro_values: dict[str, float]) -> Any:
+    def update(self, sector_returns: dict[str, float], macro_values: dict[str, float]) -> None:
         """Günlük güncelleme — rolling window'a veri ekle.
 
         Args:
             sector_returns: {sector: daily_return}
             macro_values: {macro_var: value} — usdtry_change, rate_change, inflation, vix, oil, gold
         """
-        # Sector returns
-        for sector, ret in sector_returns.items():
-            if sector not in self._sector_returns:
-                self._sector_returns[sector] = []
-            self._sector_returns[sector].append(ret)
-            # Rolling window
-            if len(self._sector_returns[sector]) > self._window * 2:
-                self._sector_returns[sector] = self._sector_returns[sector][-self._window :]
+        with self._lock:
+            # Sector returns
+            for sector, ret in sector_returns.items():
+                if sector not in self._sector_returns:
+                    self._sector_returns[sector] = []
+                self._sector_returns[sector].append(ret)
+                # Rolling window
+                if len(self._sector_returns[sector]) > self._window * 2:
+                    self._sector_returns[sector] = self._sector_returns[sector][-self._window :]
 
-        # Macro values
-        for var, val in macro_values.items():
-            if var not in self._macro_values:
-                self._macro_values[var] = []
-            self._macro_values[var].append(val)
-            if len(self._macro_values[var]) > self._window * 2:
-                self._macro_values[var] = self._macro_values[var][-self._window :]
+            # Macro values
+            for var, val in macro_values.items():
+                if var not in self._macro_values:
+                    self._macro_values[var] = []
+                self._macro_values[var].append(val)
+                if len(self._macro_values[var]) > self._window * 2:
+                    self._macro_values[var] = self._macro_values[var][-self._window :]
 
-        # Cache invalidation
-        self._last_cache_update = None
+            # Cache invalidation
+            self._last_cache_update = None
 
-    def register_company_override(self, ticker: str, sector: str, override: CompanySensitivity) -> Any:
+    def register_company_override(self, ticker: str, sector: str, override: CompanySensitivity) -> None:
         """Şirket bazlı hassasiyet override kaydet."""
         override.ticker = ticker
         override.sector = sector
-        self._company_overrides[ticker] = override
+        with self._lock:
+            self._company_overrides[ticker] = override
 
     def compute_dynamic_sensitivity(self, sector: str) -> SensitivityResult:
         """Sektör için dinamik hassasiyet hesapla — rolling korelasyon.
@@ -338,6 +344,100 @@ class DynamicSensitivityEngine:
             "window_days": self._window,
         }
 
+    def estimate_multivariate_betas(
+        self,
+        sector: str,
+        alpha_ridge: float = 1e-3,
+    ) -> dict[str, float]:
+        """Çok değişkenli Ridge regresyonu ile eşzamanlı ve ortogonalize edilmiş makro betaları hesaplar.
+
+        Tek değişkenli korelasyonların birbiriyle ilişkili makro değişkenler (ör. kur ve faiz)
+        arasında yarattığı çoklu doğrusal bağlantı (multicollinearity) sapmasını önler.
+
+        Args:
+            sector: Sektör adı.
+            alpha_ridge: Tikhonov düzenlileştirme (shrinkage) parametresi (varsayılan: 1e-3).
+
+        Returns:
+            dict[str, float]: Makro faktör başına hesaplanan çok değişkenli beta katsayıları.
+        """
+        macro_keys = ["usdtry_change", "rate_change", "inflation", "vix", "oil_change", "gold_change"]
+        with self._lock:
+            sector_rets = list(self._sector_returns.get(sector, []))
+            macro_data = {k: list(self._macro_values.get(k, [])) for k in macro_keys}
+
+        if len(sector_rets) < self._min_observations:
+            default_res = self._get_default_sensitivity(sector)
+            return {
+                "usdtry": default_res.usdtry_sensitivity,
+                "rate": default_res.rate_sensitivity,
+                "inflation": default_res.inflation_sensitivity,
+                "vix": default_res.vix_sensitivity,
+                "oil": default_res.oil_sensitivity,
+                "gold": default_res.gold_sensitivity,
+            }
+
+        n = min([len(sector_rets)] + [len(v) for v in macro_data.values() if v])
+        if n < self._min_observations:
+            default_res = self._get_default_sensitivity(sector)
+            return {
+                "usdtry": default_res.usdtry_sensitivity,
+                "rate": default_res.rate_sensitivity,
+                "inflation": default_res.inflation_sensitivity,
+                "vix": default_res.vix_sensitivity,
+                "oil": default_res.oil_sensitivity,
+                "gold": default_res.gold_sensitivity,
+            }
+
+        y = np.array(sector_rets[-n:], dtype=np.float64)
+        active_keys = [k for k in macro_keys if len(macro_data[k]) >= n]
+        if not active_keys:
+            default_res = self._get_default_sensitivity(sector)
+            return {
+                "usdtry": default_res.usdtry_sensitivity,
+                "rate": default_res.rate_sensitivity,
+                "inflation": default_res.inflation_sensitivity,
+                "vix": default_res.vix_sensitivity,
+                "oil": default_res.oil_sensitivity,
+                "gold": default_res.gold_sensitivity,
+            }
+
+        X = np.column_stack([np.array(macro_data[k][-n:], dtype=np.float64) for k in active_keys])
+        valid_mask = np.isfinite(y) & np.all(np.isfinite(X), axis=1)
+        X_clean = X[valid_mask]
+        y_clean = y[valid_mask]
+
+        if len(y_clean) < self._min_observations:
+            default_res = self._get_default_sensitivity(sector)
+            return {
+                "usdtry": default_res.usdtry_sensitivity,
+                "rate": default_res.rate_sensitivity,
+                "inflation": default_res.inflation_sensitivity,
+                "vix": default_res.vix_sensitivity,
+                "oil": default_res.oil_sensitivity,
+                "gold": default_res.gold_sensitivity,
+            }
+
+        x_std = np.std(X_clean, axis=0)
+        x_std[x_std == 0] = 1.0
+        X_norm = (X_clean - np.mean(X_clean, axis=0)) / x_std
+        y_norm = y_clean - np.mean(y_clean)
+
+        p = X_norm.shape[1]
+        xtx = X_norm.T @ X_norm + alpha_ridge * np.eye(p)
+        xty = X_norm.T @ y_norm
+        try:
+            betas = np.linalg.solve(xtx, xty)
+        except np.linalg.LinAlgError:
+            betas = np.linalg.pinv(xtx) @ xty
+
+        result: dict[str, float] = {}
+        for k, b in zip(active_keys, betas, strict=False):
+            clean_name = k.replace("_change", "")
+            result[clean_name] = round(float(b), 4)
+
+        return result
+
     def _compute_rolling_corr(
         self,
         sector_returns: list[float],
@@ -376,14 +476,11 @@ class DynamicSensitivityEngine:
         except Exception:
             return 0.0, 1.0
 
-        # p-value (basitleştirilmiş — t-test)
+        # p-value (t-test)
         try:
             n_obs = len(sr)
             if n_obs > 2 and abs(corr) < 1.0:
                 t_stat = corr * np.sqrt((n_obs - 2) / (1 - corr**2))
-                # Basit p-value approximation
-                from scipy import stats
-
                 p_value = float(2 * stats.t.sf(abs(t_stat), n_obs - 2))
             else:
                 p_value = 1.0

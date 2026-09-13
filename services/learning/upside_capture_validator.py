@@ -1,9 +1,16 @@
-# Upside Capture Validator
-# Validates model's ability to capture upside moves
+"""
+ALPHA BIST — Yukarı Yönlü Getiri Yakalama Doğrulayıcısı (Upside Capture Validator v2.0)
+
+Model tahminlerinin yükseliş dönemlerindeki kazançları yakalama (upside capture)
+ve düşüş dönemlerindeki kayıpları sınırlama (downside capture) yetkinliğini ölçer.
+Ayrıca XU100 endeksi trend ve volatilite rejimlerini (BULL, BEAR, SIDEWAYS, HIGH_VOL, LOW_VOL)
+point-in-time güvenliğiyle sınıflandıran pazar rejimi tespit motorunu barındırır.
+"""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 import structlog
@@ -13,7 +20,7 @@ logger = structlog.get_logger(__name__)
 
 @dataclass
 class UpsideCaptureResult:
-    """Result of upside capture analysis."""
+    """Yukarı yönlü getiri yakalama analizi sonuç veri modeli."""
 
     upside_capture_ratio: float
     downside_capture_ratio: float
@@ -24,13 +31,30 @@ class UpsideCaptureResult:
     down_periods_correct: int
     is_valid: bool
 
+    def __repr__(self) -> str:
+        """Yukarı yönlü yakalama sonucunun okunabilir metin temsili."""
+        status = "GEÇERLİ" if self.is_valid else "EŞİK_ALTI"
+        return (
+            f"UpsideCaptureResult(upside={self.upside_capture_ratio:.1%}, "
+            f"downside={self.downside_capture_ratio:.1%}, spread={self.capture_spread:+.1%}, "
+            f"durum={status})"
+        )
+
 
 class UpsideCaptureValidator:
-    """Validates model's ability to capture upside vs downside moves."""
+    """Modelin yükseliş ve düşüş hareketlerini yakalama kabiliyetini doğrulayan motor."""
 
-    def __init__(self, min_capture_ratio: float = 0.5):
-        """Yukarı yönlü getiri yakalama doğrulama motorunu başlatır."""
+    def __init__(self, min_capture_ratio: float = 0.5) -> None:
+        """Yukarı yönlü getiri yakalama doğrulama motorunu başlatır.
+
+        Args:
+            min_capture_ratio: Asgari kabul edilebilir yukarı yönlü yakalama oranı (varsayılan: 0.50).
+        """
         self.min_capture_ratio = min_capture_ratio
+
+    def __repr__(self) -> str:
+        """Doğrulayıcının okunabilir metin temsili."""
+        return f"UpsideCaptureValidator(min_capture_ratio={self.min_capture_ratio:.1%})"
 
     def validate(
         self,
@@ -38,28 +62,28 @@ class UpsideCaptureValidator:
         actual_returns: np.ndarray,
         threshold: float = 0.0,
     ) -> UpsideCaptureResult:
-        """Validate upside capture ratio.
+        """Yukarı ve aşağı yönlü getiri yakalama oranlarını hesaplar ve doğrular.
 
         Args:
-            predictions: Model predictions (positive = bullish)
-            actual_returns: Actual returns
-            threshold: Threshold for classification
+            predictions: Model tahminleri (pozitif = yükseliş beklentisi).
+            actual_returns: Gerçekleşen getiri dizisi.
+            threshold: Yön sınıflandırması için referans eşik değeri (varsayılan: 0.0).
 
         Returns:
-            UpsideCaptureResult with capture metrics
+            UpsideCaptureResult: Yakalama oranları, dönem adetleri ve geçerlilik sonucu.
         """
-        # Up periods (actual return > 0)
+        # Yükseliş ve düşüş maskeleri
         up_mask = actual_returns > threshold
         down_mask = actual_returns <= threshold
 
         up_total = int(np.sum(up_mask))
         down_total = int(np.sum(down_mask))
 
-        # Correct predictions
+        # Doğru tahmin sayıları
         up_correct = int(np.sum(predictions[up_mask] > threshold)) if up_total > 0 else 0
         down_correct = int(np.sum(predictions[down_mask] <= threshold)) if down_total > 0 else 0
 
-        # Capture ratios
+        # Yakalama oranları
         upside_capture = up_correct / up_total if up_total > 0 else 0.0
         downside_capture = down_correct / down_total if down_total > 0 else 0.0
         capture_spread = upside_capture - downside_capture
@@ -79,41 +103,39 @@ class UpsideCaptureValidator:
 
         if not is_valid:
             logger.warning(
-                "Upside capture below threshold",
-                upside_capture=upside_capture,
+                "Yukarı yönlü yakalama oranı eşiğin altında kaldı",
+                upside_capture=round(upside_capture, 4),
                 threshold=self.min_capture_ratio,
             )
 
         return result
 
 
-# Singleton
+# Global Tekil Örnek
 upside_capture_validator = UpsideCaptureValidator()
 
 
 def detect_market_regime_v2(
-    xu100_close: np.ndarray | object,
-    current_date: object,
+    xu100_close: np.ndarray | Any,
+    current_date: Any,
     short_window: int = 20,
     long_window: int = 60,
     vol_window: int = 20,
 ) -> str:
-    """Detect market regime using trend and volatility analysis.
-
-    V2: Includes V-Dip recovery detection.
+    """Trend ve volatilite analizine dayalı olarak piyasa rejimini belirler.
 
     Args:
-        xu100_close: XU100 closing prices (array or Series)
-        current_date: Current date for filtering
-        short_window: Short-term MA window
-        long_window: Long-term MA window
-        vol_window: Volatility calculation window
+        xu100_close: XU100 kapanış fiyat dizisi veya serisi.
+        current_date: Point-in-time filtreleme için referans tarih.
+        short_window: Kısa vadeli hareketli ortalama penceresi (varsayılan: 20 gün).
+        long_window: Uzun vadeli hareketli ortalama penceresi (varsayılan: 60 gün).
+        vol_window: Volatilite hesaplama penceresi (varsayılan: 20 gün).
 
     Returns:
-        Regime string: BULL_TREND, BEAR_TREND, SIDEWAYS, HIGH_VOL, LOW_VOL
+        str: Piyasa rejimi etiketi (BULL_TREND, BEAR_TREND, HIGH_VOL, LOW_VOL, SIDEWAYS).
     """
     try:
-        if hasattr(xu100_close, "filter"):
+        if hasattr(xu100_close, "filter") and hasattr(xu100_close, "index"):
             hist = xu100_close.filter(xu100_close.index <= current_date)
         else:
             hist = xu100_close
@@ -125,30 +147,29 @@ def detect_market_regime_v2(
         if len(prices) < long_window:
             return "SIDEWAYS"
 
-        # Moving averages
-        sma_short = np.mean(prices[-short_window:])
-        sma_long = np.mean(prices)
-        current_price = prices[-1]
+        # Hareketli ortalamalar
+        sma_short = float(np.mean(prices[-short_window:]))
+        sma_long = float(np.mean(prices))
+        current_price = float(prices[-1])
 
-        # Volatility
+        # Yıllıklandırılmış volatilite
         returns = np.diff(np.log(prices[-vol_window:]))
-        volatility = np.std(returns) * np.sqrt(252) if len(returns) > 1 else 0.0
+        volatility = float(np.std(returns) * np.sqrt(252)) if len(returns) > 1 else 0.0
 
-        # Trend detection
+        # Trend gücü
         trend_strength = (sma_short - sma_long) / sma_long if sma_long > 0 else 0.0
 
-        # Regime classification
+        # Rejim sınıflandırma hiyerarşisi
         if volatility > 0.35:
             return "HIGH_VOL"
-        elif volatility < 0.12:
+        if volatility < 0.12:
             return "LOW_VOL"
-        elif trend_strength > 0.02 and current_price > sma_short:
+        if trend_strength > 0.02 and current_price > sma_short:
             return "BULL_TREND"
-        elif trend_strength < -0.02 and current_price < sma_short:
+        if trend_strength < -0.02 and current_price < sma_short:
             return "BEAR_TREND"
-        else:
-            return "SIDEWAYS"
+        return "SIDEWAYS"
 
     except Exception as e:
-        logger.warning("Regime detection failed", error=str(e))
+        logger.warning("Piyasa rejimi tespiti başarısız oldu, varsayılan SIDEWAYS döndürülüyor", hata=str(e))
         return "SIDEWAYS"

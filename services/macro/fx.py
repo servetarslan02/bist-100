@@ -160,6 +160,35 @@ def compute_fx_features(fx_data: dict[str, Any]) -> dict[str, float]:
     return features
 
 
+def estimate_inflation_passthrough(
+    fx_change_pct: float,
+    horizon_months: int = 12,
+    passthrough_coeff: float = 0.28,
+) -> dict[str, float]:
+    """TCMB ampirik modelleri doğrultusunda kur hareketinin enflasyona geçişkenliğini modeller.
+
+    Türkiye ekonomisinde kur geçişkenliği (FX pass-through) katsayısı tarihsel olarak
+    12 aylık birikimli ufukta %25 - %35 aralığında (ortalama ~0.28) gerçekleşmektedir.
+
+    Args:
+        fx_change_pct: Kurlardaki yüzde değişim (ör. %10 kur artışı için 10.0).
+        horizon_months: Geçişkenliğin yansıma ufku (ay).
+        passthrough_coeff: Toplam geçişkenlik katsayısı (varsayılan: 0.28).
+
+    Returns:
+        dict[str, float]: Enflasyona beklenen doğrudan ve dolaylı ek katkı puanı.
+    """
+    total_impact_bps = fx_change_pct * passthrough_coeff
+    monthly_impact = total_impact_bps / max(horizon_months, 1)
+
+    return {
+        "cumulative_inflation_impact_pp": round(total_impact_bps, 3),
+        "monthly_runrate_impact_pp": round(monthly_impact, 3),
+        "horizon_months": float(horizon_months),
+        "passthrough_coefficient": float(passthrough_coeff),
+    }
+
+
 __all__ = [
     "DEFAULT_FX_REGIME_SHOCK",
     "DEFAULT_FX_REGIME_STRONG_WEAKENING",
@@ -167,6 +196,7 @@ __all__ = [
     "DEFAULT_FX_REGIME_STABLE",
     "DEFAULT_FX_REGIME_STRENGTHENING",
     "compute_fx_features",
+    "estimate_inflation_passthrough",
 ]
 
 

@@ -135,19 +135,55 @@ def compute_tcmb_features(tcmb_data: dict[str, Any]) -> dict[str, float]:
         real_rate_val = features.get("tcmb_real_rate")
         if real_rate_val is not None:
             if real_rate_val > DEFAULT_TCMB_STANCE_VERY_TIGHT:
-                stance = 2.0  # ÇOK SIKI (> 3.0%)
+                stance = 2.0  # ÇOK SIKI
             elif real_rate_val > DEFAULT_TCMB_STANCE_TIGHT:
-                stance = 1.0  # SIKI (> 0.0%)
+                stance = 1.0  # SIKI
+            elif real_rate_val >= DEFAULT_TCMB_STANCE_NEUTRAL:
+                stance = 0.0  # NÖTR
             elif real_rate_val > DEFAULT_TCMB_STANCE_LOOSE:
-                stance = -1.0  # GEVŞEK (> -3.0%)
+                stance = -1.0  # GEVŞEK
             else:
-                stance = -2.0  # ÇOK GEVŞEK (<= -3.0%)
+                stance = -2.0  # ÇOK GEVŞEK
             features["tcmb_policy_stance"] = stance
 
     except Exception as e:
         logger.error("TCMB kurumsal analitik hesaplaması başarısız oldu", error=str(e))
 
     return features
+
+
+def estimate_ppk_probability_distribution(
+    expected_rate: float,
+    current_rate: float,
+    survey_std: float = 1.25,
+) -> dict[str, float]:
+    """Piyasa beklenti anketi ve dağılımından PPK faiz kararı olasılık dağılımını hesaplar.
+
+    Args:
+        expected_rate: Piyasa medyan politika faizi beklentisi (%).
+        current_rate: Mevcut politika faizi (%).
+        survey_std: Beklenti anket standart sapması (varsayılan: 1.25).
+
+    Returns:
+        dict[str, float]: Faiz artırımı, sabit tutma ve faiz indirimi ihtimalleri (%).
+    """
+    from scipy import stats
+
+    std = max(survey_std, 0.25)
+    # Eşik: ±125 bps bant
+    upper_threshold = current_rate + 0.5
+    lower_threshold = current_rate - 0.5
+
+    p_cut = float(stats.norm.cdf(lower_threshold, loc=expected_rate, scale=std))
+    p_hike = float(1.0 - stats.norm.cdf(upper_threshold, loc=expected_rate, scale=std))
+    p_hold = float(max(0.0, 1.0 - p_cut - p_hike))
+
+    return {
+        "prob_rate_cut_pct": round(p_cut * 100.0, 2),
+        "prob_rate_hold_pct": round(p_hold * 100.0, 2),
+        "prob_rate_hike_pct": round(p_hike * 100.0, 2),
+        "expected_rate_change_bps": round((expected_rate - current_rate) * 100.0, 1),
+    }
 
 
 __all__ = [
@@ -157,6 +193,7 @@ __all__ = [
     "DEFAULT_TCMB_STANCE_LOOSE",
     "DEFAULT_TCMB_SURPRISE_THRESHOLD",
     "compute_tcmb_features",
+    "estimate_ppk_probability_distribution",
 ]
 
 

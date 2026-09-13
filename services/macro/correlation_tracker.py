@@ -10,6 +10,7 @@ Makro değişkenler arası korelasyon takibi:
 KURAL: Korelasyon zamanla değişir — rolling window ile takip et.
 """
 
+import threading
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -86,6 +87,7 @@ class MacroCorrelationTracker:
 
         Değişken geçmişi, zaman damgaları ve korelasyon serilerini ilklendirir.
         """
+        self._lock = threading.Lock()
         self._window = macro_config.correlation.window_days
         self._history: dict[str, list[float]] = {}
         self._timestamps: dict[str, list[str]] = {}
@@ -94,13 +96,14 @@ class MacroCorrelationTracker:
 
     def __repr__(self) -> str:
         """Makro korelasyon motoru okunabilir string temsili."""
-        return (
-            f"MacroCorrelationTracker(window={self._window}, "
-            f"variables={len(self._history)}, "
-            f"tracked_corrs={len(self._correlation_history)})"
-        )
+        with self._lock:
+            return (
+                f"MacroCorrelationTracker(window={self._window}, "
+                f"variables={len(self._history)}, "
+                f"tracked_corrs={len(self._correlation_history)})"
+            )
 
-    def update(self, macro_data: dict[str, float]) -> Any:
+    def update(self, macro_data: dict[str, float]) -> None:
         """Günlük veri güncelle.
 
         Args:
@@ -108,18 +111,19 @@ class MacroCorrelationTracker:
         """
         now = datetime.now(UTC).isoformat()
 
-        for key, value in macro_data.items():
-            if key not in self._history:
-                self._history[key] = []
-                self._timestamps[key] = []
+        with self._lock:
+            for key, value in macro_data.items():
+                if key not in self._history:
+                    self._history[key] = []
+                    self._timestamps[key] = []
 
-            self._history[key].append(value)
-            self._timestamps[key].append(now)
+                self._history[key].append(value)
+                self._timestamps[key].append(now)
 
-            # Rolling window
-            if len(self._history[key]) > self._window * 2:
-                self._history[key] = self._history[key][-self._window * 2 :]
-                self._timestamps[key] = self._timestamps[key][-self._window * 2 :]
+                # Rolling window
+                if len(self._history[key]) > self._window * 2:
+                    self._history[key] = self._history[key][-self._window * 2 :]
+                    self._timestamps[key] = self._timestamps[key][-self._window * 2 :]
 
     def _calc_ewma_corr(self, x: np.ndarray, y: np.ndarray, decay: float = 0.94) -> float:
         """RiskMetrics standardı EWMA (Exponentially Weighted Moving Average) korelasyonu."""

@@ -140,10 +140,13 @@ class SovereignCDSEngine:
         cds_1y = float(cds_data.get("cds_1y", 0.0))
         cds_10y = float(cds_data.get("cds_10y", 0.0))
         slope = 0.0
+        curvature = 0.0
         inverted = False
         if cds_1y > 0:
             slope = cds_5y - cds_1y
             inverted = cds_1y > cds_5y  # Kısa vadenin uzun vadeden yüksek olması = Akut kriz / Inversion
+        if cds_1y > 0 and cds_10y > 0:
+            curvature = (2.0 * cds_5y) - cds_1y - cds_10y
 
         # Tarihsel İstatistikler
         history = cds_data.get("cds_history", [])
@@ -166,7 +169,7 @@ class SovereignCDSEngine:
                     ret_20 = np.diff(np.log(hist_arr[-21:]))
                     vol_20d = float(np.std(ret_20) * np.sqrt(252) * 100.0)
 
-                percentile = float(sum(1 for v in hist_arr if v <= cds_5y) / len(hist_arr))
+                percentile = float(sum(1 for v in hist_arr if v <= cds_5y) / max(len(hist_arr), 1))
 
         # Risk Seviyesi Sınıflandırması
         if cds_5y < DEFAULT_CDS_RISK_LOW:
@@ -188,6 +191,8 @@ class SovereignCDSEngine:
         # Piyasa Stres Bayrağı
         stress_flag = bool(cds_5y >= DEFAULT_CDS_RISK_HIGH or zscore > 2.0 or inverted)
 
+        change_bps = (cds_5y - float(cds_prev)) if (cds_prev and float(cds_prev) > 0) else 0.0
+
         return CDSMetricsResult(
             cds_5y=round(cds_5y, 2),
             risk_level=level.value,
@@ -206,8 +211,33 @@ class SovereignCDSEngine:
             additional_metrics={
                 "recovery_rate": self.recovery_rate,
                 "cds_10y": round(cds_10y, 2),
+                "cds_change_bps": round(change_bps, 2),
+                "cds_curve_curvature": round(curvature, 2),
             },
         )
+
+    def estimate_equity_impact(
+        self,
+        cds_change_bps: float,
+        beta_xbank: float = -0.045,
+        beta_xu100: float = -0.028,
+    ) -> dict[str, float]:
+        """CDS spread değişiminin BIST 100 ve Bankacılık endeksine beklenen etkisini modeller.
+
+        Args:
+            cds_change_bps: CDS değişim miktarı (baz puan cinsinden, ör. +50 bps).
+            beta_xbank: Bankacılık endeksi duyarlılık katsayısı (% getiri / 100 bps CDS).
+            beta_xu100: BIST 100 endeksi duyarlılık katsayısı (% getiri / 100 bps CDS).
+
+        Returns:
+            dict[str, float]: Beklenen yüzde getiri şoku tahminleri.
+        """
+        bps_scaled = cds_change_bps / 100.0
+        return {
+            "expected_xbank_impact_pct": round(bps_scaled * beta_xbank * 100.0, 3),
+            "expected_xu100_impact_pct": round(bps_scaled * beta_xu100 * 100.0, 3),
+            "risk_premium_shock_pct": round(bps_scaled * 0.015 * 100.0, 3),
+        }
 
 
 cds_engine = SovereignCDSEngine()
@@ -220,7 +250,7 @@ def compute_cds_features(cds_data: dict[str, Any]) -> dict[str, float]:
     if metrics.cds_5y <= 0:
         return {}
 
-    return {
+    features = {
         "cds_5y": metrics.cds_5y,
         "cds_risk_level": metrics.risk_numeric_score,
         "cds_implied_default_prob": metrics.implied_default_prob_5y,
@@ -235,6 +265,16 @@ def compute_cds_features(cds_data: dict[str, Any]) -> dict[str, float]:
         "cds_curve_inverted": 1.0 if metrics.curve_inverted else 0.0,
         "cds_market_stress_flag": 1.0 if metrics.market_stress_flag else 0.0,
     }
+
+    change_bps = metrics.additional_metrics.get("cds_change_bps")
+    if change_bps is not None:
+        features["cds_change_bps"] = float(change_bps)
+
+    curvature = metrics.additional_metrics.get("cds_curve_curvature")
+    if curvature is not None:
+        features["cds_curve_curvature"] = float(curvature)
+
+    return features
 
 
 __all__ = [

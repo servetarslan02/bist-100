@@ -10,6 +10,7 @@ Makro şok etki analizi + decay modeli:
 KURAL: Etki zamanla azalır — half-life modeli.
 """
 
+import threading
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -83,18 +84,20 @@ class MacroImpactAnalyzer:
 
         Şok olay geçmişi listesini ilklendirir.
         """
+        self._lock = threading.Lock()
         self._shock_history: list[ShockEvent] = []
 
     def __repr__(self) -> str:
         """Makro şok etki analiz motoru okunabilir string temsili."""
-        return f"MacroImpactAnalyzer(recorded_shocks={len(self._shock_history)})"
+        with self._lock:
+            return f"MacroImpactAnalyzer(recorded_shocks={len(self._shock_history)})"
 
     def record_shock(
         self,
         shock_type: str,
         magnitude: float,
         indicator: str,
-    ) -> Any:
+    ) -> None:
         """Şok olayı kaydet."""
         cfg = macro_config.decay
         half_life = cfg.half_life_by_shock_type.get(shock_type, cfg.default_half_life_days)
@@ -106,9 +109,10 @@ class MacroImpactAnalyzer:
             indicator=indicator,
             half_life_days=half_life,
         )
-        self._shock_history.append(event)
-        if len(self._shock_history) > 1000:
-            self._shock_history = self._shock_history[-1000:]
+        with self._lock:
+            self._shock_history.append(event)
+            if len(self._shock_history) > 1000:
+                self._shock_history = self._shock_history[-1000:]
 
         logger.warning(
             "Macro shock recorded", shock_type=shock_type, magnitude=magnitude, indicator=indicator, half_life=half_life
@@ -152,13 +156,16 @@ class MacroImpactAnalyzer:
         self,
         ticker: str,
         sector: str,
-    ) -> dict[str, float]:
+    ) -> dict[str, Any]:
         """Tüm aktif şokların birikimli etkisini hesapla."""
         now = datetime.now(UTC)
         total_impact = 0.0
         shock_impacts = {}
 
-        for shock in self._shock_history:
+        with self._lock:
+            shocks_copy = list(self._shock_history)
+
+        for shock in shocks_copy:
             shock_time = datetime.fromisoformat(shock.timestamp)
             days_elapsed = (now - shock_time).days
 
@@ -216,9 +223,9 @@ class MacroImpactAnalyzer:
 
     def get_shock_report(self) -> dict[str, Any]:
         """Şok raporu."""
-        return {
-            "total_shocks": len(self._shock_history),
-            "recent_shocks": [
+        with self._lock:
+            total_shocks = len(self._shock_history)
+            recent = [
                 {
                     "type": s.shock_type,
                     "magnitude": s.magnitude,
@@ -227,7 +234,10 @@ class MacroImpactAnalyzer:
                     "half_life": s.half_life_days,
                 }
                 for s in self._shock_history[-10:]
-            ],
+            ]
+        return {
+            "total_shocks": total_shocks,
+            "recent_shocks": recent,
         }
 
 

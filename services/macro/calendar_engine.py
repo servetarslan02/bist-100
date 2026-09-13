@@ -11,6 +11,7 @@ Makro takvim entegrasyonu — otomatik tetikleme:
 KURAL: Olay öncesi beklenti topla, olay sonrası surprise hesapla.
 """
 
+import threading
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -89,18 +90,20 @@ class MacroCalendarEngine:
 
         Olay listesini ve piyasa beklentilerini ilklendirir, tanımlı makro olayları yükler.
         """
+        self._lock = threading.Lock()
         self._events: list[MacroEvent] = []
         self._expectations: dict[str, float] = {}  # event_id → expected
         self._initialize_events()
 
     def __repr__(self) -> str:
         """Makro takvim motoru okunabilir string temsili."""
-        return (
-            f"MacroCalendarEngine(total_events={len(self._events)}, "
-            f"expectations={len(self._expectations)})"
-        )
+        with self._lock:
+            return (
+                f"MacroCalendarEngine(total_events={len(self._events)}, "
+                f"expectations={len(self._expectations)})"
+            )
 
-    def _initialize_events(self) -> Any:
+    def _initialize_events(self) -> None:
         """Takvim olaylarını başlat."""
         year = datetime.now(UTC).year
 
@@ -136,54 +139,95 @@ class MacroCalendarEngine:
         cutoff = now + timedelta(days=days)
 
         upcoming = []
-        for event in self._events:
-            event_date = datetime.strptime(event.date, "%Y-%m-%d")
-            if now.date() <= event_date.date() <= cutoff.date():
-                upcoming.append(event)
+        with self._lock:
+            for event in self._events:
+                event_date = datetime.strptime(event.date, "%Y-%m-%d")
+                if now.date() <= event_date.date() <= cutoff.date():
+                    upcoming.append(event)
 
         return sorted(upcoming, key=lambda e: e.date)
 
-    def register_expectation(self, event_id: str, expected: float) -> Any:
+    def register_expectation(self, event_id: str, expected: float) -> None:
         """Beklenti kaydet."""
-        self._expectations[event_id] = expected
+        with self._lock:
+            self._expectations[event_id] = expected
 
-        # Event'i güncelle
-        for event in self._events:
-            if event.event_id == event_id:
-                event.expected_value = expected
-                break
+            # Event'i güncelle
+            for event in self._events:
+                if event.event_id == event_id:
+                    event.expected_value = expected
+                    break
 
         logger.info("Expectation registered", event_id=event_id, expected=expected)
 
     def complete_event(self, event_id: str, actual: float) -> MacroEvent | None:
         """Olay tamamlandı — actual değeri kaydet."""
-        for event in self._events:
-            if event.event_id == event_id:
-                event.actual_value = actual
-                event.status = "COMPLETED"
+        with self._lock:
+            for event in self._events:
+                if event.event_id == event_id:
+                    event.actual_value = actual
+                    event.status = "COMPLETED"
 
-                # Surprise hesapla
-                if event.expected_value is not None:
-                    event.surprise = actual - event.expected_value
-                    event.status = "ANALYZED"
+                    # Surprise hesapla
+                    if event.expected_value is not None:
+                        event.surprise = actual - event.expected_value
+                        event.status = "ANALYZED"
 
-                    logger.warning(
-                        "Macro event completed with surprise",
-                        event_id=event_id,
-                        expected=event.expected_value,
-                        actual=actual,
-                        surprise=event.surprise,
-                    )
-                else:
-                    logger.info("Macro event completed (no expectation)", event_id=event_id, actual=actual)
+                        logger.warning(
+                            "Macro event completed with surprise",
+                            event_id=event_id,
+                            expected=event.expected_value,
+                            actual=actual,
+                            surprise=event.surprise,
+                        )
+                    else:
+                        logger.info("Macro event completed (no expectation)", event_id=event_id, actual=actual)
 
-                return event
+                    return event
 
         return None
 
+    def compute_calendar_proximity_features(self, target_date_str: str | None = None) -> dict[str, float]:
+        """TCMB PPK ve FOMC toplantılarına yakınlık metriklerini ve binary risk göstergelerini hesaplar.
+
+        Args:
+            target_date_str: Hedef tarih (YYYY-MM-DD), None ise güncel UTC tarihi.
+
+        Returns:
+            dict[str, float]: Gün sayıları ve risk bayrakları sözlüğü.
+        """
+        if target_date_str:
+            ref_date = datetime.strptime(target_date_str, "%Y-%m-%d").date()
+        else:
+            ref_date = datetime.now(UTC).date()
+
+        days_to_ppk: float = 999.0
+        days_to_fomc: float = 999.0
+
+        for d in self.TCMB_PPK_DATES:
+            dt = datetime.strptime(d, "%Y-%m-%d").date()
+            diff = (dt - ref_date).days
+            if diff >= 0 and diff < days_to_ppk:
+                days_to_ppk = float(diff)
+
+        for d in self.FOMC_DATES:
+            dt = datetime.strptime(d, "%Y-%m-%d").date()
+            diff = (dt - ref_date).days
+            if diff >= 0 and diff < days_to_fomc:
+                days_to_fomc = float(diff)
+
+        high_impact_near = 1.0 if (days_to_ppk <= 3.0 or days_to_fomc <= 2.0) else 0.0
+
+        return {
+            "calendar_days_to_ppk": days_to_ppk,
+            "calendar_days_to_fomc": days_to_fomc,
+            "calendar_high_impact_imminent": high_impact_near,
+        }
+
     def get_pre_event_alert(self, event_id: str) -> dict[str, Any]:
         """Olay öncesi hazırlık uyarısı."""
-        event = next((e for e in self._events if e.event_id == event_id), None)
+        with self._lock:
+            event = next((e for e in self._events if e.event_id == event_id), None)
         if not event:
             return {"error": "Event not found"}
 
@@ -205,7 +249,8 @@ class MacroCalendarEngine:
 
     def get_post_event_analysis(self, event_id: str) -> dict[str, Any]:
         """Olay sonrası analiz."""
-        event = next((e for e in self._events if e.event_id == event_id), None)
+        with self._lock:
+            event = next((e for e in self._events if e.event_id == event_id), None)
         if not event or event.status != "ANALYZED":
             return {"error": "Event not analyzed"}
 
@@ -225,11 +270,14 @@ class MacroCalendarEngine:
         now = datetime.now(UTC)
 
         upcoming = self.get_upcoming_events(days=30)
-        completed = [e for e in self._events if e.status == "COMPLETED"]
-        analyzed = [e for e in self._events if e.status == "ANALYZED"]
+        with self._lock:
+            total_events = len(self._events)
+            completed = [e for e in self._events if e.status == "COMPLETED"]
+            analyzed = [e for e in self._events if e.status == "ANALYZED"]
+            exp_len = len(self._expectations)
 
         return {
-            "total_events": len(self._events),
+            "total_events": total_events,
             "upcoming_30d": len(upcoming),
             "completed": len(completed),
             "analyzed": len(analyzed),
@@ -241,7 +289,7 @@ class MacroCalendarEngine:
             }
             if upcoming
             else None,
-            "expectations_set": len(self._expectations),
+            "expectations_set": exp_len,
         }
 
 
