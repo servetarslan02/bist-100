@@ -32,47 +32,95 @@ __all__ = [
 
 
 def compute_job_features(job_data: dict[str, Any], ticker: str) -> dict[str, float]:
-    """İş ilanı feature'larını hesapla.
+    """İş ilanı ve istihdam talebi ham verisinden kurumsal büyüme göstergelerini hesaplar.
 
-    Geriye dönük uyumluluk ve hızlı hesaplama fonksiyonu.
+    Hesaplanan Göstergeler:
+    - job_posting_growth: İlan adedi büyüme hızı (%)
+    - job_hiring_velocity: İstihdam ivmesi (aylık ilan artış hızındaki ivmelenme)
+    - tech_hiring_pct: Mühendislik, Ar-Ge ve teknoloji pozisyon oranı (%)
+    - avg_salary_change: Teklif edilen maaş değişim/enflasyon oranı (%)
+    - layoff_signal: İşten çıkarma / tensikat riski sinyali (0 veya 1)
+    - job_posting_count: Toplam aktif açık pozisyon sayısı
+    - job_remote_ratio: Uzaktan / hibrit çalışma esnekliği oranı
+    - job_expansion_ratio: Yeni pozisyon / büyüme odaklı işe alım oranı
+    - job_retention_score: Tahmini çalışan bağlılığı / elde tutma skoru (0-1)
+    - job_headcount_regime: 0 (Küçülme/Tensikat), 1 (Dondurma), 2 (Normal), 3 (Agresif Büyüme)
 
     Args:
-        job_data: İş ilanı ham verisi (Kariyer.net veya diğer kaynaklardan).
-        ticker: Hisse sembolü.
+        job_data: Kariyer portalları veya şirket istihdam verilerini içeren sözlük.
+        ticker: İlgili BIST hisse sembolü.
 
     Returns:
-        Feature sözlüğü. Her değer float tipindedir.
+        dict[str, float]: Hesaplanmış kurumsal istihdam göstergeleri sözlüğü.
     """
     features: dict[str, float] = {}
 
     if not job_data:
         return features
 
-    key_feature_map = {
-        "posting_growth": "job_posting_growth",
-        "tech_hiring_pct": "tech_hiring_pct",
-        "salary_change": "avg_salary_change",
-        "posting_count": "job_posting_count",
-        "remote_ratio": "job_remote_ratio",
-        "retention_score": "job_retention_score",
-    }
-    for key, feature_name in key_feature_map.items():
-        value = job_data.get(key)
-        if value is not None:
-            try:
-                features[feature_name] = float(value)
-            except (TypeError, ValueError):
-                logger.debug("Skipping non-numeric value", feature=feature_name, value=value)
+    try:
+        # 1. İlan Sayısı ve Büyüme Hızı
+        count_val = job_data.get("posting_count") or job_data.get("job_posting_count")
+        if count_val is not None:
+            features["job_posting_count"] = round(float(count_val), 0)
 
-    # İşten çıkarma sinyali
-    layoff_val = job_data.get("layoff")
-    if layoff_val is not None:
-        features["layoff_signal"] = 1.0 if layoff_val is True or layoff_val == 1 else 0.0
-    elif "layoff_signal" in job_data:
-        try:
-            features["layoff_signal"] = float(job_data["layoff_signal"])
-        except (TypeError, ValueError):
-            features["layoff_signal"] = 0.0
+        growth_val = job_data.get("posting_growth") or job_data.get("job_posting_growth")
+        if growth_val is not None:
+            features["job_posting_growth"] = round(float(growth_val), 2)
+
+        # 2. İşe Alım İvmesi (Hiring Velocity)
+        prev_growth = job_data.get("prev_posting_growth")
+        if growth_val is not None and prev_growth is not None:
+            features["job_hiring_velocity"] = round(float(growth_val) - float(prev_growth), 2)
+
+        # 3. Teknoloji ve Ar-Ge Pozisyon Yoğunluğu
+        tech_val = job_data.get("tech_hiring_pct")
+        if tech_val is not None:
+            features["tech_hiring_pct"] = round(float(tech_val), 4)
+
+        # 4. Maaş Değişimi ve Maliyet Baskısı
+        salary_val = job_data.get("salary_change") or job_data.get("avg_salary_change")
+        if salary_val is not None:
+            features["avg_salary_change"] = round(float(salary_val), 2)
+
+        # 5. Uzaktan Çalışma Oranı
+        remote_val = job_data.get("remote_ratio") or job_data.get("job_remote_ratio")
+        if remote_val is not None:
+            features["job_remote_ratio"] = round(float(remote_val), 4)
+
+        # 6. Büyüme vs Ayrılanın Yerini Doldurma Oranı (Expansion vs Replacement)
+        expansion_val = job_data.get("expansion_ratio") or job_data.get("job_expansion_ratio")
+        if expansion_val is not None:
+            features["job_expansion_ratio"] = round(float(expansion_val), 4)
+
+        # 7. Çalışan Elde Tutma Skoru
+        retention_val = job_data.get("retention_score") or job_data.get("job_retention_score")
+        if retention_val is not None:
+            features["job_retention_score"] = round(max(0.0, min(1.0, float(retention_val))), 4)
+
+        # 8. İşten Çıkarma / Tensikat Sinyali
+        layoff_val = job_data.get("layoff") or job_data.get("layoff_signal")
+        if layoff_val is not None:
+            is_layoff = 1.0 if layoff_val is True or layoff_val in (1, "1", "true", "TRUE") else 0.0
+            features["layoff_signal"] = is_layoff
+
+        # 9. İstihdam Rejimi
+        is_layoff_flag = features.get("layoff_signal", 0.0) == 1.0
+        growth = features.get("job_posting_growth", 0.0)
+
+        if is_layoff_flag or growth < -25.0:
+            regime = 0.0  # TENSİKAT / KÜÇÜLME REJİMİ
+        elif growth < -5.0:
+            regime = 1.0  # İSTİHDAM DONDURMA / DOĞAL ERİME
+        elif growth < 20.0:
+            regime = 2.0  # DENGELİ / RUTİN İSTİHDAM
+        else:
+            regime = 3.0  # AGRESİF KAPASİTE ARTIŞI / BÜYÜME
+
+        features["job_headcount_regime"] = regime
+
+    except Exception as e:
+        logger.error("İş ilanı gösterge hesaplaması başarısız oldu", ticker=ticker, error=str(e))
 
     return features
 
@@ -112,10 +160,9 @@ class JobPostingAdapter(BaseAdapter):
                 if isinstance(data, dict):
                     return data
             except Exception as e:
-                logger.warning("Custom job data provider error", ticker=ticker, error=str(e))
+                logger.warning("Özel iş ilanı sağlayıcısı hatası", ticker=ticker, error=str(e))
                 return None
 
-        # Harici sağlayıcı yoksa sahte veri üretme, None dön
         return None
 
     def compute_features(self, data: dict[str, Any], ticker: str) -> dict[str, float]:
@@ -134,5 +181,5 @@ class JobPostingAdapter(BaseAdapter):
         return f"JobPostingAdapter(source={self.source_name!r}, rate_limit={self.rate_limit})"
 
 
-# Singleton instance
 jobs_adapter = JobPostingAdapter()
+

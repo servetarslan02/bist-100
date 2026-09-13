@@ -79,7 +79,7 @@ class GoogleTrendsAdapter(BaseAdapter):
 
                 self._pytrends = TrendReq(hl="tr-TR", tz=180)
             except ImportError:
-                logger.warning("pytrends not installed. Install with: pip install pytrends")
+                logger.warning("pytrends kütüphanesi yüklü değil. Kurulum için: uv add pytrends")
                 return None
         return self._pytrends
 
