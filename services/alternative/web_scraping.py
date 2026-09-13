@@ -32,6 +32,18 @@ __all__ = [
 ]
 
 
+def _safe_float(val: Any) -> float | None:
+    """Değeri güvenli float'a çevirir, geçersiz string veya NaN/Inf durumunda None döndürür."""
+    if val is None:
+        return None
+    try:
+        f = float(val)
+        import math
+        return None if (math.isnan(f) or math.isinf(f)) else f
+    except (ValueError, TypeError):
+        return None
+
+
 def compute_web_features(scraped_data: dict[str, Any], ticker: str) -> dict[str, float]:
     """Web scraping ham verisinden kurumsal düzeyde dijital ayak izi feature'larını hesapla.
 
@@ -64,57 +76,57 @@ def compute_web_features(scraped_data: dict[str, Any], ticker: str) -> dict[str,
 
     try:
         # 1. Web Trafiği ve İvmesi
-        traffic_change = scraped_data.get("web_traffic_change") or scraped_data.get("traffic_growth")
+        traffic_change = _safe_float(scraped_data.get("web_traffic_change") or scraped_data.get("traffic_growth"))
         if traffic_change is not None:
-            features["web_traffic_change"] = round(float(traffic_change), 2)
-            prev_traffic = scraped_data.get("prev_web_traffic_change")
+            features["web_traffic_change"] = round(traffic_change, 2)
+            prev_traffic = _safe_float(scraped_data.get("prev_web_traffic_change"))
             if prev_traffic is not None:
-                features["web_traffic_velocity"] = round(float(traffic_change) - float(prev_traffic), 2)
+                features["web_traffic_velocity"] = round(traffic_change - prev_traffic, 2)
 
         # 2. Arama Motoru İlgisi ve Bileşik Trafik Momentumu
-        search_change = scraped_data.get("search_volume_change") or scraped_data.get("search_growth")
+        search_change = _safe_float(scraped_data.get("search_volume_change") or scraped_data.get("search_growth"))
         if search_change is not None:
-            features["search_volume_change"] = round(float(search_change), 2)
+            features["search_volume_change"] = round(search_change, 2)
             if traffic_change is not None:
                 # %60 fiili web trafiği, %40 arama niyeti momentumu
-                momentum = 0.60 * float(traffic_change) + 0.40 * float(search_change)
+                momentum = 0.60 * traffic_change + 0.40 * search_change
                 features["digital_traffic_momentum"] = round(momentum, 2)
 
         # 3. Kullanıcı Etkileşimi ve Kalite Endeksi
-        bounce_change = scraped_data.get("web_bounce_rate_change") or scraped_data.get("bounce_change")
+        bounce_change = _safe_float(scraped_data.get("web_bounce_rate_change") or scraped_data.get("bounce_change"))
         if bounce_change is not None:
-            features["web_bounce_rate_change"] = round(float(bounce_change), 2)
+            features["web_bounce_rate_change"] = round(bounce_change, 2)
 
-        duration_change = scraped_data.get("web_avg_duration_change") or scraped_data.get("duration_change")
+        duration_change = _safe_float(scraped_data.get("web_avg_duration_change") or scraped_data.get("duration_change"))
         if duration_change is not None:
-            features["web_avg_duration_change"] = round(float(duration_change), 2)
+            features["web_avg_duration_change"] = round(duration_change, 2)
 
         if duration_change is not None and bounce_change is not None:
             # Süre uzaması pozitif (+), hemen çıkma artışı negatif (-) etki
-            quality_idx = float(duration_change) - float(bounce_change)
+            quality_idx = duration_change - bounce_change
             features["web_engagement_quality_index"] = round(quality_idx, 2)
 
         # 4. Mobil Uygulama ve Virallik
-        app_rank = scraped_data.get("app_ranking_change") or scraped_data.get("app_rank_delta")
+        app_rank = _safe_float(scraped_data.get("app_ranking_change") or scraped_data.get("app_rank_delta"))
         if app_rank is not None:
-            features["app_ranking_change"] = round(float(app_rank), 2)
+            features["app_ranking_change"] = round(app_rank, 2)
 
-        review_growth = scraped_data.get("review_count_growth") or scraped_data.get("review_growth")
+        review_growth = _safe_float(scraped_data.get("review_count_growth") or scraped_data.get("review_growth"))
         if review_growth is not None:
-            features["review_count_growth"] = round(float(review_growth), 2)
+            features["review_count_growth"] = round(review_growth, 2)
 
         if app_rank is not None and review_growth is not None:
-            virality = (float(app_rank) * 2.0) + float(review_growth)
+            virality = (app_rank * 2.0) + review_growth
             features["app_virality_score"] = round(virality, 2)
 
         # 5. Fiyat Rekabet Gücü ve İlanlar
-        price_idx = scraped_data.get("price_vs_competitors") or scraped_data.get("price_index")
+        price_idx = _safe_float(scraped_data.get("price_vs_competitors") or scraped_data.get("price_index"))
         if price_idx is not None:
-            features["price_vs_competitors"] = round(float(price_idx), 2)
+            features["price_vs_competitors"] = round(price_idx, 2)
 
-        job_growth = scraped_data.get("job_posting_growth") or scraped_data.get("job_growth")
+        job_growth = _safe_float(scraped_data.get("job_posting_growth") or scraped_data.get("job_growth"))
         if job_growth is not None:
-            features["job_posting_growth"] = round(float(job_growth), 2)
+            features["job_posting_growth"] = round(job_growth, 2)
 
         # 6. Dijital Ayak İzi Bileşik Sağlık Skoru (0 - 100 bazında)
         score_components = []

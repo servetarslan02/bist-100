@@ -31,6 +31,18 @@ __all__ = [
 ]
 
 
+def _safe_float(val: Any) -> float | None:
+    """Değeri güvenli float'a çevirir, geçersiz string veya NaN/Inf durumunda None döndürür."""
+    if val is None:
+        return None
+    try:
+        f = float(val)
+        import math
+        return None if (math.isnan(f) or math.isinf(f)) else f
+    except (ValueError, TypeError):
+        return None
+
+
 def compute_cc_features(cc_data: dict[str, Any], ticker: str) -> dict[str, float]:
     """Kredi kartı ve BKM tüketici harcama ham verisinden kurumsal göstergeleri hesaplar.
 
@@ -43,8 +55,8 @@ def compute_cc_features(cc_data: dict[str, Any], ticker: str) -> dict[str, float
     - cc_online_ratio: Dijital / e-ticaret harcama oranı (%)
     - cc_transaction_count: İşlem adedi (hacim)
     - cc_avg_basket_size: İşlem başına ortalama sepet büyüklüğü (TL)
-    - cc_discretionary_ratio: İsteğe bağlı vs temel tüketim harcama ayrışması
-    - cc_retail_demand_regime: 0 (Şiddetli Daralma) ile 3 (Güçlü Tüketici Talebi) arası talep rejimi
+    - cc_discretionary_ratio: İsteğe bağlı / zorunlu olmayan tüketim payı (0.0 - 1.0)
+    - cc_retail_demand_regime: 0=Çöküş, 1=Daralma, 2=Stabil, 3=Patlama
 
     Args:
         cc_data: BKM veya ticari kart işlem verilerini içeren sözlük.
@@ -60,53 +72,54 @@ def compute_cc_features(cc_data: dict[str, Any], ticker: str) -> dict[str, float
 
     try:
         # 1. Nominal Harcama Büyümesi
-        spend_growth = cc_data.get("spend_growth") or cc_data.get("cc_spend_growth")
-        if spend_growth is not None:
-            features["cc_spend_growth"] = round(float(spend_growth), 2)
+        spend_growth_val = _safe_float(cc_data.get("spend_growth") or cc_data.get("cc_spend_growth"))
+        if spend_growth_val is not None:
+            features["cc_spend_growth"] = round(spend_growth_val, 2)
 
             # 2. Enflasyondan Arındırılmış Reel Büyüme (TÜFE düşülerek)
-            cpi_rate = cc_data.get("cpi_rate") or cc_data.get("inflation_rate")
-            if cpi_rate is not None:
-                real_growth = float(spend_growth) - float(cpi_rate)
-                features["cc_real_spend_growth"] = round(real_growth, 2)
+            cpi_val = _safe_float(cc_data.get("cpi_rate") or cc_data.get("inflation_rate"))
+            if cpi_val is not None:
+                features["cc_real_spend_growth"] = round(spend_growth_val - cpi_val, 2)
             else:
-                features["cc_real_spend_growth"] = round(float(spend_growth), 2)
+                features["cc_real_spend_growth"] = round(spend_growth_val, 2)
 
         # 3. Harcama İvmesi (Velocity - İkinci Türev)
-        prev_growth = cc_data.get("prev_spend_growth")
-        if spend_growth is not None and prev_growth is not None:
-            features["cc_spending_velocity"] = round(float(spend_growth) - float(prev_growth), 2)
+        prev_growth_val = _safe_float(cc_data.get("prev_spend_growth"))
+        if spend_growth_val is not None and prev_growth_val is not None:
+            features["cc_spending_velocity"] = round(spend_growth_val - prev_growth_val, 2)
 
         # 4. Sektöre Göre Bağıl Güç
-        vs_sector = cc_data.get("vs_sector") or cc_data.get("cc_vs_sector")
-        if vs_sector is not None:
-            features["cc_vs_sector"] = round(float(vs_sector), 2)
+        vs_sector_val = _safe_float(cc_data.get("vs_sector") or cc_data.get("cc_vs_sector"))
+        if vs_sector_val is not None:
+            features["cc_vs_sector"] = round(vs_sector_val, 2)
 
         # 5. Mevsimsel Sapma Skoru
-        seasonal_dev = cc_data.get("seasonal_deviation") or cc_data.get("cc_seasonal_deviation")
-        if seasonal_dev is not None:
-            features["cc_seasonal_deviation"] = round(float(seasonal_dev), 4)
+        seasonal_val = _safe_float(cc_data.get("seasonal_deviation") or cc_data.get("cc_seasonal_deviation"))
+        if seasonal_val is not None:
+            features["cc_seasonal_deviation"] = round(seasonal_val, 4)
 
         # 6. Online / E-Ticaret Penetrasyon Oranı
-        online_ratio = cc_data.get("online_ratio") or cc_data.get("cc_online_ratio")
-        if online_ratio is not None:
-            features["cc_online_ratio"] = round(float(online_ratio), 4)
+        online_val = _safe_float(cc_data.get("online_ratio") or cc_data.get("cc_online_ratio"))
+        if online_val is not None:
+            features["cc_online_ratio"] = round(online_val, 4)
 
         # 7. İşlem Adedi ve Ortalama Sepet Büyüklüğü
-        tx_count = cc_data.get("transaction_count") or cc_data.get("cc_transaction_count")
-        if tx_count is not None and float(tx_count) > 0:
-            features["cc_transaction_count"] = round(float(tx_count), 0)
+        tx_count_val = _safe_float(cc_data.get("transaction_count") or cc_data.get("cc_transaction_count"))
+        if tx_count_val is not None and tx_count_val > 0:
+            features["cc_transaction_count"] = round(tx_count_val, 0)
 
-        total_spend = cc_data.get("total_spend")
-        if total_spend is not None and tx_count is not None and float(tx_count) > 0:
-            features["cc_avg_basket_size"] = round(float(total_spend) / float(tx_count), 2)
-        elif cc_data.get("avg_basket_size") is not None:
-            features["cc_avg_basket_size"] = round(float(cc_data["avg_basket_size"]), 2)
+        total_spend_val = _safe_float(cc_data.get("total_spend"))
+        if total_spend_val is not None and tx_count_val is not None and tx_count_val > 0:
+            features["cc_avg_basket_size"] = round(total_spend_val / tx_count_val, 2)
+        else:
+            avg_basket_val = _safe_float(cc_data.get("avg_basket_size"))
+            if avg_basket_val is not None:
+                features["cc_avg_basket_size"] = round(avg_basket_val, 2)
 
         # 8. İsteğe Bağlı Tüketim Oranı (Discretionary vs Staples)
-        disc_ratio = cc_data.get("discretionary_ratio") or cc_data.get("cc_discretionary_ratio")
-        if disc_ratio is not None:
-            features["cc_discretionary_ratio"] = round(float(disc_ratio), 4)
+        disc_val = _safe_float(cc_data.get("discretionary_ratio") or cc_data.get("cc_discretionary_ratio"))
+        if disc_val is not None:
+            features["cc_discretionary_ratio"] = round(disc_val, 4)
 
         # 9. Tüketici Talep Rejimi
         growth_metric = features.get("cc_real_spend_growth", features.get("cc_spend_growth", 0.0))
