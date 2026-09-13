@@ -13,28 +13,29 @@ Test edilen bileşenler:
 
 from __future__ import annotations
 
+import contextlib
 import pickle
 import threading
 from datetime import UTC, datetime
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import duckdb
 import orjson
 import polars as pl
 import pytest
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
 from services.core.safe_pickle import (
     ModelArtifactMeta,
     clear_artifact_audit_duckdb,
     export_artifact_audit_to_polars,
-    read_artifact_audit_from_duckdb,
     safe_pickle_dump,
     safe_pickle_load,
     set_safe_pickle_duckdb_connection,
-    set_safe_pickle_duckdb_path,
     to_orjson_bytes,
 )
-
 
 # ==============================================================================
 # Test yardımcıları
@@ -53,10 +54,8 @@ def in_memory_conn() -> duckdb.DuckDBPyConnection:
     conn = duckdb.connect(":memory:")
     set_safe_pickle_duckdb_connection(conn)
     yield conn
-    try:
+    with contextlib.suppress(Exception):
         clear_artifact_audit_duckdb()
-    except Exception:
-        pass
     conn.close()
 
 
@@ -204,6 +203,7 @@ class TestSafePickleDump:
         """Mevcut dosyanın üzerine yazılabilir."""
         safe_pickle_dump({"v": 1}, pkl_path)
         h1 = safe_pickle_dump({"v": 2}, pkl_path)
+        assert len(h1) == 64
         loaded = safe_pickle_load(pkl_path, verify_hash=True)
         assert loaded["v"] == 2
 
@@ -269,7 +269,6 @@ class TestSafePickleLoad:
 
     def test_load_complex_objects(self, pkl_path: Path) -> None:
         """Karmaşık nesneler round-trip korumasıyla yüklenir."""
-        import numpy as np
         original = {
             "matrix": [[1.0, 2.0], [3.0, 4.0]],
             "labels": ["A", "B", "C"],

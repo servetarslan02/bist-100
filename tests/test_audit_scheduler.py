@@ -2,7 +2,6 @@
 ALPHA BIST — Scheduler ve Tasks Servisi Kapsamlı Denetim ve Doğrulama Testleri
 """
 
-import pytest
 
 from services.scheduler.daily_report import generate_daily_report
 from services.scheduler.daily_workflow import (
@@ -24,7 +23,6 @@ from services.scheduler.scheduler_api import SchedulerAPI
 from services.scheduler.unified_scheduler import (
     JobConfig,
     JobResult,
-    JobType,
     MarketPhase,
     MarketSessionManager,
     UnifiedScheduler,

@@ -117,52 +117,52 @@ class TestFaz0_LLMClient:
     """Faz 0: LLM Client Abstraction test'leri."""
 
     def test_llm_config_defaults(self) -> Any:
-        """Otomatik eklendi."""
+        """Llm config defaults senaryosunu doğrular."""
         config = LLMConfig()
         assert config.provider == "ollama"
         assert config.temperature == 0.3
         assert config.max_retries == 3
 
     def test_llm_factory_ollama(self) -> Any:
-        """Otomatik eklendi."""
+        """Llm factory ollama senaryosunu doğrular."""
         config = LLMConfig(provider="ollama")
         client = LLMClientFactory.create(config)
         assert isinstance(client, OllamaLLMClient)
 
     def test_llm_factory_unknown_provider(self) -> Any:
-        """Otomatik eklendi."""
+        """Llm factory unknown provider senaryosunu doğrular."""
         config = LLMConfig(provider="unknown")
         with pytest.raises(ValueError, match="Unknown LLM provider"):
             LLMClientFactory.create(config)
 
     def test_parse_llm_json_valid(self) -> Any:
-        """Otomatik eklendi."""
+        """Parse llm json valid senaryosunu doğrular."""
         content = '{"direction": "LONG", "confidence": 0.7}'
         result = parse_llm_json(content)
         assert result is not None
         assert result["direction"] == "LONG"
 
     def test_parse_llm_json_code_block(self) -> Any:
-        """Otomatik eklendi."""
+        """Parse llm json code block senaryosunu doğrular."""
         content = '```json\n{"direction": "SHORT", "confidence": 0.6}\n```'
         result = parse_llm_json(content)
         assert result is not None
         assert result["direction"] == "SHORT"
 
     def test_parse_llm_json_text_fallback(self) -> Any:
-        """Otomatik eklendi."""
+        """Parse llm json text fallback senaryosunu doğrular."""
         content = "Hisse LONG görünüyor, confidence 0.75"
         result = parse_llm_json(content)
         assert result is not None
         assert result["direction"] == "LONG"
 
     def test_parse_llm_json_empty(self) -> Any:
-        """Otomatik eklendi."""
+        """Parse llm json empty senaryosunu doğrular."""
         result = parse_llm_json("")
         assert result is None
 
     def test_parse_llm_json_none(self) -> Any:
-        """Otomatik eklendi."""
+        """Parse llm json none senaryosunu doğrular."""
         result = parse_llm_json(None)
         assert result is None
 
@@ -171,7 +171,7 @@ class TestFaz0_Schemas:
     """Faz 0: JSON Schema test'leri."""
 
     def test_agent_output_schema_valid(self) -> Any:
-        """Otomatik eklendi."""
+        """Agent output schema valid senaryosunu doğrular."""
         from services.agents.schemas import AgentOutputSchema
 
         data = {"direction": "LONG", "confidence": 0.7, "score": 65}
@@ -180,7 +180,7 @@ class TestFaz0_Schemas:
         assert schema.confidence == 0.7
 
     def test_agent_output_schema_normalize_confidence(self) -> Any:
-        """Otomatik eklendi."""
+        """Agent output schema normalize confidence senaryosunu doğrular."""
         from services.agents.schemas import AgentOutputSchema
 
         data = {"confidence": 75}  # 0-100 arası
@@ -188,7 +188,7 @@ class TestFaz0_Schemas:
         assert schema.confidence == 0.75
 
     def test_validate_agent_output_valid(self) -> Any:
-        """Otomatik eklendi."""
+        """Validate agent output valid senaryosunu doğrular."""
         data = {"direction": "LONG", "confidence": 0.7}
         is_valid, parsed, errors = validate_agent_output(data)
         assert is_valid
@@ -199,7 +199,7 @@ class TestFaz0_Prompts:
     """Faz 0: Prompt Template test'leri."""
 
     def test_list_templates(self) -> Any:
-        """Otomatik eklendi."""
+        """List templates senaryosunu doğrular."""
         templates = PromptFactory.list_templates()
         assert "technical" in templates
         assert "fundamental" in templates
@@ -209,7 +209,7 @@ class TestFaz0_Prompts:
         assert "synthesis" in templates
 
     def test_get_technical_prompt(self) -> Any:
-        """Otomatik eklendi."""
+        """Get technical prompt senaryosunu doğrular."""
         context = {"features": create_mock_features()}
         system, user = PromptFactory.get_prompts("technical", "THYAO", context)
         assert "THYAO" in system
@@ -217,7 +217,7 @@ class TestFaz0_Prompts:
         assert "THYAO" in user
 
     def test_unknown_template_raises(self) -> Any:
-        """Otomatik eklendi."""
+        """Unknown template raises senaryosunu doğrular."""
         with pytest.raises(ValueError, match="Unknown template"):
             PromptFactory.get_prompts("nonexistent", "THYAO", {})
 
@@ -226,13 +226,13 @@ class TestFaz0_AgentSystem:
     """Faz 0: Agent System refactor test'leri."""
 
     def test_agent_roles(self) -> Any:
-        """Otomatik eklendi."""
+        """Agent roles senaryosunu doğrular."""
         assert AgentRole.TECHNICAL.value == "TECHNICAL"
         assert AgentRole.BULL.value == "BULL"
         assert AgentRole.BEAR.value == "BEAR"
 
     def test_agent_task_creation(self) -> Any:
-        """Otomatik eklendi."""
+        """Agent task creation senaryosunu doğrular."""
         task = AgentTask(
             task_id="test-1",
             agent_role=AgentRole.TECHNICAL,
@@ -244,13 +244,13 @@ class TestFaz0_AgentSystem:
         assert task.template_name is None
 
     def test_tool_registry(self) -> Any:
-        """Otomatik eklendi."""
+        """Tool registry senaryosunu doğrular."""
         assert AgentToolRegistry.can_access(AgentRole.TECHNICAL, "read_market_data")
         assert not AgentToolRegistry.can_access(AgentRole.TECHNICAL, "read_portfolio")
         assert AgentToolRegistry.can_access(AgentRole.RISK, "reject_decision")
 
     def test_fallback_analysis(self) -> Any:
-        """Otomatik eklendi."""
+        """Fallback analysis senaryosunu doğrular."""
         features = create_mock_features()
         result = AIFallback.rule_based_analysis(features, "THYAO")
         assert "direction" in result
@@ -258,13 +258,13 @@ class TestFaz0_AgentSystem:
         assert result["source"] == "rule_based_fallback"
 
     def test_output_validator_valid(self) -> Any:
-        """Otomatik eklendi."""
+        """Output validator valid senaryosunu doğrular."""
         output = orjson.dumps({"direction": "LONG", "confidence": 0.7}).decode()
         result = AIOutputValidator.validate(output)
         assert result["valid"]
 
     def test_output_validator_invalid_direction(self) -> Any:
-        """Otomatik eklendi."""
+        """Output validator invalid direction senaryosunu doğrular."""
         output = orjson.dumps({"direction": "INVALID", "confidence": 0.7}).decode()
         result = AIOutputValidator.validate(output)
         assert not result["valid"] or "Invalid direction" in str(result["errors"])
@@ -279,7 +279,7 @@ class TestFaz1_ParallelRunner:
     """Faz 1: Parallel Agent Runner test'leri."""
 
     def test_parallel_run_result_properties(self) -> Any:
-        """Otomatik eklendi."""
+        """Parallel run result properties senaryosunu doğrular."""
         result = ParallelRunResult(
             results={},
             total_duration_ms=100,
@@ -292,7 +292,7 @@ class TestFaz1_ParallelRunner:
         assert result.partial_success
 
     def test_parallel_run_result_all_failed(self) -> Any:
-        """Otomatik eklendi."""
+        """Parallel run result all failed senaryosunu doğrular."""
         result = ParallelRunResult(
             results={},
             total_duration_ms=100,
@@ -305,7 +305,7 @@ class TestFaz1_ParallelRunner:
 
     @pytest.mark.asyncio
     async def test_parallel_runner_basic(self) -> Any:
-        """Otomatik eklendi."""
+        """Parallel runner basic senaryosunu doğrular."""
         runner = ParallelAgentRunner(max_concurrent=2, timeout_seconds=5)
 
         # Mock agent'lar
@@ -345,7 +345,7 @@ class TestFaz2_ConflictDetector:
     """Faz 2: Conflict Detection test'leri."""
 
     def test_no_conflict_unanimous_long(self) -> Any:
-        """Otomatik eklendi."""
+        """No conflict unanimous long senaryosunu doğrular."""
         detector = ConflictDetector()
         results = {
             AgentRole.TECHNICAL: create_mock_agent_result(AgentRole.TECHNICAL, "LONG"),
@@ -358,7 +358,7 @@ class TestFaz2_ConflictDetector:
         assert not report.requires_debate
 
     def test_conflict_long_vs_short(self) -> Any:
-        """Otomatik eklendi."""
+        """Conflict long vs short senaryosunu doğrular."""
         detector = ConflictDetector()
         results = {
             AgentRole.TECHNICAL: create_mock_agent_result(AgentRole.TECHNICAL, "LONG"),
@@ -372,7 +372,7 @@ class TestFaz2_ConflictDetector:
         assert report.short_count == 1
 
     def test_excludes_synthesis_and_risk(self) -> Any:
-        """Otomatik eklendi."""
+        """Excludes synthesis and risk senaryosunu doğrular."""
         detector = ConflictDetector()
         results = {
             AgentRole.TECHNICAL: create_mock_agent_result(AgentRole.TECHNICAL, "LONG"),
@@ -387,7 +387,7 @@ class TestFaz2_DebateEngine:
     """Faz 2: Debate Engine test'leri."""
 
     def test_debate_result_to_dict(self) -> Any:
-        """Otomatik eklendi."""
+        """Debate result to dict senaryosunu doğrular."""
         result = DebateResult(
             consensus="LONG",
             consensus_confidence=0.6,
@@ -409,7 +409,7 @@ class TestFaz3_WorkingMemory:
     """Faz 3: Working Memory test'leri."""
 
     def test_add_and_get_recent(self) -> Any:
-        """Otomatik eklendi."""
+        """Add and get recent senaryosunu doğrular."""
         wm = WorkingMemory(max_items=5)
         for i in range(10):
             wm.add(
@@ -428,7 +428,7 @@ class TestFaz3_WorkingMemory:
         assert len(recent) == 3
 
     def test_get_last_direction(self) -> Any:
-        """Otomatik eklendi."""
+        """Get last direction senaryosunu doğrular."""
         wm = WorkingMemory()
         wm.add(
             MemoryEntry(
@@ -459,7 +459,7 @@ class TestFaz3_EpisodicMemory:
     """Faz 3: Episodic Memory test'leri."""
 
     def test_record_outcome(self) -> Any:
-        """Otomatik eklendi."""
+        """Record outcome senaryosunu doğrular."""
         em = EpisodicMemory()
         em.add(
             MemoryEntry(
@@ -478,7 +478,7 @@ class TestFaz3_EpisodicMemory:
         assert em.outcomes["t1"]["correct"]  # LONG + positive return
 
     def test_accuracy(self) -> Any:
-        """Otomatik eklendi."""
+        """Accuracy senaryosunu doğrular."""
         em = EpisodicMemory()
         for i in range(10):
             task_id = f"t{i}"
@@ -503,13 +503,13 @@ class TestFaz3_AgentMemory:
     """Faz 3: Agent Memory (3 katmanlı) test'leri."""
 
     def test_record_task(self) -> Any:
-        """Otomatik eklendi."""
+        """Record task senaryosunu doğrular."""
         mem = AgentMemory("TECHNICAL")
         mem.record_task("t1", "THYAO", "LONG", 0.7, "test reasoning")
         assert len(mem.working.items) == 1
 
     def test_get_context(self) -> Any:
-        """Otomatik eklendi."""
+        """Get context senaryosunu doğrular."""
         mem = AgentMemory("TECHNICAL")
         mem.record_task("t1", "THYAO", "LONG", 0.7, "test")
         context = mem.get_context_for_task("THYAO")
@@ -517,7 +517,7 @@ class TestFaz3_AgentMemory:
         assert "accuracy" in context
 
     def test_performance_summary(self) -> Any:
-        """Otomatik eklendi."""
+        """Performance summary senaryosunu doğrular."""
         mem = AgentMemory("TECHNICAL")
         summary = mem.get_performance_summary()
         assert summary["agent_role"] == "TECHNICAL"
@@ -529,7 +529,7 @@ class TestFaz3_MemoryConsolidator:
 
     @pytest.mark.asyncio
     async def test_consolidate_first_run(self) -> Any:
-        """Otomatik eklendi."""
+        """Consolidate first run senaryosunu doğrular."""
         consolidator = MemoryConsolidator(consolidation_interval_hours=24)
         mem = AgentMemory("TECHNICAL")
         # Boş memory — consolidation yapmaz
@@ -539,7 +539,7 @@ class TestFaz3_MemoryConsolidator:
 
     @pytest.mark.asyncio
     async def test_consolidate_too_soon(self) -> Any:
-        """Otomatik eklendi."""
+        """Consolidate too soon senaryosunu doğrular."""
         consolidator = MemoryConsolidator(consolidation_interval_hours=24)
         mem = AgentMemory("TECHNICAL")
         # İlk çalıştırma
@@ -559,7 +559,7 @@ class TestFaz4_CommunicationBus:
     """Faz 4: Communication Bus test'leri."""
 
     def test_send_and_receive(self) -> Any:
-        """Otomatik eklendi."""
+        """Send and receive senaryosunu doğrular."""
         bus = AgentCommunicationBus()
         msg = AgentMessage(
             sender=AgentRole.TECHNICAL,
@@ -574,7 +574,7 @@ class TestFaz4_CommunicationBus:
         assert messages[0].payload["data"] == "test"
 
     def test_broadcast(self) -> Any:
-        """Otomatik eklendi."""
+        """Broadcast senaryosunu doğrular."""
         bus = AgentCommunicationBus()
         bus.broadcast(AgentRole.TECHNICAL, "ALERT", {"warning": True})
         # Tüm roller TECHNICAL hariç mesaj almalı
@@ -588,7 +588,7 @@ class TestFaz4_ConflictResolver:
     """Faz 4: Conflict Resolver test'leri."""
 
     def test_majority_vote(self) -> Any:
-        """Otomatik eklendi."""
+        """Majority vote senaryosunu doğrular."""
         resolver = ConflictResolver()
         results = {
             AgentRole.TECHNICAL: create_mock_agent_result(AgentRole.TECHNICAL, "LONG", 0.7),
@@ -600,7 +600,7 @@ class TestFaz4_ConflictResolver:
         assert resolution.method == "majority_vote"
 
     def test_risk_veto(self) -> Any:
-        """Otomatik eklendi."""
+        """Risk veto senaryosunu doğrular."""
         resolver = ConflictResolver()
         results = {
             AgentRole.TECHNICAL: create_mock_agent_result(AgentRole.TECHNICAL, "LONG"),
@@ -610,7 +610,7 @@ class TestFaz4_ConflictResolver:
         assert resolution.method == "risk_veto"
 
     def test_debate_consensus(self) -> Any:
-        """Otomatik eklendi."""
+        """Debate consensus senaryosunu doğrular."""
         resolver = ConflictResolver()
         results = {
             AgentRole.TECHNICAL: create_mock_agent_result(AgentRole.TECHNICAL, "LONG"),
@@ -625,7 +625,7 @@ class TestFaz4_SynthesisEngine:
 
     @pytest.mark.asyncio
     async def test_synthesize_basic(self) -> Any:
-        """Otomatik eklendi."""
+        """Synthesize basic senaryosunu doğrular."""
         engine = SynthesisEngine()
         results = {
             AgentRole.TECHNICAL: create_mock_agent_result(AgentRole.TECHNICAL, "LONG", 0.7),
@@ -656,7 +656,7 @@ class TestFaz5_SelfEvaluator:
     """Faz 5: Self-Evaluator test'leri."""
 
     def test_evaluate_empty_memory(self) -> Any:
-        """Otomatik eklendi."""
+        """Evaluate empty memory senaryosunu doğrular."""
         evaluator = AgentSelfEvaluator()
         mem = AgentMemory("TECHNICAL")
         report = evaluator.evaluate(mem)
@@ -664,7 +664,7 @@ class TestFaz5_SelfEvaluator:
         assert report.accuracy == 0
 
     def test_evaluate_with_outcomes(self) -> Any:
-        """Otomatik eklendi."""
+        """Evaluate with outcomes senaryosunu doğrular."""
         evaluator = AgentSelfEvaluator()
         mem = AgentMemory("TECHNICAL")
 
@@ -689,7 +689,7 @@ class TestFaz6_RiskAssessor:
 
     @pytest.mark.asyncio
     async def test_assess_low_risk(self) -> Any:
-        """Otomatik eklendi."""
+        """Assess low risk senaryosunu doğrular."""
         assessor = RiskAssessor()
         features = create_mock_features()
         results = {
@@ -702,7 +702,7 @@ class TestFaz6_RiskAssessor:
 
     @pytest.mark.asyncio
     async def test_assess_high_volatility(self) -> Any:
-        """Otomatik eklendi."""
+        """Assess high volatility senaryosunu doğrular."""
         assessor = RiskAssessor()
         features = {**create_mock_features(), "atr_pct": 8.0}
         results = {

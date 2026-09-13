@@ -33,7 +33,7 @@ MOCK_KEYWORDS = ["MOCK", "DUMMY", "SYNTHETIC_TEST", "SAMPLE_EVENT", "84.2M Satı
 
 
 async def run_audit() -> Any:
-    """Otomatik eklendi."""
+    """Audit sürecini veya işlevini yürütür."""
     logger.info("=" * 75)
     logger.info("ALPHA BIST -- SIFIR SAHTE VERI (ZERO-MOCK) KAPSAMLI DENETIM TESTI")
     logger.info("=" * 75)

@@ -8,7 +8,7 @@ import orjson
 
 
 def verify_all() -> Any:
-    """Otomatik eklendi."""
+    """Verify all sürecini veya işlevini yürütür."""
     logger.info("=" * 75)
     logger.info("  ALPHA BIST — 17 SAYFA VE TÜM ARKA PLAN SERVİSLERİ DOĞRULAMA DENETİMİ")
     logger.info("=" * 75)

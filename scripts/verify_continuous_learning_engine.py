@@ -19,7 +19,7 @@ from services.learning.learning_pipeline import LearningPipeline
 
 
 def test_learning_pipeline_in_code() -> Any:
-    """Otomatik eklendi."""
+    """Learning pipeline in code sürecini veya işlevini yürütür."""
     logger.info("=" * 80)
     logger.info("ALPHA BIST — SÜREKLİ ÖĞRENME MOTORU DOĞRULAMA (KOD TABANI TESTİ)")
     logger.info("=" * 80)

@@ -29,7 +29,7 @@ from services.paper_trading.synthetic_liquidity import LiquidityScenario
 
 
 def run_forensic_proof() -> Any:
-    """Otomatik eklendi."""
+    """Forensic proof sürecini veya işlevini yürütür."""
     logger.info("=" * 90)
     logger.info("🔬 ALPHA BIST ÇEKİRDEK MOTORU DERİNLEMESİNE ADLİ (FORENSIC) ÇAPRAZ DENETİMİ")
     logger.info("=" * 90)

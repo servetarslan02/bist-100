@@ -18,7 +18,7 @@ _TZ_ISTANBUL = timezone(timedelta(hours=3))
 
 
 class PlaybackSpeed(Enum):
-    """Otomatik eklendi."""
+    """Piyasa oynatma hızı çarpanları."""
     REALTIME = 1.0
     FAST_10X = 10.0
     FAST_100X = 100.0
@@ -27,7 +27,7 @@ class PlaybackSpeed(Enum):
 
 @dataclass
 class TickData:
-    """Otomatik eklendi."""
+    """Tekil piyasa tick/bar veri modeli."""
     timestamp: datetime
     ticker: str
     open: float
@@ -37,8 +37,12 @@ class TickData:
     volume: int
     phase: str = "CONTINUOUS"
 
+    def __repr__(self) -> str:
+        """Sınıfın temsil dizesi."""
+        return f"TickData(ticker={self.ticker!r}, close={self.close}, phase={self.phase!r})"
+
     def to_dict(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Veri modelini sözlük formatına dönüştürür."""
         return {
             "timestamp": self.timestamp.isoformat(),
             "ticker": self.ticker,
@@ -55,7 +59,7 @@ class MarketPlayer:
     """Geçmiş piyasa verisini oynatan motor."""
 
     def __init__(self):
-        """Otomatik eklendi."""
+        """Piyasa oynatıcı motor durum değişkenlerini ilklendirir."""
         self._data: pl.DataFrame | None = None
         self._tickers: list[str] = []
         self._is_playing: bool = False
@@ -133,12 +137,16 @@ class MarketPlayer:
 
         return result
 
+    def __repr__(self) -> str:
+        """Sınıfın temsil dizesi."""
+        return f"MarketPlayer(playing={self._is_playing}, paused={self._is_paused}, tickers={len(self._tickers)})"
+
     def set_speed(self, speed: PlaybackSpeed) -> Any:
-        """Otomatik eklendi."""
+        """Oynatma hızını günceller."""
         self._speed = speed
 
     def on_tick(self, callback: Callable) -> Any:
-        """Otomatik eklendi."""
+        """Her tick/bar olayı için geri çağırım işlevi kaydeder."""
         self._on_tick_callbacks.append(callback)
 
     def play(self, start_index: int = 0, max_ticks: int | None = None) -> Generator[TickData, None, None]:
@@ -210,20 +218,20 @@ class MarketPlayer:
             self._is_playing = False
 
     def pause(self) -> Any:
-        """Otomatik eklendi."""
+        """Oynatmayı geçici olarak duraklatır."""
         self._is_paused = True
 
     def resume(self) -> Any:
-        """Otomatik eklendi."""
+        """Duraklatılan oynatmayı devam ettirir."""
         self._is_paused = False
 
     def stop(self) -> Any:
-        """Otomatik eklendi."""
+        """Oynatmayı tamamen durdurur."""
         self._is_playing = False
         self._is_paused = False
 
     def get_status(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Oynatıcının güncel durum ve metrik sözlüğünü döndürür."""
         return {
             "is_playing": self._is_playing,
             "is_paused": self._is_paused,

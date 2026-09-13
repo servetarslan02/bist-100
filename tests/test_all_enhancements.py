@@ -27,13 +27,13 @@ class TestFeatureStability:
     """FeatureStabilityAnalyzer testleri."""
 
     def test_import(self) -> Any:
-        """Otomatik eklendi."""
+        """Import senaryosunu doğrular."""
         from services.ml.feature_stability import feature_stability
 
         assert feature_stability is not None
 
     def test_record_and_check(self) -> Any:
-        """Otomatik eklendi."""
+        """Record and check senaryosunu doğrular."""
         from services.ml.feature_stability import FeatureStabilityAnalyzer
 
         fs = FeatureStabilityAnalyzer()
@@ -50,7 +50,7 @@ class TestFeatureStability:
         assert summary.overall_stability_score > 0.5
 
     def test_detect_shift(self) -> Any:
-        """Otomatik eklendi."""
+        """Detect shift senaryosunu doğrular."""
         from services.ml.feature_stability import FeatureStabilityAnalyzer
 
         fs = FeatureStabilityAnalyzer()
@@ -67,7 +67,7 @@ class TestFeatureStability:
         assert summary.overall_stability_score < 1.0
 
     def test_get_unstable_features(self) -> Any:
-        """Otomatik eklendi."""
+        """Get unstable features senaryosunu doğrular."""
         from services.ml.feature_stability import FeatureStabilityAnalyzer
 
         fs = FeatureStabilityAnalyzer()
@@ -87,13 +87,13 @@ class TestCalibrationEnhanced:
     """CalibrationEnhanced testleri."""
 
     def test_import(self) -> Any:
-        """Otomatik eklendi."""
+        """Import senaryosunu doğrular."""
         from services.ml.calibration_enhanced import calibration_enhanced
 
         assert calibration_enhanced is not None
 
     def test_generate_out_of_fold(self) -> Any:
-        """Otomatik eklendi."""
+        """Generate out of fold senaryosunu doğrular."""
         from sklearn.linear_model import Ridge
 
         from services.ml.calibration_enhanced import CalibrationEnhanced
@@ -110,7 +110,7 @@ class TestCalibrationEnhanced:
         assert result.mean_brier >= 0
 
     def test_record_and_check_drift(self) -> Any:
-        """Otomatik eklendi."""
+        """Record and check drift senaryosunu doğrular."""
         from services.ml.calibration_enhanced import CalibrationEnhanced
 
         ce = CalibrationEnhanced()
@@ -126,7 +126,7 @@ class TestCalibrationEnhanced:
         assert drift.severity in ("WARNING", "ALERT")
 
     def test_should_retrain(self) -> Any:
-        """Otomatik eklendi."""
+        """Should retrain senaryosunu doğrular."""
         from services.ml.calibration_enhanced import CalibrationEnhanced
 
         ce = CalibrationEnhanced()
@@ -134,7 +134,7 @@ class TestCalibrationEnhanced:
         assert schedule.should_retrain  # İlk retrain
 
     def test_compare_methods(self) -> Any:
-        """Otomatik eklendi."""
+        """Compare methods senaryosunu doğrular."""
         from services.ml.calibration_enhanced import CalibrationEnhanced
 
         ce = CalibrationEnhanced()
@@ -157,13 +157,13 @@ class TestRegimeLimits:
     """RegimeLimitsManager testleri."""
 
     def test_import(self) -> Any:
-        """Otomatik eklendi."""
+        """Import senaryosunu doğrular."""
         from services.risk.regime_limits import regime_limits
 
         assert regime_limits is not None
 
     def test_get_limits(self) -> Any:
-        """Otomatik eklendi."""
+        """Get limits senaryosunu doğrular."""
         from services.risk.regime_limits import RegimeLimitsManager
 
         rm = RegimeLimitsManager()
@@ -175,7 +175,7 @@ class TestRegimeLimits:
         assert bull.max_total_exposure > bear.max_total_exposure
 
     def test_adjust_for_confidence(self) -> Any:
-        """Otomatik eklendi."""
+        """Adjust for confidence senaryosunu doğrular."""
         from services.risk.regime_limits import RegimeLimitsManager
 
         rm = RegimeLimitsManager()
@@ -189,7 +189,7 @@ class TestRegimeLimits:
         assert high > low
 
     def test_check_sector_concentration(self) -> Any:
-        """Otomatik eklendi."""
+        """Check sector concentration senaryosunu doğrular."""
         from services.risk.regime_limits import RegimeLimitsManager
 
         rm = RegimeLimitsManager()
@@ -202,7 +202,7 @@ class TestRegimeLimits:
         assert not is_within
 
     def test_check_liquidity(self) -> Any:
-        """Otomatik eklendi."""
+        """Check liquidity senaryosunu doğrular."""
         from services.risk.regime_limits import RegimeLimitsManager
 
         rm = RegimeLimitsManager()
@@ -211,7 +211,7 @@ class TestRegimeLimits:
         assert not rm.check_liquidity("THYAO", liquidity_score=0.1, regime="CRISIS")
 
     def test_get_all_regimes(self) -> Any:
-        """Otomatik eklendi."""
+        """Get all regimes senaryosunu doğrular."""
         from services.risk.regime_limits import RegimeLimitsManager
 
         rm = RegimeLimitsManager()
@@ -230,13 +230,13 @@ class TestPortfolioEnhancements:
     """PortfolioEnhancements testleri."""
 
     def test_import(self) -> Any:
-        """Otomatik eklendi."""
+        """Import senaryosunu doğrular."""
         from services.portfolio.portfolio_enhancements import portfolio_enhancements
 
         assert portfolio_enhancements is not None
 
     def test_turnover_penalty(self) -> Any:
-        """Otomatik eklendi."""
+        """Turnover penalty senaryosunu doğrular."""
         from services.portfolio.portfolio_enhancements import PortfolioEnhancements
 
         pe = PortfolioEnhancements()
@@ -250,7 +250,7 @@ class TestPortfolioEnhancements:
         assert abs(adjusted["A"] - 0.5) < abs(current["A"] - 0.5)
 
     def test_should_rebalance(self) -> Any:
-        """Otomatik eklendi."""
+        """Should rebalance senaryosunu doğrular."""
         from services.portfolio.portfolio_enhancements import PortfolioConstraints, PortfolioEnhancements
 
         pe = PortfolioEnhancements(PortfolioConstraints(hysteresis_threshold=0.02))
@@ -270,7 +270,7 @@ class TestPortfolioEnhancements:
         assert not decision.should_rebalance
 
     def test_hysteresis(self) -> Any:
-        """Otomatik eklendi."""
+        """Hysteresis senaryosunu doğrular."""
         from services.portfolio.portfolio_enhancements import PortfolioEnhancements
 
         pe = PortfolioEnhancements()
@@ -286,7 +286,7 @@ class TestPortfolioEnhancements:
         assert filtered["B"] == 0.30
 
     def test_sector_constraints(self) -> Any:
-        """Otomatik eklendi."""
+        """Sector constraints senaryosunu doğrular."""
         from services.portfolio.portfolio_enhancements import PortfolioEnhancements
 
         pe = PortfolioEnhancements()
@@ -301,7 +301,7 @@ class TestPortfolioEnhancements:
         assert bank_total <= 0.301  # Floating point toleransı
 
     def test_liquidity_constraints(self) -> Any:
-        """Otomatik eklendi."""
+        """Liquidity constraints senaryosunu doğrular."""
         from services.portfolio.portfolio_enhancements import PortfolioEnhancements
 
         pe = PortfolioEnhancements()
@@ -315,7 +315,7 @@ class TestPortfolioEnhancements:
         assert adjusted["B"] == 0.0
 
     def test_min_position(self) -> Any:
-        """Otomatik eklendi."""
+        """Min position senaryosunu doğrular."""
         from services.portfolio.portfolio_enhancements import PortfolioEnhancements
 
         pe = PortfolioEnhancements()
@@ -327,7 +327,7 @@ class TestPortfolioEnhancements:
         assert "C" not in filtered
 
     def test_position_limits(self) -> Any:
-        """Otomatik eklendi."""
+        """Position limits senaryosunu doğrular."""
         from services.portfolio.portfolio_enhancements import PortfolioEnhancements
 
         pe = PortfolioEnhancements()
@@ -348,13 +348,13 @@ class TestBacktestEnhancements:
     """BacktestEnhancements testleri."""
 
     def test_import(self) -> Any:
-        """Otomatik eklendi."""
+        """Import senaryosunu doğrular."""
         from services.backtest.backtest_enhancements import backtest_enhancements
 
         assert backtest_enhancements is not None
 
     def test_t_plus_1(self) -> Any:
-        """Otomatik eklendi."""
+        """T plus 1 senaryosunu doğrular."""
         from services.backtest.backtest_enhancements import BacktestEnhancements
 
         be = BacktestEnhancements()
@@ -370,7 +370,7 @@ class TestBacktestEnhancements:
         assert result.delay_days >= 2  # Hafta sonu
 
     def test_market_impact(self) -> Any:
-        """Otomatik eklendi."""
+        """Market impact senaryosunu doğrular."""
         from services.backtest.backtest_enhancements import BacktestEnhancements
 
         be = BacktestEnhancements()
@@ -385,7 +385,7 @@ class TestBacktestEnhancements:
         assert not impact.is_feasible  # %50 participation
 
     def test_delisted(self) -> Any:
-        """Otomatik eklendi."""
+        """Delisted senaryosunu doğrular."""
         from services.backtest.backtest_enhancements import BacktestEnhancements
 
         be = BacktestEnhancements()
@@ -397,7 +397,7 @@ class TestBacktestEnhancements:
         assert not be.is_delisted("ABC", "2026-07-01")
 
     def test_ipo_handling(self) -> Any:
-        """Otomatik eklendi."""
+        """Ipo handling senaryosunu doğrular."""
         from services.backtest.backtest_enhancements import BacktestEnhancements
 
         be = BacktestEnhancements()
@@ -407,7 +407,7 @@ class TestBacktestEnhancements:
         assert be.is_post_ipo("NEW", "2026-07-15", min_days=30)
 
     def test_corporate_actions(self) -> Any:
-        """Otomatik eklendi."""
+        """Corporate actions senaryosunu doğrular."""
         from services.backtest.backtest_enhancements import BacktestEnhancements, CorporateAction
 
         be = BacktestEnhancements()
@@ -425,7 +425,7 @@ class TestBacktestEnhancements:
         assert len(actions) == 1
 
     def test_dividend_adjustment(self) -> Any:
-        """Otomatik eklendi."""
+        """Dividend adjustment senaryosunu doğrular."""
         from services.backtest.backtest_enhancements import BacktestEnhancements
 
         be = BacktestEnhancements()
@@ -433,7 +433,7 @@ class TestBacktestEnhancements:
         assert adjusted == 95.0
 
     def test_split_adjustment(self) -> Any:
-        """Otomatik eklendi."""
+        """Split adjustment senaryosunu doğrular."""
         from services.backtest.backtest_enhancements import BacktestEnhancements
 
         be = BacktestEnhancements()
@@ -441,7 +441,7 @@ class TestBacktestEnhancements:
         assert adjusted == 100.0
 
     def test_liquidity_check(self) -> Any:
-        """Otomatik eklendi."""
+        """Liquidity check senaryosunu doğrular."""
         from services.backtest.backtest_enhancements import BacktestEnhancements
 
         be = BacktestEnhancements()
@@ -462,13 +462,13 @@ class TestEventEnhancements:
     """EventEnhancements testleri."""
 
     def test_import(self) -> Any:
-        """Otomatik eklendi."""
+        """Import senaryosunu doğrular."""
         from services.core.event_enhancements import event_enhancements
 
         assert event_enhancements is not None
 
     def test_idempotency(self) -> Any:
-        """Otomatik eklendi."""
+        """Idempotency senaryosunu doğrular."""
         from services.core.event_enhancements import EventEnhancements
 
         ee = EventEnhancements()
@@ -479,7 +479,7 @@ class TestEventEnhancements:
         assert not ee.is_duplicate("event_2")
 
     def test_process_with_idempotency(self) -> Any:
-        """Otomatik eklendi."""
+        """Process with idempotency senaryosunu doğrular."""
         from services.core.event_enhancements import EventEnhancements
 
         ee = EventEnhancements()
@@ -494,7 +494,7 @@ class TestEventEnhancements:
         assert len(results) == 1
 
     def test_retry_policy(self) -> Any:
-        """Otomatik eklendi."""
+        """Retry policy senaryosunu doğrular."""
         from services.core.event_enhancements import EventEnhancements, RetryPolicy
 
         ee = EventEnhancements(retry_policy=RetryPolicy(max_retries=3))
@@ -504,7 +504,7 @@ class TestEventEnhancements:
         assert not ee.should_retry("event_1", attempt=3)
 
     def test_retry_delay(self) -> Any:
-        """Otomatik eklendi."""
+        """Retry delay senaryosunu doğrular."""
         from services.core.event_enhancements import EventEnhancements, RetryPolicy
 
         ee = EventEnhancements(retry_policy=RetryPolicy(base_delay=1.0, exponential_base=2.0, jitter=False))
@@ -516,7 +516,7 @@ class TestEventEnhancements:
         assert d0 < d1 < d2
 
     def test_correlation_id(self) -> Any:
-        """Otomatik eklendi."""
+        """Correlation id senaryosunu doğrular."""
         from services.core.event_enhancements import EventEnhancements
 
         ee = EventEnhancements()
@@ -532,7 +532,7 @@ class TestEventEnhancements:
         assert "event_2" in linked
 
     def test_sequence_number(self) -> Any:
-        """Otomatik eklendi."""
+        """Sequence number senaryosunu doğrular."""
         from services.core.event_enhancements import EventEnhancements
 
         ee = EventEnhancements()
@@ -542,7 +542,7 @@ class TestEventEnhancements:
         assert ee.get_next_sequence("topic_b") == 1
 
     def test_create_metadata(self) -> Any:
-        """Otomatik eklendi."""
+        """Create metadata senaryosunu doğrular."""
         from services.core.event_enhancements import EventEnhancements
 
         ee = EventEnhancements()
@@ -553,7 +553,7 @@ class TestEventEnhancements:
         assert meta.timestamp is not None
 
     def test_stats(self) -> Any:
-        """Otomatik eklendi."""
+        """Stats senaryosunu doğrular."""
         from services.core.event_enhancements import EventEnhancements
 
         ee = EventEnhancements()

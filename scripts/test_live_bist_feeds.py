@@ -11,7 +11,7 @@ if sys.platform == "win32":
 
 
 def test_tradingview_turkey_scanner() -> Any:
-    """Otomatik eklendi."""
+    """Tradingview turkey scanner sürecini veya işlevini yürütür."""
     url = "https://scanner.tradingview.com/turkey/scan"
     payload = {
         "filter": [],
@@ -64,7 +64,7 @@ def test_tradingview_turkey_scanner() -> Any:
 
 
 def test_bigpara() -> Any:
-    """Otomatik eklendi."""
+    """Bigpara sürecini veya işlevini yürütür."""
     url = "https://bigpara.hurriyet.com.tr/api/v1/hisse/list"
     try:
         r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5)

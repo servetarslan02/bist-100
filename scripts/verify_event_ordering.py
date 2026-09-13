@@ -18,7 +18,7 @@ if sys.platform == "win32":
 
 
 def test_events() -> Any:
-    """Otomatik eklendi."""
+    """Events sürecini veya işlevini yürütür."""
     r = requests.get("http://localhost:8000/api/v1/event-study/events").json()
     events = r.get("events", [])
     logger.info("=" * 110)

@@ -20,7 +20,7 @@ os.environ.setdefault("JWT_SECRET", "alpha-bist-test-secret-key-32-chars-minimum
 
 
 async def audit_all_live_data() -> Any:
-    """Otomatik eklendi."""
+    """Audit all live data sürecini veya işlevini yürütür."""
     logger.info("=" * 85)
     logger.info("ALPHA BIST — SİSTEM CANLILIK VE DİNAMİK VERİ DENETİM RAPORU")
     logger.info("=" * 85)

@@ -27,7 +27,7 @@ endpoints = [
 
 
 def main() -> Any:
-    """Otomatik eklendi."""
+    """Main sürecini veya işlevini yürütür."""
     logger.info("=" * 80)
     logger.info("ALPHA BIST -- SİTE ÜZERİNDEKİ CANLI VERİ ENTEGRASYONU DETAYLI DOĞRULAMASI")
     logger.info("=" * 80)

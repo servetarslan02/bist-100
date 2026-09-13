@@ -104,9 +104,13 @@ class MLTrainer:
     """ML model training with purged walk-forward validation."""
 
     def __init__(self):
-        """Otomatik eklendi."""
+        """Model deposunu ve eğitim sonuçları izleme sözlüğünü ilklendirir."""
         self.models: dict[str, Any] = {}
         self.training_results: dict[str, dict] = {}
+
+    def __repr__(self) -> str:
+        """Sınıfın temsil dizesi."""
+        return f"MLTrainer(models={list(self.models.keys())}, results={len(self.training_results)})"
 
     def generate_labels(
         self,

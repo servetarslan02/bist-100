@@ -127,13 +127,13 @@ EXPECTED_PORTS = {
 
 # ─── Bulgu Sınıfı ────────────────────────────────────────────────────────────
 class Finding:
-    """Otomatik eklendi."""
+    """Finding sürecini veya işlevini yürütür."""
     __slots__ = ("dim", "category", "severity", "file", "line", "msg", "snippet")
 
     SEV_ORDER = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3, "INFO": 4}
 
     def __init__(self, dim: int, category: str, severity: str, file: str, line: int, msg: str, snippet: str = ""):
-        """Otomatik eklendi."""
+        """Init sürecini veya işlevini yürütür."""
         self.dim = dim
         self.category = category
         self.severity = severity
@@ -143,7 +143,7 @@ class Finding:
         self.snippet = snippet.strip()[:200]  # 200 char limit
 
     def to_dict(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """To dict sürecini veya işlevini yürütür."""
         return {
             "dimension": self.dim,
             "category": self.category,
@@ -157,7 +157,7 @@ class Finding:
 
 # ─── Yardımcı: Satır Getir ───────────────────────────────────────────────────
 def _snip(lines: list[str], lineno: int) -> str:
-    """Otomatik eklendi."""
+    """Snip sürecini veya işlevini yürütür."""
     if 1 <= lineno <= len(lines):
         return lines[lineno - 1].strip()
     return ""
@@ -165,7 +165,7 @@ def _snip(lines: list[str], lineno: int) -> str:
 
 # ─── BOYUT 1: Sözdizimi & Dosya Bütünlüğü ───────────────────────────────────
 def dim1_syntax_and_encoding(rel: str, raw_bytes: bytes) -> list[Finding]:
-    """Otomatik eklendi."""
+    """Dim1 syntax and encoding sürecini veya işlevini yürütür."""
     finds: list[Finding] = []
 
     # BOM karakteri (UTF-8 BOM: U+FEFF) — Windows'ta çökme sebebi
@@ -209,7 +209,7 @@ class DeepInspector(ast.NodeVisitor):
     """Tek bir Python dosyasını tüm AST boyutlarında tarar."""
 
     def __init__(self, rel: str, lines: list[str]):
-        """Otomatik eklendi."""
+        """Init sürecini veya işlevini yürütür."""
         self.rel = rel
         self.lines = lines
         self.finds: list[Finding] = []
@@ -223,11 +223,11 @@ class DeepInspector(ast.NodeVisitor):
 
     # ── Yardımcılar ──────────────────────────────────────────────────────────
     def _add(self, dim: int, cat: str, sev: str, lineno: int, msg: str) -> Any:
-        """Otomatik eklendi."""
+        """Add sürecini veya işlevini yürütür."""
         self.finds.append(Finding(dim, cat, sev, self.rel, lineno, msg, _snip(self.lines, lineno)))
 
     def _decorator_names(self, node) -> set[str]:
-        """Otomatik eklendi."""
+        """Decorator names sürecini veya işlevini yürütür."""
         names: set[str] = set()
         for d in node.decorator_list:
             if isinstance(d, ast.Name):
@@ -238,7 +238,7 @@ class DeepInspector(ast.NodeVisitor):
 
     # ── BOYUT 2: Boş/Yarım Fonksiyonlar ─────────────────────────────────────
     def _check_empty_func(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> Any:
-        """Otomatik eklendi."""
+        """Check empty func sürecini veya işlevini yürütür."""
         decs = self._decorator_names(node)
         skip_decs = {"abstractmethod", "overload", "property"}
         if decs & skip_decs:
@@ -302,7 +302,7 @@ class DeepInspector(ast.NodeVisitor):
 
     # ── BOYUT 8: Tip Güvenliği ────────────────────────────────────────────────
     def _check_type_hints(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> Any:
-        """Otomatik eklendi."""
+        """Check type hints sürecini veya işlevini yürütür."""
         # Sadece production servis ve ML dosyaları için
         if not self._is_prod:
             return
@@ -337,7 +337,7 @@ class DeepInspector(ast.NodeVisitor):
 
     # ── BOYUT 16: Docstring Bütünlüğü ────────────────────────────────────────
     def _check_docstring(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> Any:
-        """Otomatik eklendi."""
+        """Check docstring sürecini veya işlevini yürütür."""
         if not self._is_prod:
             return
         if node.name.startswith("_"):  # Private metotlar opsiyonel
@@ -355,7 +355,7 @@ class DeepInspector(ast.NodeVisitor):
 
     # ── FunctionDef / AsyncFunctionDef ────────────────────────────────────────
     def visit_FunctionDef(self, node: ast.FunctionDef) -> Any:
-        """Otomatik eklendi."""
+        """Visit functiondef sürecini veya işlevini yürütür."""
         self._defined_funcs.add(node.name)
         self._check_empty_func(node)
         self._check_type_hints(node)
@@ -363,7 +363,7 @@ class DeepInspector(ast.NodeVisitor):
         self.generic_visit(node)
 
     def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> Any:
-        """Otomatik eklendi."""
+        """Visit asyncfunctiondef sürecini veya işlevini yürütür."""
         self._defined_funcs.add(node.name)
         self._check_empty_func(node)
         self._check_type_hints(node)
@@ -374,7 +374,7 @@ class DeepInspector(ast.NodeVisitor):
 
     # ── BOYUT 3: Fail-Closed & Hata Yönetimi ─────────────────────────────────
     def visit_Try(self, node: ast.Try) -> Any:
-        """Otomatik eklendi."""
+        """Visit try sürecini veya işlevini yürütür."""
         for handler in node.handlers:
             body = handler.body
             # except: pass — tam sessiz yutma
@@ -425,7 +425,7 @@ class DeepInspector(ast.NodeVisitor):
 
     # ── BOYUT 4: Async Bütünlüğü ──────────────────────────────────────────────
     def visit_Call(self, node: ast.Call) -> Any:
-        """Otomatik eklendi."""
+        """Visit call sürecini veya işlevini yürütür."""
         if self._async_depth > 0:
             func = node.func
             # time.sleep
@@ -481,21 +481,21 @@ class DeepInspector(ast.NodeVisitor):
 
     # ── BOYUT 5 & 6: Import Analizi ──────────────────────────────────────────
     def visit_Import(self, node: ast.Import) -> Any:
-        """Otomatik eklendi."""
+        """Visit import sürecini veya işlevini yürütür."""
         for alias in node.names:
             self._imports.add(alias.name)
             self._check_import(alias.name, node.lineno)
         self.generic_visit(node)
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> Any:
-        """Otomatik eklendi."""
+        """Visit importfrom sürecini veya işlevini yürütür."""
         mod = node.module or ""
         self._imports.add(mod)
         self._check_import(mod, node.lineno, names=[a.name for a in node.names])
         self.generic_visit(node)
 
     def _check_import(self, mod: str, lineno: int, names: list[str] | None = None) -> Any:
-        """Otomatik eklendi."""
+        """Check import sürecini veya işlevini yürütür."""
         # BOYUT 5: Pandas yasağı (production'da)
         if self._is_prod and (mod == "pandas" or mod.startswith("pandas.")):
             self._add(
@@ -548,7 +548,7 @@ class DeepInspector(ast.NodeVisitor):
     # ── BOYUT 13: print Kullanımı ────────────────────────────────────────────
     # (visit_Call içinde)
     def _check_print_call(self, node: ast.Call, lineno: int) -> Any:
-        """Otomatik eklendi."""
+        """Check print call sürecini veya işlevini yürütür."""
         if not self._is_prod:
             return
         if isinstance(node.func, ast.Name) and node.func.id == "print":
@@ -562,7 +562,7 @@ class DeepInspector(ast.NodeVisitor):
 
     # ── BOYUT 7: Sahte Testler ────────────────────────────────────────────────
     def visit_Assert(self, node: ast.Assert) -> Any:
-        """Otomatik eklendi."""
+        """Visit assert sürecini veya işlevini yürütür."""
         # assert True
         if isinstance(node.test, ast.Constant) and node.test.value is True:
             self._add(
@@ -584,7 +584,7 @@ class DeepInspector(ast.NodeVisitor):
 
     # ── BOYUT 9: Quant / PIT Kontrolleri ─────────────────────────────────────
     def visit_Assign(self, node: ast.Assign) -> Any:
-        """Otomatik eklendi."""
+        """Visit assign sürecini veya işlevini yürütür."""
         # Polars/pandas DataFrame'de shift(-N) → lookahead leakage işareti
         for target in node.targets:
             # Assign içindeki Call'lara bakıyoruz
@@ -593,7 +593,7 @@ class DeepInspector(ast.NodeVisitor):
         self.generic_visit(node)
 
     def _check_leakage_call(self, call: ast.Call, lineno: int) -> Any:
-        """Otomatik eklendi."""
+        """Check leakage call sürecini veya işlevini yürütür."""
         if isinstance(call.func, ast.Attribute) and call.func.attr == "shift":
             # shift(-N) → geleceğe bak = leakage
             for arg in call.args:
@@ -610,7 +610,7 @@ class DeepInspector(ast.NodeVisitor):
 
 # ─── BOYUT 6: Metin Tabanlı Güvenlik & Kalite Taraması ──────────────────────
 def dim6_text_scan(rel: str, content: str, lines: list[str]) -> list[Finding]:
-    """Otomatik eklendi."""
+    """Dim6 text scan sürecini veya işlevini yürütür."""
     finds: list[Finding] = []
     is_prod = any(rel.startswith(d + "/") for d in PRODUCTION_DIRS)
 
@@ -745,7 +745,7 @@ def dim10_architecture_check(all_imports: dict[str, set[str]]) -> list[Finding]:
 
 # ─── BOYUT 11: Servis __init__.py Varlığı ───────────────────────────────────
 def dim11_init_check(all_py_files: list[Path]) -> list[Finding]:
-    """Otomatik eklendi."""
+    """Dim11 init check sürecini veya işlevini yürütür."""
     finds: list[Finding] = []
     # Her Python dosyası içeren dizinde __init__.py olmalı
     dirs_with_py: set[Path] = set()
@@ -774,7 +774,7 @@ def dim11_init_check(all_py_files: list[Path]) -> list[Finding]:
 
 # ─── BOYUT 12: Docker & .env Uyumu ──────────────────────────────────────────
 def dim12_docker_env_check() -> list[Finding]:
-    """Otomatik eklendi."""
+    """Dim12 docker env check sürecini veya işlevini yürütür."""
     finds: list[Finding] = []
 
     # .env dosyası var mı?
@@ -844,7 +844,7 @@ def dim12_docker_env_check() -> list[Finding]:
 
 # ─── BOYUT 15: Test Kapsam Eksikliği ────────────────────────────────────────
 def dim15_test_coverage_check() -> list[Finding]:
-    """Otomatik eklendi."""
+    """Dim15 coverage check sürecini veya işlevini yürütür."""
     finds: list[Finding] = []
     existing_tests: set[str] = set()
 
@@ -899,7 +899,7 @@ def dim14_resource_leak_text(rel: str, content: str, lines: list[str]) -> list[F
 
 # ─── Ana Motor ───────────────────────────────────────────────────────────────
 def run_ultimate_audit() -> Any:
-    """Otomatik eklendi."""
+    """Ultimate audit sürecini veya işlevini yürütür."""
     t0 = time.time()
     all_findings: list[Finding] = []
     all_imports: dict[str, set[str]] = {}
@@ -1073,7 +1073,7 @@ def run_ultimate_audit() -> Any:
     with open(md_path, "w", encoding="utf-8") as mf:
 
         def w(s: str = "") -> Any:
-            """Otomatik eklendi."""
+            """W sürecini veya işlevini yürütür."""
             mf.write(s + "\n")
 
         w("# ALPHA BIST — Nihai Kapsamli Sistem Audit Raporu")

@@ -99,7 +99,7 @@ def backfill_from_tcmb(years: int = 5) -> Any:
 
 
 def main() -> Any:
-    """Otomatik eklendi."""
+    """Main sürecini veya işlevini yürütür."""
     parser = argparse.ArgumentParser(description="Macro Data Backfill")
     parser.add_argument("--years", type=int, default=5, help="Kaç yıllık veri")
     parser.add_argument("--indicators", type=str, default="all", help="İndikatörler (virgülle ayrılmış veya 'all')")

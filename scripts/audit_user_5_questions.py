@@ -12,7 +12,7 @@ sys.stdout.reconfigure(encoding="utf-8")
 
 
 def audit_5_questions() -> Any:
-    """Otomatik eklendi."""
+    """Audit 5 questions sürecini veya işlevini yürütür."""
     logger.info("=" * 80)
     logger.info("  KULLANICI 5 KRİTİK SORU DENETİM VE KANIT RAPORU")
     logger.info("=" * 80)

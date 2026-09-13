@@ -11,7 +11,7 @@ sys.stdout.reconfigure(encoding="utf-8")
 
 
 def audit_data_and_system() -> Any:
-    """Otomatik eklendi."""
+    """Audit data and system sürecini veya işlevini yürütür."""
     logger.info("=" * 80)
     logger.info("  VERİ MERKEZİ (/data) VE SİSTEM SAĞLIĞI (/system) DETAYLI DENETİMİ")
     logger.info("=" * 80)

@@ -35,7 +35,7 @@ logger = structlog.get_logger(__name__)
 
 
 def run_full_audit() -> Any:
-    """Otomatik eklendi."""
+    """Full audit sürecini veya işlevini yürütür."""
     logger.info("=" * 105)
     logger.info("🔬 ALPHA BIST — KURUMSAL DÜZEY KANTİTATİF VE GERÇEKÇİLİK DENETİMİ (30 YIL: 1997 - 2026)")
     logger.info("=" * 105)

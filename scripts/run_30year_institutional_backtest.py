@@ -106,7 +106,7 @@ def download_30y_data() -> Any:
 
 
 def run_30year_backtest() -> Any:
-    """Otomatik eklendi."""
+    """30year backtest sürecini veya işlevini yürütür."""
     bm_df, stock_dict = download_30y_data()
 
     logger.info("=" * 80)

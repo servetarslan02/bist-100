@@ -100,12 +100,16 @@ class NewsSentimentAnalyzer:
             result["ticker"] = ticker
         return result
 
+    def __repr__(self) -> str:
+        """Sınıfın temsil dizesi."""
+        return f"NewsSentimentAnalyzer(pos_words={len(self.POSITIVE_WORDS)}, neg_words={len(self.NEGATIVE_WORDS)})"
+
     def analyze_batch(self, texts: list[dict[str, str]]) -> list[dict[str, Any]]:
-        """Otomatik eklendi."""
+        """Çoklu haber metinlerini toplu olarak duygu analizinden geçirir."""
         return [self.analyze(item.get("text", ""), item.get("ticker")) for item in texts]
 
     def get_market_sentiment(self, analyses: list[dict[str, Any]]) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Tüm haber analizlerinin ağırlıklı ortalamasını alarak genel piyasa duygu skorunu hesaplar."""
         if not analyses:
             return {"overall": "NEUTRAL", "score": 0.0}
 

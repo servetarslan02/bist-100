@@ -169,12 +169,20 @@ class AlphaModel:
     """Base model wrapper for ALPHA BIST ML models."""
 
     def __init__(self, config: ModelConfig):
-        """Otomatik eklendi."""
+        """AlphaModel temel sınıfını model yapılandırmasıyla ilklendirir.
+
+        Args:
+            config: Model yapılandırma nesnesi.
+        """
         self.config = config
         self.model = None
         self.is_trained = False
         self.feature_importance: dict[str, float] = {}
         self.metrics: dict[str, float] = {}
+
+    def __repr__(self) -> str:
+        """Sınıfın temsil dizesi."""
+        return f"{self.__class__.__name__}(name={self.config.name!r}, is_trained={self.is_trained})"
 
     def train(self, X: np.ndarray, y: np.ndarray, X_val: np.ndarray | None = None, y_val: np.ndarray | None = None) -> Any:
         """Train the model."""
@@ -274,7 +282,7 @@ class LightGBMModel(AlphaModel):
     """LightGBM model wrapper."""
 
     def __init__(self, config: ModelConfig):
-        """Otomatik eklendi."""
+        """LightGBM model yapılandırmasını ilklendirir."""
         super().__init__(config)
 
     def train(self, X: np.ndarray, y: np.ndarray, X_val: np.ndarray | None = None, y_val: np.ndarray | None = None) -> Any:
@@ -312,7 +320,7 @@ class XGBoostModel(AlphaModel):
     """XGBoost model wrapper."""
 
     def __init__(self, config: ModelConfig):
-        """Otomatik eklendi."""
+        """XGBoost model yapılandırmasını ilklendirir."""
         super().__init__(config)
 
     def train(self, X: np.ndarray, y: np.ndarray, X_val: np.ndarray | None = None, y_val: np.ndarray | None = None) -> Any:
@@ -347,8 +355,12 @@ class ModelEnsemble:
     """Ensemble of multiple models for consensus predictions."""
 
     def __init__(self):
-        """Otomatik eklendi."""
+        """Topluluk modelleri sözlüğünü ilklendirir."""
         self.models: dict[str, AlphaModel] = {}
+
+    def __repr__(self) -> str:
+        """Sınıfın temsil dizesi."""
+        return f"ModelEnsemble(models={list(self.models.keys())})"
 
     def add_model(self, model: AlphaModel) -> Any:
         """Add a model to the ensemble."""

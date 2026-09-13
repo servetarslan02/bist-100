@@ -22,7 +22,7 @@ from services.data.historical_warehouse import historical_warehouse
 
 
 def main() -> Any:
-    """Otomatik eklendi."""
+    """Main sürecini veya işlevini yürütür."""
     logger.info("=" * 80)
     logger.info("30-YILLIK KALICI YEREL BIST VERİ DEPOSU OLUŞTURULUYOR")
     logger.info("=" * 80)

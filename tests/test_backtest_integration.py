@@ -515,7 +515,7 @@ class TestDeterministicRecovery:
         call_count = 0
 
         def expensive_func() -> Any:
-            """Otomatik eklendi."""
+            """Expensive func senaryosunu doğrular."""
             nonlocal call_count
             call_count += 1
             return 42

@@ -71,9 +71,13 @@ class ReplayEngine:
     """
 
     def __init__(self):
-        """Otomatik eklendi."""
+        """Geçmiş simülasyon olay yöneticisi ve durum deposunu ilklendirir."""
         self._handlers: dict[str, Callable] = {}
         self._state: dict[str, Any] = {}
+
+    def __repr__(self) -> str:
+        """Sınıfın temsil dizesi."""
+        return f"ReplayEngine(handlers={list(self._handlers.keys())}, state_keys={list(self._state.keys())})"
 
     def on(self, event_type: str, handler: Callable) -> Any:
         """Event handler kaydet."""
@@ -324,11 +328,26 @@ class WalkForwardValidator:
     """
 
     def __init__(self, train_months: int = 12, test_months: int = 1, purge_days: int = 5, embargo_days: int = 5):
-        """Otomatik eklendi."""
+        """Purged & Embargoed Walk-Forward doğrulama parametrelerini ilklendirir.
+
+        Args:
+            train_months: Eğitim periyodu ay uzunluğu.
+            test_months: Test periyodu ay uzunluğu.
+            purge_days: Eğitim ile test arasındaki veri sızıntısını önleme arındırma gün sayısı.
+            embargo_days: Test sonrasındaki yasaklama gün sayısı.
+        """
         self.train_months = train_months
         self.test_months = test_months
         self.purge_days = purge_days
         self.embargo_days = embargo_days
+
+    def __repr__(self) -> str:
+        """Sınıfın temsil dizesi."""
+        return (
+            f"WalkForwardValidator(train_months={self.train_months}, "
+            f"test_months={self.test_months}, purge_days={self.purge_days}, "
+            f"embargo_days={self.embargo_days})"
+        )
 
     def split(
         self, data: pl.DataFrame, date_column: str = "timestamp"

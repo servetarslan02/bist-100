@@ -14,8 +14,7 @@ Test edilen bileşenler:
 
 from __future__ import annotations
 
-import math
-from datetime import UTC, datetime
+from datetime import datetime
 
 import orjson
 import polars as pl
@@ -28,7 +27,6 @@ from services.core.tax import (
     TaxCalculator,
     TaxResult,
 )
-
 
 # ==============================================================================
 # Mevzuat sabiti doğrulama testleri

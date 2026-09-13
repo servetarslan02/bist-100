@@ -42,9 +42,18 @@ class BistEnsembleTrainer:
     """Alpha BIST için LightGBM + XGBoost + CatBoost Ensemble Eğitici."""
 
     def __init__(self, train_df: pl.DataFrame, oos_df: pl.DataFrame):
-        """Otomatik eklendi."""
+        """Eğitim ve örneklem dışı (OOS) veri çerçeveleriyle ensemble model eğiticisini yapılandırır.
+
+        Args:
+            train_df: Model eğitim veri çerçevesi.
+            oos_df: Örneklem dışı test veri çerçevesi.
+        """
         self.train_df = train_df
         self.oos_df = oos_df
+
+    def __repr__(self) -> str:
+        """Sınıfın temsil dizesi."""
+        return f"BistEnsembleTrainer(train_rows={len(self.train_df)}, oos_rows={len(self.oos_df)})"
         self.feature_cols = [
             "rsi_14",
             "atr_pct",

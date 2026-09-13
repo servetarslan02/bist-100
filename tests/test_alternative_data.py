@@ -53,7 +53,7 @@ logger = structlog.get_logger(__name__)
 
 
 def create_mock_social_data() -> Any:
-    """Otomatik eklendi."""
+    """Create mock social data senaryosunu doğrular."""
     return {
         "sentiment": 0.65,
         "volume": 1500,
@@ -71,7 +71,7 @@ def create_mock_social_data() -> Any:
 
 
 def create_mock_job_data() -> Any:
-    """Otomatik eklendi."""
+    """Create mock job data senaryosunu doğrular."""
     return {
         "posting_growth": 0.25,
         "tech_hiring_pct": 0.35,
@@ -83,7 +83,7 @@ def create_mock_job_data() -> Any:
 
 
 def create_mock_cc_data() -> Any:
-    """Otomatik eklendi."""
+    """Create mock cc data senaryosunu doğrular."""
     return {
         "spend_growth": 0.15,
         "vs_sector": 0.05,
@@ -94,7 +94,7 @@ def create_mock_cc_data() -> Any:
 
 
 def create_mock_satellite_data() -> Any:
-    """Otomatik eklendi."""
+    """Create mock satellite data senaryosunu doğrular."""
     return {
         "factory_traffic": 0.10,
         "store_traffic": 0.05,
@@ -105,7 +105,7 @@ def create_mock_satellite_data() -> Any:
 
 
 def create_mock_web_data() -> Any:
-    """Otomatik eklendi."""
+    """Create mock web data senaryosunu doğrular."""
     return {
         "web_traffic_change": 0.15,
         "app_ranking_change": -5,
@@ -117,7 +117,7 @@ def create_mock_web_data() -> Any:
 
 
 def run_async(coro) -> Any:
-    """Otomatik eklendi."""
+    """Run async senaryosunu doğrular."""
     return asyncio.get_event_loop().run_until_complete(coro)
 
 
@@ -131,14 +131,14 @@ class TestFaz0_RateLimiter:
 
     @pytest.mark.asyncio
     async def test_acquire_basic(self) -> Any:
-        """Otomatik eklendi."""
+        """Acquire basic senaryosunu doğrular."""
         limiter = RateLimiter(max_requests=10, window_seconds=60)
         await limiter.acquire()  # Should not block
         assert limiter._tokens < 10
 
     @pytest.mark.asyncio
     async def test_acquire_respects_limit(self) -> Any:
-        """Otomatik eklendi."""
+        """Acquire respects limit senaryosunu doğrular."""
         limiter = RateLimiter(max_requests=2, window_seconds=60)
         await limiter.acquire()
         await limiter.acquire()
@@ -153,13 +153,13 @@ class TestFaz0_CircuitBreaker:
     """Circuit breaker test'leri."""
 
     def test_initial_state_closed(self) -> Any:
-        """Otomatik eklendi."""
+        """Initial state closed senaryosunu doğrular."""
         cb = CircuitBreaker(failure_threshold=3)
         assert cb.state == CircuitState.CLOSED
         assert cb.allow_request()
 
     def test_opens_after_threshold(self) -> Any:
-        """Otomatik eklendi."""
+        """Opens after threshold senaryosunu doğrular."""
         cb = CircuitBreaker(failure_threshold=3)
         for _ in range(3):
             cb.record_failure()
@@ -167,7 +167,7 @@ class TestFaz0_CircuitBreaker:
         assert not cb.allow_request()
 
     def test_half_open_after_timeout(self) -> Any:
-        """Otomatik eklendi."""
+        """Half open after timeout senaryosunu doğrular."""
         cb = CircuitBreaker(failure_threshold=2, recovery_timeout_seconds=0)
         cb.record_failure()
         cb.record_failure()
@@ -177,7 +177,7 @@ class TestFaz0_CircuitBreaker:
         assert cb.allow_request()
 
     def test_closes_after_success(self) -> Any:
-        """Otomatik eklendi."""
+        """Closes after success senaryosunu doğrular."""
         cb = CircuitBreaker(failure_threshold=2, recovery_timeout_seconds=0)
         cb.record_failure()
         cb.record_failure()
@@ -192,7 +192,7 @@ class TestFaz0_DataQuality:
     """Data quality validator test'leri."""
 
     def test_valid_data(self) -> Any:
-        """Otomatik eklendi."""
+        """Valid data senaryosunu doğrular."""
         validator = DataQualityValidator()
         data = {"sentiment": 0.5, "volume": 1000}
         report = validator.validate(data, source="test")
@@ -200,14 +200,14 @@ class TestFaz0_DataQuality:
         assert report.score > 0.5
 
     def test_none_data(self) -> Any:
-        """Otomatik eklendi."""
+        """None data senaryosunu doğrular."""
         validator = DataQualityValidator()
         report = validator.validate(None, source="test")
         assert not report.is_valid
         assert report.score == 0
 
     def test_empty_dict(self) -> Any:
-        """Otomatik eklendi."""
+        """Empty dict senaryosunu doğrular."""
         validator = DataQualityValidator()
         report = validator.validate({}, source="test")
         # Boş dict: null check + type check + empty check → 1 failed
@@ -215,7 +215,7 @@ class TestFaz0_DataQuality:
         assert report.checks_failed >= 1
 
     def test_all_zeros(self) -> Any:
-        """Otomatik eklendi."""
+        """All zeros senaryosunu doğrular."""
         validator = DataQualityValidator()
         data = {"a": 0, "b": 0, "c": 0}
         report = validator.validate(data, source="test")
@@ -223,7 +223,7 @@ class TestFaz0_DataQuality:
         assert report.checks_failed >= 1
 
     def test_expected_fields(self) -> Any:
-        """Otomatik eklendi."""
+        """Expected fields senaryosunu doğrular."""
         validator = DataQualityValidator()
         data = {"sentiment": 0.5}
         report = validator.validate(data, source="test", expected_fields=["sentiment", "volume"])
@@ -231,7 +231,7 @@ class TestFaz0_DataQuality:
         assert report.checks_failed >= 1
 
     def test_range_check(self) -> Any:
-        """Otomatik eklendi."""
+        """Range check senaryosunu doğrular."""
         validator = DataQualityValidator()
         data = {"confidence": 2.0}  # 0-1 arası olmalı
         report = validator.validate(data, source="test")
@@ -242,14 +242,14 @@ class TestFaz0_AdapterRegistry:
     """Adapter registry test'leri."""
 
     def test_register_and_list(self) -> Any:
-        """Otomatik eklendi."""
+        """Register and list senaryosunu doğrular."""
         registry = AdapterRegistry()
         adapter = BKMAdapter()
         registry.register(adapter)
         assert "bkm" in registry.list_adapters()
 
     def test_get_adapter(self) -> Any:
-        """Otomatik eklendi."""
+        """Get adapter senaryosunu doğrular."""
         registry = AdapterRegistry()
         adapter = BKMAdapter()
         registry.register(adapter)
@@ -257,7 +257,7 @@ class TestFaz0_AdapterRegistry:
         assert registry.get("nonexistent") is None
 
     def test_get_all_status(self) -> Any:
-        """Otomatik eklendi."""
+        """Get all status senaryosunu doğrular."""
         registry = AdapterRegistry()
         registry.register(BKMAdapter())
         status = registry.get_all_status()
@@ -273,7 +273,7 @@ class TestFaz1_LegacyFeatures:
     """Legacy feature fonksiyonları test'leri."""
 
     def test_social_features(self) -> Any:
-        """Otomatik eklendi."""
+        """Social features senaryosunu doğrular."""
         data = create_mock_social_data()
         features = compute_social_features(data, "THYAO")
         assert "social_sentiment" in features
@@ -283,7 +283,7 @@ class TestFaz1_LegacyFeatures:
         assert "social_twitter_sentiment" in features
 
     def test_job_features(self) -> Any:
-        """Otomatik eklendi."""
+        """Job features senaryosunu doğrular."""
         data = create_mock_job_data()
         features = compute_job_features(data, "THYAO")
         assert "job_posting_growth" in features
@@ -291,28 +291,28 @@ class TestFaz1_LegacyFeatures:
         assert features["tech_hiring_pct"] == 0.35
 
     def test_cc_features(self) -> Any:
-        """Otomatik eklendi."""
+        """Cc features senaryosunu doğrular."""
         data = create_mock_cc_data()
         features = compute_cc_features(data, "THYAO")
         assert "cc_spend_growth" in features
         assert features["cc_spend_growth"] == 0.15
 
     def test_satellite_features(self) -> Any:
-        """Otomatik eklendi."""
+        """Satellite features senaryosunu doğrular."""
         data = create_mock_satellite_data()
         features = compute_satellite_features(data, "THYAO")
         assert "factory_traffic_change" in features
         assert features["factory_traffic_change"] == 0.10
 
     def test_web_features(self) -> Any:
-        """Otomatik eklendi."""
+        """Web features senaryosunu doğrular."""
         data = create_mock_web_data()
         features = compute_web_features(data, "THYAO")
         assert "web_traffic_change" in features
         assert features["web_traffic_change"] == 0.15
 
     def test_empty_data(self) -> Any:
-        """Otomatik eklendi."""
+        """Empty data senaryosunu doğrular."""
         assert compute_social_features({}, "THYAO") == {}
         assert compute_social_features(None, "THYAO") == {}
 
@@ -326,22 +326,22 @@ class TestFaz2_BKMAdapter:
     """BKM adapter test'leri."""
 
     def test_source_name(self) -> Any:
-        """Otomatik eklendi."""
+        """Source name senaryosunu doğrular."""
         assert bkm_adapter.source_name == "bkm"
 
     def test_compute_features_empty(self) -> Any:
-        """Otomatik eklendi."""
+        """Compute features empty senaryosunu doğrular."""
         features = bkm_adapter.compute_features({}, "THYAO")
         assert features == {}
 
     def test_compute_features_placeholder(self) -> Any:
-        """Otomatik eklendi."""
+        """Compute features placeholder senaryosunu doğrular."""
         data = {"data_source": "placeholder", "total_spend": 0}
         features = bkm_adapter.compute_features(data, "THYAO")
         assert features == {}  # Mock veri → feature üretme
 
     def test_compute_features_valid(self) -> Any:
-        """Otomatik eklendi."""
+        """Compute features valid senaryosunu doğrular."""
         data = {
             "total_spend": 1000000,
             "transaction_count": 50000,
@@ -363,16 +363,16 @@ class TestFaz2_GoogleTrendsAdapter:
     """Google Trends adapter test'leri."""
 
     def test_source_name(self) -> Any:
-        """Otomatik eklendi."""
+        """Source name senaryosunu doğrular."""
         assert google_trends_adapter.source_name == "google_trends"
 
     def test_compute_features_empty(self) -> Any:
-        """Otomatik eklendi."""
+        """Compute features empty senaryosunu doğrular."""
         features = google_trends_adapter.compute_features({}, "THYAO")
         assert features == {}
 
     def test_compute_features_valid(self) -> Any:
-        """Otomatik eklendi."""
+        """Compute features valid senaryosunu doğrular."""
         data = {
             "score": 75,
             "avg_30d": 60,
@@ -392,16 +392,16 @@ class TestFaz2_KariyerNetAdapter:
     """Kariyer.net adapter test'leri."""
 
     def test_source_name(self) -> Any:
-        """Otomatik eklendi."""
+        """Source name senaryosunu doğrular."""
         assert kariyer_net_adapter.source_name == "kariyer_net"
 
     def test_compute_features_empty(self) -> Any:
-        """Otomatik eklendi."""
+        """Compute features empty senaryosunu doğrular."""
         features = kariyer_net_adapter.compute_features({}, "THYAO")
         assert features == {}
 
     def test_compute_features_valid(self) -> Any:
-        """Otomatik eklendi."""
+        """Compute features valid senaryosunu doğrular."""
         data = {
             "postings": [
                 {"is_tech": True, "is_management": False, "is_remote": True, "department": "IT"},
@@ -421,16 +421,16 @@ class TestFaz2_EksiSozlukAdapter:
     """Ekşi Sözlük adapter test'leri."""
 
     def test_source_name(self) -> Any:
-        """Otomatik eklendi."""
+        """Source name senaryosunu doğrular."""
         assert eksi_sozluk_adapter.source_name == "eksi_sozluk"
 
     def test_compute_features_empty(self) -> Any:
-        """Otomatik eklendi."""
+        """Compute features empty senaryosunu doğrular."""
         features = eksi_sozluk_adapter.compute_features({}, "THYAO")
         assert features == {}
 
     def test_compute_features_valid(self) -> Any:
-        """Otomatik eklendi."""
+        """Compute features valid senaryosunu doğrular."""
         data = {
             "entries": [
                 {"text": "thyao çok güzel hisse, yükseliş devam edecek", "favorites": 15},
@@ -444,7 +444,7 @@ class TestFaz2_EksiSozlukAdapter:
         assert features["eksi_volume"] == 3
 
     def test_basic_sentiment(self) -> Any:
-        """Otomatik eklendi."""
+        """Basic sentiment senaryosunu doğrular."""
         assert eksi_sozluk_adapter._basic_sentiment("güzel harika başarılı") > 0
         assert eksi_sozluk_adapter._basic_sentiment("kötü batık zarar") < 0
         # "güzel" pozitif kelimeler listesinde olduğu için nötr metin bile pozitif çıkabilir
@@ -461,33 +461,33 @@ class TestFaz3_LLMSentiment:
     """LLM sentiment test'leri."""
 
     def test_keyword_analyze_positive(self) -> Any:
-        """Otomatik eklendi."""
+        """Keyword analyze positive senaryosunu doğrular."""
         analyzer = LLMSentimentAnalyzer()
         result = analyzer._keyword_analyze("Şirket rekor kâr açıkladı, büyüme devam ediyor")
         assert result["sentiment_score"] > 0
         assert result["source"] == "keyword_fallback"
 
     def test_keyword_analyze_negative(self) -> Any:
-        """Otomatik eklendi."""
+        """Keyword analyze negative senaryosunu doğrular."""
         analyzer = LLMSentimentAnalyzer()
         result = analyzer._keyword_analyze("Şirket zarar açıkladı, iflas riski var")
         assert result["sentiment_score"] < 0
 
     def test_keyword_analyze_neutral(self) -> Any:
-        """Otomatik eklendi."""
+        """Keyword analyze neutral senaryosunu doğrular."""
         analyzer = LLMSentimentAnalyzer()
         result = analyzer._keyword_analyze("Bugün hava çok güzel")
         assert result["sentiment_score"] == 0
 
     def test_neutral_result(self) -> Any:
-        """Otomatik eklendi."""
+        """Neutral result senaryosunu doğrular."""
         analyzer = LLMSentimentAnalyzer()
         result = analyzer._neutral_result()
         assert result["sentiment_score"] == 0
         assert result["category"] == "NEUTRAL"
 
     def test_cache_stats(self) -> Any:
-        """Otomatik eklendi."""
+        """Cache stats senaryosunu doğrular."""
         analyzer = LLMSentimentAnalyzer()
         stats = analyzer.get_cache_stats()
         assert "cache_size" in stats
@@ -503,7 +503,7 @@ class TestFaz4_FeatureEngine:
     """Feature engine test'leri."""
 
     def test_get_feature_names(self) -> Any:
-        """Otomatik eklendi."""
+        """Get feature names senaryosunu doğrular."""
         engine = AlternativeFeatureEngine()
         names = engine.get_feature_names()
         assert len(names) > 40
@@ -513,7 +513,7 @@ class TestFaz4_FeatureEngine:
         assert "alt_sentiment_avg" in names
 
     def test_composite_features(self) -> Any:
-        """Otomatik eklendi."""
+        """Composite features senaryosunu doğrular."""
         engine = AlternativeFeatureEngine()
         features = {
             "google_trends_zscore": 1.5,
@@ -527,7 +527,7 @@ class TestFaz4_FeatureEngine:
         assert "alt_data_coverage" in composite
 
     def test_status(self) -> Any:
-        """Otomatik eklendi."""
+        """Status senaryosunu doğrular."""
         engine = AlternativeFeatureEngine()
         status = engine.get_status()
         assert "initialized" in status
@@ -543,16 +543,16 @@ class TestFaz5_InvestingAdapter:
     """Investing.com adapter test'leri."""
 
     def test_source_name(self) -> Any:
-        """Otomatik eklendi."""
+        """Source name senaryosunu doğrular."""
         assert investing_adapter.source_name == "investing"
 
     def test_compute_features_empty(self) -> Any:
-        """Otomatik eklendi."""
+        """Compute features empty senaryosunu doğrular."""
         features = investing_adapter.compute_features({}, "THYAO")
         assert features == {}
 
     def test_compute_features_valid(self) -> Any:
-        """Otomatik eklendi."""
+        """Compute features valid senaryosunu doğrular."""
         data = {
             "comments": [
                 {"text": "yükseliş devam edecek, al"},
@@ -566,7 +566,7 @@ class TestFaz5_InvestingAdapter:
         assert features["investing_volume"] == 3
 
     def test_basic_sentiment(self) -> Any:
-        """Otomatik eklendi."""
+        """Basic sentiment senaryosunu doğrular."""
         assert investing_adapter._basic_sentiment("yükseliş güçlü al") > 0
         assert investing_adapter._basic_sentiment("düşüş riski sat") < 0
 
@@ -575,16 +575,16 @@ class TestFaz5_SatelliteAdapter:
     """Sentinel-2 satellite adapter test'leri."""
 
     def test_source_name(self) -> Any:
-        """Otomatik eklendi."""
+        """Source name senaryosunu doğrular."""
         assert satellite_adapter.source_name == "satellite"
 
     def test_compute_features_empty(self) -> Any:
-        """Otomatik eklendi."""
+        """Compute features empty senaryosunu doğrular."""
         features = satellite_adapter.compute_features({}, "THYAO")
         assert features == {}
 
     def test_compute_features_valid(self) -> Any:
-        """Otomatik eklendi."""
+        """Compute features valid senaryosunu doğrular."""
         data = {
             "locations": {
                 "IST Airport": {
@@ -601,7 +601,7 @@ class TestFaz5_SatelliteAdapter:
         assert abs(features["sat_activity_index"] - 0.20) < 0.01
 
     def test_compute_features_factory(self) -> Any:
-        """Otomatik eklendi."""
+        """Compute features factory senaryosunu doğrular."""
         data = {
             "locations": {
                 "Erdemir": {
@@ -628,13 +628,13 @@ class TestFaz5_Reconciliation:
     """Cross-source reconciliation test'leri."""
 
     def test_reconcile_no_data(self) -> Any:
-        """Otomatik eklendi."""
+        """Reconcile no data senaryosunu doğrular."""
         r = reconciler.reconcile("THYAO", {})
         assert r.consensus_direction == "NEUTRAL"
         assert r.source_count == 0
 
     def test_reconcile_consistent(self) -> Any:
-        """Otomatik eklendi."""
+        """Reconcile consistent senaryosunu doğrular."""
         features = {
             "google_trends_zscore": 1.5,
             "eksi_sentiment": 0.6,
@@ -646,7 +646,7 @@ class TestFaz5_Reconciliation:
         assert r.reliability_score > 0
 
     def test_reconcile_discrepant(self) -> Any:
-        """Otomatik eklendi."""
+        """Reconcile discrepant senaryosunu doğrular."""
         features = {
             "google_trends_zscore": 0.8,
             "eksi_sentiment": -0.7,
@@ -655,7 +655,7 @@ class TestFaz5_Reconciliation:
         assert len(r.discrepancies) > 0 or len(r.warnings) > 0
 
     def test_reconcile_to_dict(self) -> Any:
-        """Otomatik eklendi."""
+        """Reconcile to dict senaryosunu doğrular."""
         r = reconciler.reconcile("THYAO", {"eksi_sentiment": 0.5})
         d = r.to_dict()
         assert "ticker" in d
@@ -666,14 +666,14 @@ class TestFaz5_FeatureStore:
     """Feature store test'leri."""
 
     def test_put_and_get(self) -> Any:
-        """Otomatik eklendi."""
+        """Put and get senaryosunu doğrular."""
         store = FeatureStore()
         store.put("THYAO", "2026-01-01", {"sentiment": 0.5, "volume": 100})
         features = store.get("THYAO", "2026-01-01")
         assert features["sentiment"] == 0.5
 
     def test_get_latest(self) -> Any:
-        """Otomatik eklendi."""
+        """Get latest senaryosunu doğrular."""
         store = FeatureStore()
         store.put("THYAO", "2026-01-01", {"sentiment": 0.3})
         store.put("THYAO", "2026-01-15", {"sentiment": 0.7})
@@ -681,14 +681,14 @@ class TestFaz5_FeatureStore:
         assert features["sentiment"] == 0.7
 
     def test_get_latest_before_any_date(self) -> Any:
-        """Otomatik eklendi."""
+        """Get labefore any date senaryosunu doğrular."""
         store = FeatureStore()
         store.put("THYAO", "2026-01-01", {"sentiment": 0.5})
         features = store.get_latest("THYAO", "2025-12-01")
         assert features == {}
 
     def test_register_feature(self) -> Any:
-        """Otomatik eklendi."""
+        """Register feature senaryosunu doğrular."""
         store = FeatureStore()
         store.register_feature(
             FeatureManifest(
@@ -704,7 +704,7 @@ class TestFaz5_FeatureStore:
         assert "test_feature" in store.list_features()
 
     def test_stats(self) -> Any:
-        """Otomatik eklendi."""
+        """Stats senaryosunu doğrular."""
         store = FeatureStore()
         store.put("THYAO", "2026-01-01", {"a": 1, "b": 2})
         stats = store.get_stats()

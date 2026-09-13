@@ -11,7 +11,7 @@ import orjson
 
 
 def run_proof() -> Any:
-    """Otomatik eklendi."""
+    """Proof sürecini veya işlevini yürütür."""
     logger.info("=" * 72)
     logger.info("  ALPHA BIST 30Y ML + RISK PARITY MOTORU GERCEK DUNYA KANITI")
     logger.info("=" * 72)

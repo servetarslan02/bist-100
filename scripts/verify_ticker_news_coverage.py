@@ -20,7 +20,7 @@ from services.ingestion.providers.news_provider import news_provider
 
 
 async def test_news_coverage() -> Any:
-    """Otomatik eklendi."""
+    """News coverage sürecini veya işlevini yürütür."""
     logger.info("=" * 85)
     logger.info("ALPHA BIST — HİSSE BAZLI CANLI HABER VE KAP KAPSAMI TESTİ")
     logger.info("=" * 85)

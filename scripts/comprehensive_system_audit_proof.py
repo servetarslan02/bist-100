@@ -14,14 +14,14 @@ import orjson
 
 
 def print_banner(text) -> Any:
-    """Otomatik eklendi."""
+    """Print banner sürecini veya işlevini yürütür."""
     logger.info("\n" + "=" * 78)
     logger.info(f"  {text}")
     logger.info("=" * 78)
 
 
 def audit_containers() -> Any:
-    """Otomatik eklendi."""
+    """Audit containers sürecini veya işlevini yürütür."""
     print_banner("1. DOCKER KONTEYNER VE MIKROSERVIS DURUM DENETIMI")
     try:
         res = subprocess.run(
@@ -41,7 +41,7 @@ def audit_containers() -> Any:
 
 
 def audit_warehouse() -> Any:
-    """Otomatik eklendi."""
+    """Audit warehouse sürecini veya işlevini yürütür."""
     print_banner("2. 30 YILLIK TARIHSEL VERI AMBARI & DEPO DENETIMI")
     wh_path = "data/bist_30y_warehouse.db"
     if os.path.exists(wh_path):
@@ -63,7 +63,7 @@ def audit_warehouse() -> Any:
 
 
 def audit_ml_models() -> Any:
-    """Otomatik eklendi."""
+    """Audit ml models sürecini veya işlevini yürütür."""
     print_banner("3. EGITILMIS MAKINE OGRENIMI ENSEMBLE MODELLERI & CIKARIM (INFERENCE)")
     models = {
         "LightGBM": "ml/saved_models/lightgbm_model.pkl",
@@ -92,7 +92,7 @@ def audit_ml_models() -> Any:
 
 
 def audit_backend_apis() -> Any:
-    """Otomatik eklendi."""
+    """Audit backend apis sürecini veya işlevini yürütür."""
     print_banner("4. BACKEND CANLI API UÇ NOKTALARI VE DINAMIK YANITLAR (FastAPI :8000)")
     endpoints = [
         ("/api/v1/market/heatmap", "Canli Sektor Isi Haritasi", "sectors"),
@@ -120,7 +120,7 @@ def audit_backend_apis() -> Any:
 
 
 def audit_frontend_pages() -> Any:
-    """Otomatik eklendi."""
+    """Audit frontend pages sürecini veya işlevini yürütür."""
     print_banner("5. FRONTEND 17 SAYFA ERISIM VE ZERO-MOCK RENDER KONTROLU (Next.js :3000)")
     pages = [
         ("/", "Ana Sayfa / Dashboard"),

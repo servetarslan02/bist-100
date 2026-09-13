@@ -23,9 +23,13 @@ class DatasetBuilder30Y:
     """30 yıllık BIST verisinden ML feature matrisi üreten motor."""
 
     def __init__(self):
-        """Otomatik eklendi."""
+        """HistoricalDataWarehouse üzerinden 30 yıllık veri setini belleğe yükler."""
         self.warehouse = HistoricalDataWarehouse()
         self.bm_df, self.stock_dict = self.warehouse.load_30y_data()
+
+    def __repr__(self) -> str:
+        """Sınıfın temsil dizesi."""
+        return f"DatasetBuilder30Y(stocks={len(self.stock_dict)})"
 
     def build_feature_matrix(self) -> tuple[pl.DataFrame, pl.DataFrame]:
         """

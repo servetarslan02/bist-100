@@ -13,7 +13,7 @@ import orjson
 
 @dataclass(frozen=True)
 class EventObservation:
-    """Otomatik eklendi."""
+    """Kanıta dayalı olay gözlem veri modeli."""
     event_type: str
     entity_id: str
     observed_at: datetime
@@ -21,8 +21,12 @@ class EventObservation:
     evidence_id: str
     payload: dict
 
+    def __repr__(self) -> str:
+        """Sınıfın temsil dizesi."""
+        return f"EventObservation(type={self.event_type!r}, entity={self.entity_id!r}, evidence={self.evidence_id!r})"
+
     def event_id(self) -> str:
-        """Otomatik eklendi."""
+        """Gözlem içeriğinin deterministik SHA-256 kimliğini üretir."""
         body = {
             "event_type": self.event_type,
             "entity_id": self.entity_id,
@@ -31,10 +35,10 @@ class EventObservation:
             "evidence_id": self.evidence_id,
             "payload": self.payload,
         }
-        return sha256(orjson.dumps(body, option=orjson.OPT_SORT_KEYS).decode()).hexdigest()
+        return sha256(orjson.dumps(body, option=orjson.OPT_SORT_KEYS)).hexdigest()
 
     def validate(self) -> None:
-        """Otomatik eklendi."""
+        """Gözlemin zaman damgalarını ve kanıt bütünlüğünü doğrular."""
         if not self.evidence_id:
             raise ValueError("event requires evidence")
         if self.observed_at.tzinfo != UTC:

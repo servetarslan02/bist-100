@@ -425,7 +425,7 @@ def generate_report(
 
 
 async def main() -> Any:
-    """Otomatik eklendi."""
+    """Main sürecini veya işlevini yürütür."""
     parser = argparse.ArgumentParser(description="PostgreSQL Query Performance Auditor")
     parser.add_argument(
         "--threshold",

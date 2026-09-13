@@ -23,7 +23,7 @@ OPENAPI_URL = f"{API_BASE_URL}/openapi.json"
 
 
 def fetch_openapi_schema() -> Any:
-    """Otomatik eklendi."""
+    """Fetch openapi schema sürecini veya işlevini yürütür."""
     try:
         req = urllib.request.Request(OPENAPI_URL)
         with urllib.request.urlopen(req, timeout=5) as resp:
@@ -35,7 +35,7 @@ def fetch_openapi_schema() -> Any:
 
 
 def test_endpoint(method: str, path: str, url: str) -> dict:
-    """Otomatik eklendi."""
+    """Endpoint sürecini veya işlevini yürütür."""
     t0 = time.time()
     result = {"method": method, "path": path, "status": None, "time_ms": None, "error": None}
 
@@ -66,7 +66,7 @@ def test_endpoint(method: str, path: str, url: str) -> dict:
 
 
 def main() -> Any:
-    """Otomatik eklendi."""
+    """Main sürecini veya işlevini yürütür."""
     logger.info("=" * 80)
     logger.info("  ALPHA BIST — CANLI API & ENTEGRASYON TESTİ (Response Times)")
     logger.info("=" * 80)

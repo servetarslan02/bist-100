@@ -178,7 +178,7 @@ MODELS = [
 
 
 def sync_to_mlflow() -> Any:
-    """Otomatik eklendi."""
+    """Sync to mlflow sürecini veya işlevini yürütür."""
     logger.info("Writing models directly into MLflow database (PostgreSQL)...")
     for item in MODELS:
         exp_name = item["experiment_name"]

@@ -17,8 +17,12 @@ class MarketAnalyst:
     """ML destekli piyasa analiz agent'ı."""
 
     def __init__(self):
-        """Otomatik eklendi."""
+        """Piyasa analist önbelleğini ilklendirir."""
         self._cache: dict[str, dict[str, Any]] = {}
+
+    def __repr__(self) -> str:
+        """Sınıfın temsil dizesi."""
+        return f"MarketAnalyst(cached_tickers={len(self._cache)})"
 
     def analyze_ticker(
         self, ticker: str, features: dict[str, float] | None = None, model_score: float | None = None
@@ -74,7 +78,7 @@ class MarketAnalyst:
         return result
 
     def _interpret_technical(self, features: dict[str, float]) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Teknik indikatör özniteliklerini yorumlar ve sinyal üretir."""
         signals = []
         rsi = features.get("rsi_14")
         if rsi is not None:
@@ -85,7 +89,7 @@ class MarketAnalyst:
         return {"signals": signals}
 
     def _interpret_model_score(self, score: float) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Model tahmin skorunu yön ve güvenilirlik seviyesine dönüştürür."""
         if score > 0.05:
             direction = "YUKARI"
             confidence = min(abs(score) * 10, 1.0)
@@ -98,7 +102,7 @@ class MarketAnalyst:
         return {"score": round(score, 4), "direction": direction, "confidence": round(confidence, 2)}
 
     def _assess_risk(self, features: dict[str, float]) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Özniteliklere dayalı oynaklık ve risk faktörlerini değerlendirir."""
         risk_factors = []
         atr = features.get("atr_pct", 0)
         if atr > 3.0:
@@ -109,7 +113,7 @@ class MarketAnalyst:
         }
 
     def _generate_summary(self, sections: dict[str, Any]) -> str:
-        """Otomatik eklendi."""
+        """Farklı analiz bölümlerini birleştirerek metinsel özet oluşturur."""
         model = sections.get("model", {})
         risk = sections.get("risk", {})
         parts = []
@@ -124,7 +128,7 @@ class MarketAnalyst:
         return ". ".join(parts) + "."
 
     def get_cached_analysis(self, ticker: str) -> dict[str, Any] | None:
-        """Otomatik eklendi."""
+        """Belirtilen hisse kodu için önbellekte tutulan analizi döndürür."""
         return self._cache.get(ticker)
 
 

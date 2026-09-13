@@ -25,7 +25,7 @@ except ImportError:
 
 
 async def test_websocket_channels() -> Any:
-    """Otomatik eklendi."""
+    """Websocket channels sürecini veya işlevini yürütür."""
     logger.info("=" * 80)
     logger.info("1. WEBSOCKET CANLI YAYIN VE PUSH BAĞLANTI TESTİ")
     logger.info("=" * 80)
@@ -51,7 +51,7 @@ async def test_websocket_channels() -> Any:
 
 
 def test_api_latencies() -> Any:
-    """Otomatik eklendi."""
+    """Api latencies sürecini veya işlevini yürütür."""
     logger.info("\n" + "=" * 80)
     logger.info("2. REST API UÇ NOKTALARI TEPKİ SÜRESİ VE STABİLİTE TESTİ")
     logger.info("=" * 80)

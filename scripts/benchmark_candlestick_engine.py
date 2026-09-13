@@ -44,7 +44,7 @@ BIST_TEST_STOCKS = [
 
 
 def run_benchmark() -> Any:
-    """Otomatik eklendi."""
+    """Benchmark sürecini veya işlevini yürütür."""
     logger.info("=" * 80)
     logger.info("BIST-100 GERÇEK HİSSE VERİLERİ ÜZERİNDE 10/10 MUM MOTORU A/B TESTİ")
     logger.info("=" * 80)
@@ -121,7 +121,7 @@ def run_benchmark() -> Any:
 
     # İstatistiksel Karşılaştırma
     def calc_stats(trades) -> Any:
-        """Otomatik eklendi."""
+        """Calc stats sürecini veya işlevini yürütür."""
         if not trades:
             return {"count": 0, "win_rate": 0, "avg_ret": 0, "profit_factor": 0, "total_ret": 0}
         df_t = pl.DataFrame(trades)

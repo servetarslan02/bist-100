@@ -30,14 +30,14 @@ class TestJWT:
     """JWT handler test'leri."""
 
     def test_create_token(self) -> Any:
-        """Otomatik eklendi."""
+        """Create token senaryosunu doğrular."""
         handler = JWTHandler(secret_key="test-secret")
         token = handler.create_token("user1", "testuser", Role.VIEWER)
         assert isinstance(token, str)
         assert token.count(".") == 2
 
     def test_verify_token(self) -> Any:
-        """Otomatik eklendi."""
+        """Verify token senaryosunu doğrular."""
         handler = JWTHandler(secret_key="test-secret")
         token = handler.create_token("user1", "testuser", Role.ANALYST)
         payload = handler.verify_token(token)
@@ -47,13 +47,13 @@ class TestJWT:
         assert payload.role == "ANALYST"
 
     def test_verify_invalid_token(self) -> Any:
-        """Otomatik eklendi."""
+        """Verify invalid token senaryosunu doğrular."""
         handler = JWTHandler(secret_key="test-secret")
         payload = handler.verify_token("invalid.token.here")
         assert payload is None
 
     def test_verify_expired_token(self) -> Any:
-        """Otomatik eklendi."""
+        """Verify expired token senaryosunu doğrular."""
         handler = JWTHandler(secret_key="test-secret")
         # 0 saat = hemen expire
         token = handler.create_token("user1", "testuser", Role.VIEWER, expires_hours=0)
@@ -62,7 +62,7 @@ class TestJWT:
         assert payload is None
 
     def test_verify_wrong_secret(self) -> Any:
-        """Otomatik eklendi."""
+        """Verify wrong secret senaryosunu doğrular."""
         handler1 = JWTHandler(secret_key="secret1")
         handler2 = JWTHandler(secret_key="secret2")
         token = handler1.create_token("user1", "testuser", Role.VIEWER)
@@ -70,7 +70,7 @@ class TestJWT:
         assert payload is None
 
     def test_roles(self) -> Any:
-        """Otomatik eklendi."""
+        """Roles senaryosunu doğrular."""
         handler = JWTHandler(secret_key="test-secret")
         for role in Role:
             token = handler.create_token("user1", "testuser", role)
@@ -82,7 +82,7 @@ class TestAPIKeyManager:
     """API key manager test'leri."""
 
     def test_register_and_verify(self) -> Any:
-        """Otomatik eklendi."""
+        """Register and verify senaryosunu doğrular."""
         manager = APIKeyManager()
         manager.register_key("test-key", "test-service", ["GET", "POST"])
         info = manager.verify_key("test-key")
@@ -90,13 +90,13 @@ class TestAPIKeyManager:
         assert info["service"] == "test-service"
 
     def test_verify_unknown_key(self) -> Any:
-        """Otomatik eklendi."""
+        """Verify unknown key senaryosunu doğrular."""
         manager = APIKeyManager()
         info = manager.verify_key("unknown-key")
         assert info is None
 
     def test_revoke_key(self) -> Any:
-        """Otomatik eklendi."""
+        """Revoke key senaryosunu doğrular."""
         manager = APIKeyManager()
         manager.register_key("test-key", "test-service", ["GET"])
         manager.revoke_key("test-key")
@@ -108,41 +108,41 @@ class TestRBACChecker:
     """RBAC checker test'leri."""
 
     def test_viewer_can_get(self) -> Any:
-        """Otomatik eklendi."""
+        """Viewer can get senaryosunu doğrular."""
         assert rbac_checker.check_permission(Role.VIEWER, "GET")
 
     def test_viewer_cannot_post(self) -> Any:
-        """Otomatik eklendi."""
+        """Viewer cannot post senaryosunu doğrular."""
         assert not rbac_checker.check_permission(Role.VIEWER, "POST")
 
     def test_analyst_can_post(self) -> Any:
-        """Otomatik eklendi."""
+        """Analyst can post senaryosunu doğrular."""
         assert rbac_checker.check_permission(Role.ANALYST, "POST")
 
     def test_analyst_cannot_delete(self) -> Any:
-        """Otomatik eklendi."""
+        """Analyst cannot delete senaryosunu doğrular."""
         assert not rbac_checker.check_permission(Role.ANALYST, "DELETE")
 
     @pytest.mark.parametrize("method", ["GET", "POST", "PUT", "DELETE"])
     def test_admin_can_all(self, method) -> Any:
-        """Otomatik eklendi."""
+        """Admin can all senaryosunu doğrular."""
         assert rbac_checker.check_permission(Role.ADMIN, method)
 
     @pytest.mark.parametrize("method", ["GET", "POST", "PUT", "DELETE"])
     def test_system_can_all(self, method) -> Any:
-        """Otomatik eklendi."""
+        """System can all senaryosunu doğrular."""
         assert rbac_checker.check_permission(Role.SYSTEM, method)
 
     def test_operator_can_put(self) -> Any:
-        """Otomatik eklendi."""
+        """Operator can put senaryosunu doğrular."""
         assert rbac_checker.check_permission(Role.OPERATOR, "PUT")
 
     def test_operator_cannot_delete(self) -> Any:
-        """Otomatik eklendi."""
+        """Operator cannot delete senaryosunu doğrular."""
         assert not rbac_checker.check_permission(Role.OPERATOR, "DELETE")
 
     def test_admin_endpoint_admin_only(self) -> Any:
-        """Otomatik eklendi."""
+        """Admin endpoint admin only senaryosunu doğrular."""
         assert rbac_checker.check_endpoint_access(Role.ADMIN, "/admin/policy")
         assert rbac_checker.check_endpoint_access(Role.SYSTEM, "/admin/policy")
         assert not rbac_checker.check_endpoint_access(Role.VIEWER, "/admin/policy")
@@ -150,7 +150,7 @@ class TestRBACChecker:
 
     @pytest.mark.parametrize("role", list(Role))
     def test_normal_endpoint_all_roles(self, role) -> Any:
-        """Otomatik eklendi."""
+        """Normal endpoint all roles senaryosunu doğrular."""
         assert rbac_checker.check_endpoint_access(role, "/api/v1/market/state")
 
 
@@ -164,7 +164,7 @@ class TestRateLimiter:
 
     @pytest.mark.asyncio
     async def test_allows_within_limit(self) -> Any:
-        """Otomatik eklendi."""
+        """Allows within limit senaryosunu doğrular."""
         limiter = InMemoryRateLimiter()
         allowed, info = await limiter.check("client1", "default")
         assert allowed
@@ -172,7 +172,7 @@ class TestRateLimiter:
 
     @pytest.mark.asyncio
     async def test_blocks_over_limit(self) -> Any:
-        """Otomatik eklendi."""
+        """Blocks over limit senaryosunu doğrular."""
         limiter = InMemoryRateLimiter()
         # 100 istek gönder (default limit)
         for _ in range(100):
@@ -183,7 +183,7 @@ class TestRateLimiter:
 
     @pytest.mark.asyncio
     async def test_different_clients(self) -> Any:
-        """Otomatik eklendi."""
+        """Different clients senaryosunu doğrular."""
         limiter = InMemoryRateLimiter()
         for _ in range(100):
             await limiter.check("client1", "default")
@@ -193,7 +193,7 @@ class TestRateLimiter:
 
     @pytest.mark.asyncio
     async def test_different_groups(self) -> Any:
-        """Otomatik eklendi."""
+        """Different groups senaryosunu doğrular."""
         limiter = InMemoryRateLimiter()
         for _ in range(100):
             await limiter.check("client1", "default")
@@ -202,7 +202,7 @@ class TestRateLimiter:
         assert allowed
 
     def test_endpoint_group_detection(self) -> Any:
-        """Otomatik eklendi."""
+        """Endpoint group detection senaryosunu doğrular."""
         limiter = InMemoryRateLimiter()
         assert limiter.get_endpoint_group("/api/v1/market/state", "GET") == "default"
         assert limiter.get_endpoint_group("/api/v1/backtests", "POST") == "backtest"
@@ -221,7 +221,7 @@ class TestApp:
     """FastAPI uygulama test'leri."""
 
     def test_create_app(self) -> Any:
-        """Otomatik eklendi."""
+        """Create app senaryosunu doğrular."""
         from services.api.app import create_app
 
         app = create_app()
@@ -229,7 +229,7 @@ class TestApp:
         assert app.version == "2.0.0"
 
     def test_routes_count(self) -> Any:
-        """Otomatik eklendi."""
+        """Routes count senaryosunu doğrular."""
         from services.api.app import create_app
 
         app = create_app()
@@ -238,7 +238,7 @@ class TestApp:
         assert len(routes) >= 2
 
     def test_v1_router_prefix(self) -> Any:
-        """Otomatik eklendi."""
+        """V1 router prefix senaryosunu doğrular."""
         from services.api.v1 import v1_router
 
         assert v1_router.prefix == "/api/v1"

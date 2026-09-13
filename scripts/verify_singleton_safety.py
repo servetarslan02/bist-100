@@ -88,7 +88,7 @@ def analyze_class_safety(class_name, module_path) -> Any:
 
 
 def main() -> Any:
-    """Otomatik eklendi."""
+    """Main sürecini veya işlevini yürütür."""
     logger.info("🔒 Singleton Thread-Safety Verification")
     logger.info("=" * 60)
 

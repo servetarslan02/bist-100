@@ -19,7 +19,6 @@ from __future__ import annotations
 import random
 import sys
 import time
-import traceback
 from datetime import datetime, timedelta
 
 import structlog
@@ -119,8 +118,8 @@ START_DATE = (datetime.now() - timedelta(days=120)).strftime("%Y-%m-%d")
 
 
 def t_yfinance_bulk():
-    import yfinance as yf
     import pandas as pd
+    import yfinance as yf
 
     failed = []
     fetched = []
@@ -370,8 +369,9 @@ print("-" * 50)
 
 def t_dlq_status():
     """DLQ'da ne kadar basarısız islem bekliyor?"""
-    import duckdb
     import os
+
+    import duckdb
     dlq_path = "data/dlq.db"
     if not os.path.exists(dlq_path):
         return "WARN: DLQ veritabani yok (henuz hata olmamis olabilir)"
@@ -406,8 +406,9 @@ def t_mini_backtest():
     AlphaEngine ile 90 gun veri, 60 gun train, 30 gun test.
     Gercek fiyatlarla portfoy getirisi hesapla.
     """
-    from services.core.alpha_engine import AlphaEngine
     import lightgbm as lgb
+
+    from services.core.alpha_engine import AlphaEngine
 
     engine = AlphaEngine()
     engine.params["n_estimators"] = 30  # hizli
@@ -491,13 +492,13 @@ print(f"  Toplam sure: {total_time:.1f}s")
 print("=" * 75)
 
 if failed > 0:
-    print(f"\nBAŞARISIZ TESTLER:")
+    print("\nBAŞARISIZ TESTLER:")
     for r in results:
         if r["status"] == FAIL:
             print(f"  ERR  {r['name']}: {r['detail']}")
 
 if warned > 0:
-    print(f"\nUYARI TESTLER:")
+    print("\nUYARI TESTLER:")
     for r in results:
         if r["status"] == WARN:
             print(f"  WRN  {r['name']}: {r['detail']}")

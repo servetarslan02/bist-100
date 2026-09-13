@@ -73,11 +73,11 @@ IGNORED_DIRS = {
 
 
 class AuditFinding:
-    """Otomatik eklendi."""
+    """Auditfinding sürecini veya işlevini yürütür."""
     def __init__(
         self, category: str, severity: str, file_path: str, line_no: int, message: str, code_snippet: str = ""
     ):
-        """Otomatik eklendi."""
+        """Init sürecini veya işlevini yürütür."""
         self.category = category  # 'EMPTY_CODE', 'FAIL_CLOSED', 'ASYNC_BLOCKING', 'PANDAS_VIOLATION', 'FAKE_TEST', 'MOCK_LEAK', 'BROKEN_IMPORT', 'TODO_MARKER'
         self.severity = severity  # 'CRITICAL', 'HIGH', 'MEDIUM', 'LOW'
         self.file_path = file_path
@@ -86,7 +86,7 @@ class AuditFinding:
         self.code_snippet = code_snippet.strip()
 
     def to_dict(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """To dict sürecini veya işlevini yürütür."""
         return {
             "category": self.category,
             "severity": self.severity,
@@ -98,9 +98,9 @@ class AuditFinding:
 
 
 class CodeInspector(ast.NodeVisitor):
-    """Otomatik eklendi."""
+    """Codeinspector sürecini veya işlevini yürütür."""
     def __init__(self, rel_path: str, source_lines: list[str]):
-        """Otomatik eklendi."""
+        """Init sürecini veya işlevini yürütür."""
         self.rel_path = rel_path
         self.source_lines = source_lines
         self.findings: list[AuditFinding] = []
@@ -110,19 +110,19 @@ class CodeInspector(ast.NodeVisitor):
         self.in_async = False
 
     def _get_snippet(self, lineno: int) -> str:
-        """Otomatik eklendi."""
+        """Get snippet sürecini veya işlevini yürütür."""
         if 1 <= lineno <= len(self.source_lines):
             return self.source_lines[lineno - 1].strip()
         return ""
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> Any:
-        """Otomatik eklendi."""
+        """Visit functiondef sürecini veya işlevini yürütür."""
         self.defined_functions.add(node.name)
         self._check_empty_or_placeholder_func(node)
         self.generic_visit(node)
 
     def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> Any:
-        """Otomatik eklendi."""
+        """Visit asyncfunctiondef sürecini veya işlevini yürütür."""
         self.defined_functions.add(node.name)
         self._check_empty_or_placeholder_func(node)
 
@@ -132,7 +132,7 @@ class CodeInspector(ast.NodeVisitor):
         self.in_async = prev_async
 
     def _check_empty_or_placeholder_func(self, node) -> Any:
-        """Otomatik eklendi."""
+        """Check empty or placeholder func sürecini veya işlevini yürütür."""
         # Soyut metotları veya overload'ları hariç tut
         for dec in node.decorator_list:
             if isinstance(dec, ast.Name) and dec.id in ("abstractmethod", "overload"):
@@ -211,12 +211,12 @@ class CodeInspector(ast.NodeVisitor):
             return
 
     def visit_ClassDef(self, node: ast.ClassDef) -> Any:
-        """Otomatik eklendi."""
+        """Visit classdef sürecini veya işlevini yürütür."""
         self.defined_classes.add(node.name)
         self.generic_visit(node)
 
     def visit_Try(self, node: ast.Try) -> Any:
-        """Otomatik eklendi."""
+        """Visit try sürecini veya işlevini yürütür."""
         for handler in node.handlers:
             # except: pass veya except Exception: pass
             if len(handler.body) == 1 and isinstance(handler.body[0], ast.Pass):
@@ -245,7 +245,7 @@ class CodeInspector(ast.NodeVisitor):
         self.generic_visit(node)
 
     def visit_Call(self, node: ast.Call) -> Any:
-        """Otomatik eklendi."""
+        """Visit call sürecini veya işlevini yürütür."""
         # async def içinde time.sleep kontrolü
         if self.in_async:
             if isinstance(node.func, ast.Attribute):
@@ -274,21 +274,21 @@ class CodeInspector(ast.NodeVisitor):
         self.generic_visit(node)
 
     def visit_Import(self, node: ast.Import) -> Any:
-        """Otomatik eklendi."""
+        """Visit import sürecini veya işlevini yürütür."""
         for alias in node.names:
             self.imported_modules.add(alias.name)
             self._check_forbidden_imports(alias.name, node.lineno)
         self.generic_visit(node)
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> Any:
-        """Otomatik eklendi."""
+        """Visit importfrom sürecini veya işlevini yürütür."""
         mod = node.module or ""
         self.imported_modules.add(mod)
         self._check_forbidden_imports(mod, node.lineno)
         self.generic_visit(node)
 
     def _check_forbidden_imports(self, mod_name: str, lineno: int) -> Any:
-        """Otomatik eklendi."""
+        """Check forbidden imports sürecini veya işlevini yürütür."""
         is_prod = (
             self.rel_path.startswith("services")
             or self.rel_path.startswith("ml")
@@ -322,7 +322,7 @@ class CodeInspector(ast.NodeVisitor):
             )
 
     def visit_Assert(self, node: ast.Assert) -> Any:
-        """Otomatik eklendi."""
+        """Visit assert sürecini veya işlevini yürütür."""
         # assert ... or True veya assert True
         if isinstance(node.test, ast.Constant) and node.test.value is True:
             self.findings.append(
@@ -352,7 +352,7 @@ class CodeInspector(ast.NodeVisitor):
 
 
 def scan_source_text(rel_path: str, content: str) -> list[AuditFinding]:
-    """Otomatik eklendi."""
+    """Scan source text sürecini veya işlevini yürütür."""
     findings = []
     lines = content.splitlines()
 
@@ -397,7 +397,7 @@ def scan_source_text(rel_path: str, content: str) -> list[AuditFinding]:
 
 
 def run_cross_audit() -> Any:
-    """Otomatik eklendi."""
+    """Cross audit sürecini veya işlevini yürütür."""
     start_time = time.time()
     all_findings: list[AuditFinding] = []
     total_files = 0

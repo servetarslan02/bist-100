@@ -18,7 +18,7 @@ _TZ_ISTANBUL = timezone(timedelta(hours=3))
 
 @dataclass
 class ReplayResult:
-    """Otomatik eklendi."""
+    """Strateji geriye dönük oynatma simülasyon sonuç modeli."""
     start_date: str
     end_date: str
     total_ticks: int = 0
@@ -31,8 +31,15 @@ class ReplayResult:
     trades: list[dict[str, Any]] = field(default_factory=list)
     equity_curve: list[float] = field(default_factory=list)
 
+    def __repr__(self) -> str:
+        """Sınıfın temsil dizesi."""
+        return (
+            f"ReplayResult(period={self.start_date}..{self.end_date}, "
+            f"total_pnl={self.total_pnl:.2f}, sharpe={self.sharpe_ratio:.2f})"
+        )
+
     def summary(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Simülasyon sonuçlarının temel özet sözlüğünü döndürür."""
         return {
             "period": f"{self.start_date} → {self.end_date}",
             "total_ticks": self.total_ticks,
@@ -50,11 +57,16 @@ class StrategyReplay:
     """Strateji replay motoru."""
 
     def __init__(self):
-        """Otomatik eklendi."""
+        """Strateji oynatıcı durumunu ilklendirir."""
         self._strategy = None
 
+    def __repr__(self) -> str:
+        """Sınıfın temsil dizesi."""
+        strat_name = self._strategy.__class__.__name__ if self._strategy else "None"
+        return f"StrategyReplay(strategy={strat_name})"
+
     def load_strategy(self, strategy) -> Any:
-        """Otomatik eklendi."""
+        """Simülasyonda yürütülecek alım-satım stratejisini bağlar."""
         self._strategy = strategy
 
     def run(

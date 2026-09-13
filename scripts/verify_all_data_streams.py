@@ -23,7 +23,7 @@ logger.info("=" * 85)
 
 
 async def test_all_streams() -> Any:
-    """Otomatik eklendi."""
+    """All streams sürecini veya işlevini yürütür."""
     # -------------------------------------------------------------
     # 1. CANLI KAP VE FİNANS HABER AKIŞI (NEWS & KAP PROVIDER)
     # -------------------------------------------------------------

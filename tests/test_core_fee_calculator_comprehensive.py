@@ -16,7 +16,6 @@ Test edilen bileşenler:
 
 from __future__ import annotations
 
-import math
 import threading
 
 import polars as pl
@@ -24,8 +23,8 @@ import pytest
 
 from services.core.fee_calculator import (
     DEFAULT_BIST_FEE_RATE,
-    DEFAULT_BSMV_RATE,
     DEFAULT_BROKER_RATE,
+    DEFAULT_BSMV_RATE,
     DEFAULT_MIN_COMMISSION,
     DEFAULT_MKK_FEE_RATE,
     DEFAULT_VIOP_FEE_RATE,
@@ -34,7 +33,6 @@ from services.core.fee_calculator import (
     FeeCalculator,
     _safe_float,
 )
-
 
 # ==============================================================================
 # Sabit doğrulama testleri (Mevzuat)
@@ -46,27 +44,27 @@ class TestRegulatoryConstants:
 
     def test_broker_rate_default(self) -> None:
         """Varsayılan broker komisyonu on binde 3 (%0.03)."""
-        assert DEFAULT_BROKER_RATE == pytest.approx(0.0003)
+        assert pytest.approx(0.0003) == DEFAULT_BROKER_RATE
 
     def test_bist_fee_rate(self) -> None:
         """BIST borsa payı %0.0056 (yüz binde 5.6)."""
-        assert DEFAULT_BIST_FEE_RATE == pytest.approx(0.000056)
+        assert pytest.approx(0.000056) == DEFAULT_BIST_FEE_RATE
 
     def test_viop_fee_rate(self) -> None:
         """VİOP borsa payı %0.0040."""
-        assert DEFAULT_VIOP_FEE_RATE == pytest.approx(0.00004)
+        assert pytest.approx(0.00004) == DEFAULT_VIOP_FEE_RATE
 
     def test_mkk_fee_rate(self) -> None:
         """MKK tescil/saklama payı %0.00109."""
-        assert DEFAULT_MKK_FEE_RATE == pytest.approx(0.0000109)
+        assert pytest.approx(0.0000109) == DEFAULT_MKK_FEE_RATE
 
     def test_bsmv_rate(self) -> None:
         """BSMV oranı %5."""
-        assert DEFAULT_BSMV_RATE == pytest.approx(0.05)
+        assert pytest.approx(0.05) == DEFAULT_BSMV_RATE
 
     def test_min_commission(self) -> None:
         """Minimum komisyon 1.00 TL."""
-        assert DEFAULT_MIN_COMMISSION == pytest.approx(1.00)
+        assert pytest.approx(1.00) == DEFAULT_MIN_COMMISSION
 
 
 # ==============================================================================

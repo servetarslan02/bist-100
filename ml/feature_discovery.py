@@ -29,10 +29,18 @@ class FeatureDiscoveryPipeline:
     """Feature discovery and selection pipeline."""
 
     def __init__(self):
-        """Otomatik eklendi."""
+        """Öznitelik keşif ve seçim boru hattını ilklendirir."""
         self.raw_features: list[str] = []
         self.candidate_features: list[str] = []
         self.selected_features: list[str] = []
+
+    def __repr__(self) -> str:
+        """Sınıfın temsil dizesi."""
+        return (
+            f"FeatureDiscoveryPipeline(raw={len(self.raw_features)}, "
+            f"candidates={len(self.candidate_features)}, "
+            f"selected={len(self.selected_features)})"
+        )
 
     def discover(
         self,

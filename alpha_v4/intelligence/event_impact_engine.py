@@ -9,7 +9,7 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class EventImpactAssessment:
-    """Otomatik eklendi."""
+    """Olayın şirket üzerindeki yapısal finansal etki hipotezi modeli."""
     materiality: str
     revenue_relevance: str
     cashflow_relevance: str
@@ -17,9 +17,18 @@ class EventImpactAssessment:
     uncertainty: str
     horizon: str
 
+    def __repr__(self) -> str:
+        """Sınıfın temsil dizesi."""
+        return f"EventImpactAssessment(materiality={self.materiality!r}, horizon={self.horizon!r})"
+
 
 class EventImpactEngine:
-    """Otomatik eklendi."""
+    """Haber ve olayların finansal etki hipotezlerini üreten motor."""
+
+    def __repr__(self) -> str:
+        """Sınıfın temsil dizesi."""
+        return "EventImpactEngine()"
+
     def assess(
         self,
         *,
@@ -30,7 +39,7 @@ class EventImpactEngine:
         uncertainty: str,
         horizon: str,
     ) -> EventImpactAssessment:
-        """Otomatik eklendi."""
+        """Belirtilen etki parametrelerine göre değerlendirme çıktısı oluşturur."""
         return EventImpactAssessment(
             materiality=materiality,
             revenue_relevance=revenue_relevance,

@@ -87,7 +87,7 @@ DATA_QUALITY_RULES = {
 
 
 async def get_connection() -> Any:
-    """Otomatik eklendi."""
+    """Get connection sürecini veya işlevini yürütür."""
     return await asyncpg.connect(
         host=settings.postgres_host,
         port=settings.postgres_port,
@@ -547,7 +547,7 @@ def generate_report(
 
 
 async def main() -> Any:
-    """Otomatik eklendi."""
+    """Main sürecini veya işlevini yürütür."""
     parser = argparse.ArgumentParser(description="TimescaleDB Health Auditor")
     parser.add_argument(
         "--output",

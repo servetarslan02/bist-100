@@ -21,7 +21,7 @@ headers = {
 
 
 def test_doviz_bist() -> Any:
-    """Otomatik eklendi."""
+    """Doviz bist sürecini veya işlevini yürütür."""
     url = "https://www.doviz.com/api/v1/currencies/all/latest"
     try:
         r = requests.get(url, headers=headers, timeout=5)
@@ -31,7 +31,7 @@ def test_doviz_bist() -> Any:
 
 
 def test_bigpara_live() -> Any:
-    """Otomatik eklendi."""
+    """Bigpara live sürecini veya işlevini yürütür."""
     url = "https://bigpara.hurriyet.com.tr/api/v1/borsa/hissemarket"
     try:
         r = requests.get(url, headers=headers, timeout=5)

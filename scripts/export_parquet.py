@@ -27,7 +27,7 @@ from services.core.duckdb_research import research_engine
 
 
 async def main() -> Any:
-    """Otomatik eklendi."""
+    """Main sürecini veya işlevini yürütür."""
     parser = argparse.ArgumentParser(description="TimescaleDB → Parquet Export")
     parser.add_argument(
         "--table",

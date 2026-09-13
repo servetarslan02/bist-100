@@ -63,7 +63,7 @@ async def backfill_ticker(ticker: str, start_date: str, end_date: str) -> Any:
 
 
 async def main() -> Any:
-    """Otomatik eklendi."""
+    """Main sürecini veya işlevini yürütür."""
     parser = argparse.ArgumentParser(description="Historical data backfill")
     parser.add_argument("--tickers", help="Comma-separated ticker list")
     parser.add_argument("--all-bist100", action="store_true", help="All BIST-100 tickers")

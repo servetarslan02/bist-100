@@ -34,7 +34,7 @@ logger = structlog.get_logger(__name__)
 
 
 def main() -> Any:
-    """Otomatik eklendi."""
+    """Main sürecini veya işlevini yürütür."""
     logger.info("=" * 105)
     logger.info("🔒 ALPHA BIST — KİLİTLİ 2024-2026 KÖR HOLDOUT VE 30-YILLIK PERFORMANS TESTİ")
     logger.info("=" * 105)

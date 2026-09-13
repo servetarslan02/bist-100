@@ -27,7 +27,6 @@ from services.core.price_limits import (
     PriceLimitResult,
 )
 
-
 # ==============================================================================
 # Sabit doğrulama testleri
 # ==============================================================================
@@ -38,11 +37,11 @@ class TestRegulatoryConstants:
 
     def test_default_limit_pct(self) -> None:
         """Standart pazarlarda ±%10 limiti."""
-        assert DEFAULT_LIMIT_PCT == pytest.approx(10.0)
+        assert pytest.approx(10.0) == DEFAULT_LIMIT_PCT
 
     def test_post_cb_limit_pct(self) -> None:
         """Devre kesici sonrası ±%5 daraltılmış marj."""
-        assert DEFAULT_POST_CB_LIMIT_PCT == pytest.approx(5.0)
+        assert pytest.approx(5.0) == DEFAULT_POST_CB_LIMIT_PCT
 
     def test_market_limits_defined(self) -> None:
         """Tüm pazar tipleri için limit tanımlı."""
@@ -131,10 +130,10 @@ class TestPriceLimitMonitorInit:
     """PriceLimitMonitor başlangıç durumu testleri."""
 
     def test_default_limit(self, monitor: PriceLimitMonitor) -> None:
-        assert monitor.DEFAULT_LIMIT == pytest.approx(10.0)
+        assert pytest.approx(10.0) == monitor.DEFAULT_LIMIT
 
     def test_post_cb_limit(self, monitor: PriceLimitMonitor) -> None:
-        assert monitor.POST_CB_LIMIT == pytest.approx(5.0)
+        assert pytest.approx(5.0) == monitor.POST_CB_LIMIT
 
 
 # ==============================================================================

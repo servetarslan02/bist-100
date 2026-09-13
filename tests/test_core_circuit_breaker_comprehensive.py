@@ -15,9 +15,9 @@ Test edilen bileşenler:
 
 from __future__ import annotations
 
-import time
 import threading
-from unittest.mock import MagicMock, patch
+import time
+from unittest.mock import patch
 
 import pytest
 
@@ -26,7 +26,6 @@ from services.core.circuit_breaker import (
     CircuitState,
     RateLimiter,
 )
-
 
 # ==============================================================================
 # CircuitState enum testleri
@@ -259,7 +258,6 @@ class TestCircuitBreakerStateMachine:
         assert breaker.state == CircuitState.OPEN
 
         # OPEN → Timeout yok → Çağrıya izin verme
-        from datetime import UTC
         breaker.last_failure_time = datetime.now(UTC)  # Yeni hata
         assert breaker.can_execute() is False
 

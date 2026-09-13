@@ -14,7 +14,6 @@ Test edilen bileşenler:
 
 from __future__ import annotations
 
-import math
 import pytest
 
 from services.core.bist_tick_size import (
@@ -27,7 +26,6 @@ from services.core.bist_tick_size import (
     round_to_bist_tick,
     round_to_valid_tick,
 )
-
 
 # ==============================================================================
 # _safe_float testleri
@@ -477,10 +475,13 @@ class TestEndToEndScenarios:
         ref_price = 50.0
         upper = ref_price * 1.10
         lower = ref_price * 0.90
-        # Üst limitin geçerli BIST adımına yuvarlanması
+        # Üst limitin ve alt limitin geçerli BIST adımına yuvarlanması
         upper_rounded = round_to_bist_tick(upper, mode="FLOOR")
+        lower_rounded = round_to_bist_tick(lower, mode="CEIL")
         assert upper_rounded <= upper
+        assert lower_rounded >= lower
         assert is_valid_bist_tick(upper_rounded)
+        assert is_valid_bist_tick(lower_rounded)
 
     def test_round_trip_consistency(self) -> None:
         """Bir fiyatı yuvarlayıp doğrulama → round-trip tutarlılığı."""

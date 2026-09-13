@@ -175,7 +175,7 @@ ALL_MODULES = [
 
 
 def main() -> Any:
-    """Otomatik eklendi."""
+    """Tüm sistem ve servis modüllerini dinamik olarak import ederek sözdizimi ve bağımlılık kontrolü yapar."""
     passed = failed = 0
     start = time.time()
     for mod in ALL_MODULES:

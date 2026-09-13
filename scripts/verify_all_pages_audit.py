@@ -37,7 +37,7 @@ PAGES = [
 
 
 def audit_all_pages() -> Any:
-    """Otomatik eklendi."""
+    """Audit all pages sürecini veya işlevini yürütür."""
     logger.info("=" * 80)
     logger.info("ALPHA BIST — 16 SAYFA DETAYLI DENETİM RAPORU")
     logger.info("=" * 80)

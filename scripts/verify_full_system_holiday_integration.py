@@ -33,9 +33,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
 class _EmptyModule:
-    """Otomatik eklendi."""
+    """Emptymodule sürecini veya işlevini yürütür."""
     def __getattr__(self, name) -> Any:
-        """Otomatik eklendi."""
+        """Getattr sürecini veya işlevini yürütür."""
         return type("Fake", (), {"__init__": lambda s, *a, **k: None})()
 
 
@@ -46,7 +46,7 @@ if "services.core" not in sys.modules:
 
 
 def _load_module_direct(name, path) -> Any:
-    """Otomatik eklendi."""
+    """Load module direct sürecini veya işlevini yürütür."""
     spec = importlib.util.spec_from_file_location(name, path)
     mod = importlib.util.module_from_spec(spec)
     sys.modules[name] = mod
@@ -66,34 +66,34 @@ IST = timezone(timedelta(hours=3))
 
 
 class TestResult:
-    """Otomatik eklendi."""
+    """Testresult sürecini veya işlevini yürütür."""
     def __init__(self):
-        """Otomatik eklendi."""
+        """Init sürecini veya işlevini yürütür."""
         self.passed = 0
         self.failed = 0
         self.warnings = 0
         self.details = []
 
     def ok(self, msg) -> Any:
-        """Otomatik eklendi."""
+        """Ok sürecini veya işlevini yürütür."""
         self.passed += 1
         self.details.append(f"  ✅ {msg}")
         logger.info(f"  ✅ {msg}")
 
     def fail(self, msg) -> Any:
-        """Otomatik eklendi."""
+        """Fail sürecini veya işlevini yürütür."""
         self.failed += 1
         self.details.append(f"  ❌ {msg}")
         logger.info(f"  ❌ {msg}")
 
     def warn(self, msg) -> Any:
-        """Otomatik eklendi."""
+        """Warn sürecini veya işlevini yürütür."""
         self.warnings += 1
         self.details.append(f"  ⚠️  {msg}")
         logger.info(f"  ⚠️  {msg}")
 
     def summary(self) -> Any:
-        """Otomatik eklendi."""
+        """Summary sürecini veya işlevini yürütür."""
         total = self.passed + self.failed
         return f"\n{'=' * 60}\nSONUÇ: {self.passed}/{total} geçti, {self.failed} başarısız, {self.warnings} uyarı\n{'=' * 60}"
 
@@ -568,7 +568,7 @@ def test_realtime_status(result: TestResult) -> Any:
 
 
 async def main() -> Any:
-    """Otomatik eklendi."""
+    """Main sürecini veya işlevini yürütür."""
     logger.info("=" * 60)
     logger.info("🧪 ALPHA BIST — Tam Sistem Tatil Entegrasyonu E2E Testi")
     logger.info(f"📅 Tarih: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")

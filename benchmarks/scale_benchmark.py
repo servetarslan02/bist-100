@@ -105,7 +105,7 @@ def measure(engine, market) -> Any:
 
 
 def main() -> Any:
-    """Otomatik eklendi."""
+    """Farklı hisse senedi evren boyutlarında (100, 500, 1000) panel ve skaler motor ölçeklenebilirlik benchmark testlerini çalıştırır."""
     logger.info("=" * 78)
     logger.info("  ALPHA BIST — Scale Benchmark (100/500/1000 hisse × 1 yıl)")
     logger.info("=" * 78)

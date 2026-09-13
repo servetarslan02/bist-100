@@ -12,7 +12,7 @@ from services.learning.model_memory_store import ModelMemoryStore
 
 
 def seed_history() -> Any:
-    """Otomatik eklendi."""
+    """Seed history sürecini veya işlevini yürütür."""
     store = ModelMemoryStore()
     pipeline = LearningPipeline(memory_store=store)
 

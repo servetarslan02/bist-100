@@ -11,7 +11,7 @@ sys.stdout.reconfigure(encoding="utf-8")
 
 
 def verify_learning_system() -> Any:
-    """Otomatik eklendi."""
+    """Verify learning system sürecini veya işlevini yürütür."""
     logger.info("=" * 80)
     logger.info("  MODEL MERKEZİ & ÖĞRENME LAB DÖNGÜSÜ DOĞRULAMA VE TESTİ")
     logger.info("=" * 80)

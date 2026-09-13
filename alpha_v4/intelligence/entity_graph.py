@@ -6,15 +6,19 @@ from datetime import datetime
 
 @dataclass(frozen=True)
 class EntityRelation:
-    """Otomatik eklendi."""
+    """Şirket ve varlıklar arası kanıtlı ilişki modeli."""
     source: str
     relation: str
     target: str
     effective_at: datetime
     evidence_id: str
 
+    def __repr__(self) -> str:
+        """Sınıfın temsil dizesi."""
+        return f"EntityRelation({self.source!r} --{self.relation}--> {self.target!r})"
+
     def __post_init__(self) -> None:
-        """Otomatik eklendi."""
+        """İlişki zaman damgası ve kanıt kimliği doğrulaması yapar."""
         if not self.evidence_id:
             raise ValueError("relations require evidence")
         if self.effective_at.tzinfo is None:
@@ -22,17 +26,22 @@ class EntityRelation:
 
 
 class EntityGraph:
-    """Otomatik eklendi."""
+    """Kanıt destekli şirket ilişkileri çizge modeli."""
+
     def __init__(self) -> None:
-        """Otomatik eklendi."""
+        """İlişkiler kümesini ilklendirir."""
         self._relations: set[EntityRelation] = set()
 
+    def __repr__(self) -> str:
+        """Sınıfın temsil dizesi."""
+        return f"EntityGraph(relations_count={len(self._relations)})"
+
     def add(self, relation: EntityRelation) -> None:
-        """Otomatik eklendi."""
+        """Çizgeye yeni bir ilişki ekler."""
         self._relations.add(relation)
 
     def relations_at(self, entity: str, as_of: datetime) -> tuple[EntityRelation, ...]:
-        """Otomatik eklendi."""
+        """Belirtilen varlığa ait ve geçerlilik tarihi geçmiş ilişkileri döndürür."""
         if as_of.tzinfo is None:
             raise ValueError("as_of must be timezone aware")
         return tuple(

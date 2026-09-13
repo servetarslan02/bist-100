@@ -15,7 +15,7 @@ from pathlib import Path
 
 
 def load_env_file() -> Any:
-    """Otomatik eklendi."""
+    """Load env file sürecini veya işlevini yürütür."""
     env_file = Path(__file__).parent.parent / ".env"
     if env_file.exists():
         for line in env_file.read_text(encoding="utf-8", errors="replace").splitlines():
@@ -31,7 +31,7 @@ sys.stdout.reconfigure(encoding="utf-8")
 
 
 async def test_postgres() -> Any:
-    """Otomatik eklendi."""
+    """Postgres sürecini veya işlevini yürütür."""
     try:
         import asyncpg
 
@@ -51,7 +51,7 @@ async def test_postgres() -> Any:
 
 
 async def test_redis() -> Any:
-    """Otomatik eklendi."""
+    """Redis sürecini veya işlevini yürütür."""
     try:
         import redis.asyncio as aioredis
 
@@ -70,7 +70,7 @@ async def test_redis() -> Any:
 
 
 async def test_clickhouse() -> Any:
-    """Otomatik eklendi."""
+    """Clickhouse sürecini veya işlevini yürütür."""
     try:
         import urllib.request
 
@@ -93,7 +93,7 @@ async def test_clickhouse() -> Any:
 
 
 async def test_nats() -> Any:
-    """Otomatik eklendi."""
+    """Nats sürecini veya işlevini yürütür."""
     try:
         import nats
 
@@ -101,7 +101,7 @@ async def test_nats() -> Any:
         received = []
 
         async def handler(msg) -> Any:
-            """Otomatik eklendi."""
+            """Handler sürecini veya işlevini yürütür."""
             received.append(msg.data.decode())
 
         sub = await nc.subscribe("alpha.healthcheck.test", cb=handler)
@@ -118,7 +118,7 @@ async def test_nats() -> Any:
 
 
 async def main() -> Any:
-    """Otomatik eklendi."""
+    """Main sürecini veya işlevini yürütür."""
     logger.info("=" * 80)
     logger.info("  ALPHA BIST — CANLI VERİ TABANI & MESAJLAŞMA HANDSHAKE TESTİ")
     logger.info("=" * 80)

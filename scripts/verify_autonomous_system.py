@@ -23,7 +23,7 @@ logger.info("=" * 85)
 
 
 async def verify_autonomous() -> Any:
-    """Otomatik eklendi."""
+    """Verify autonomous sürecini veya işlevini yürütür."""
     # -------------------------------------------------------------
     # 1. BİRLEŞİK OTONOM ZAMANLAYICI (UNIFIED SCHEDULER)
     # -------------------------------------------------------------

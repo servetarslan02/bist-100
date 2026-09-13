@@ -14,6 +14,11 @@ Test edilen bileşenler:
 from __future__ import annotations
 
 import asyncio
+
+# ==============================================================================
+# Test izolasyonu: Her test kendi debounce namespace'ini kullanır
+# ==============================================================================
+import itertools
 import threading
 import time
 
@@ -22,8 +27,8 @@ import polars as pl
 import pytest
 
 from services.core.debounce import (
-    DEFAULT_MIN_INTERVAL_SEC,
     _WAL_PARAM_REGEX,
+    DEFAULT_MIN_INTERVAL_SEC,
     configure_duckdb_wal,
     debounced_save,
     export_debounce_metrics_to_polars,
@@ -33,13 +38,6 @@ from services.core.debounce import (
     reset_debounce,
     should_save,
 )
-
-
-# ==============================================================================
-# Test izolasyonu: Her test kendi debounce namespace'ini kullanır
-# ==============================================================================
-
-import itertools
 
 _KEY_COUNTER = itertools.count()
 

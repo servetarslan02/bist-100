@@ -46,7 +46,7 @@ logger = structlog.get_logger()
 
 
 class OpportunityResponse(BaseModel):
-    """Otomatik eklendi."""
+    """Piyasa fırsat tarama sonucu modeli."""
     ticker: str
     rank: int
     score: float
@@ -57,7 +57,7 @@ class OpportunityResponse(BaseModel):
 
 
 class PortfolioResponse(BaseModel):
-    """Otomatik eklendi."""
+    """Portföy pozisyon ve risk dağılım yanıt modeli."""
     date: str
     total_positions: int
     total_weight: float
@@ -66,7 +66,7 @@ class PortfolioResponse(BaseModel):
 
 
 class HealthResponse(BaseModel):
-    """Otomatik eklendi."""
+    """Sistem genel sağlık durumu yanıt modeli."""
     status: str
     timestamp: str
     uptime_hours: float
@@ -75,13 +75,13 @@ class HealthResponse(BaseModel):
 
 
 class PredictRequest(BaseModel):
-    """Otomatik eklendi."""
+    """Hisse bazlı model tahmin istek modeli."""
     ticker: str
     features: dict | None = None
 
 
 class PredictResponse(BaseModel):
-    """Otomatik eklendi."""
+    """Hisse tahmin sonucu ve öznitelik önem düzeyleri modeli."""
     ticker: str
     score: float
     rank: int
@@ -282,22 +282,26 @@ class ConnectionManager:
     """WebSocket bağlantı yöneticisi."""
 
     def __init__(self):
-        """Otomatik eklendi."""
+        """Aktif WebSocket istemci listesini ilklendirir."""
         self.active_connections: list[WebSocket] = []
 
+    def __repr__(self) -> str:
+        """Sınıfın temsil dizesi."""
+        return f"ConnectionManager(active_connections={len(self.active_connections)})"
+
     async def connect(self, websocket: WebSocket) -> Any:
-        """Otomatik eklendi."""
+        """Yeni WebSocket bağlantısını kabul eder ve listeye ekler."""
         await websocket.accept()
         self.active_connections.append(websocket)
         logger.info("WebSocket connected", connections=len(self.active_connections))
 
     def disconnect(self, websocket: WebSocket) -> Any:
-        """Otomatik eklendi."""
+        """Kapanan WebSocket bağlantısını listeden çıkarır."""
         self.active_connections.remove(websocket)
         logger.info("WebSocket disconnected", connections=len(self.active_connections))
 
     async def broadcast(self, message: dict) -> Any:
-        """Otomatik eklendi."""
+        """Bağlı tüm WebSocket istemcilerine mesaj iletir."""
         for connection in self.active_connections:
             try:
                 await connection.send_json(message)

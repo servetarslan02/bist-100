@@ -23,10 +23,14 @@ class MLModelLoader:
     """
 
     def __init__(self):
-        """Otomatik eklendi."""
+        """Model yükleyici durumunu ve model sözlüklerini ilklendirir."""
         self._models: dict[str, Any] = {}
         self._model_configs: dict[str, dict] = {}
         self._loaded = False
+
+    def __repr__(self) -> str:
+        """Sınıfın temsil dizesi."""
+        return f"MLModelLoader(models={list(self._models.keys())}, loaded={self._loaded})"
 
     def load_models(self, model_dir: str = "ml/saved_models") -> int:
         """Tüm eğitilmiş modelleri yükle."""

@@ -339,7 +339,7 @@ def run_stage_simulation(
 
 
 def main() -> Any:
-    """Otomatik eklendi."""
+    """Main sürecini veya işlevini yürütür."""
     bm_df, stock_dict = load_bist_historical_data()
 
     logger.info("=" * 90)

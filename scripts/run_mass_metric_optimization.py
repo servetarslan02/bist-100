@@ -37,7 +37,7 @@ logger = structlog.get_logger(__name__)
 
 
 def main() -> Any:
-    """Otomatik eklendi."""
+    """Main sürecini veya işlevini yürütür."""
     logger.info("=" * 95)
     logger.info("🔬 BIST 30-YILLIK ASİMETRİK RALLİ KİLİTLİ PARAMETRE OPTİMİZASYONU VE ROBUSTNESS MOTORU")
     logger.info("=" * 95)

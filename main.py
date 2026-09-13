@@ -11,14 +11,18 @@ logger = structlog.get_logger()
 
 
 def setup_logging() -> Any:
-    """Otomatik eklendi."""
+    """Temel loglama yapılandırmasını başlatır."""
     import logging
 
     logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 
 def run_daily_pipeline(date: str) -> Any:
-    """Otomatik eklendi."""
+    """Belirtilen işlem günü için günlük tahmin ve risk parity ağırlıklandırma akışını çalıştırır.
+
+    Args:
+        date: İşlem tarihi (YYYY-MM-DD).
+    """
     logger.info("\n" + "=" * 70)
     logger.info(f"🚀 ALPHA BIST v4.2 — GUNLUK RAPOR ({date})")
     logger.info("=" * 70)
@@ -61,7 +65,12 @@ def run_daily_pipeline(date: str) -> Any:
 
 
 def run_backtest(start_date: str, end_date: str) -> Any:
-    """Otomatik eklendi."""
+    """Belirtilen tarih aralığında AlphaEngine walk-forward backtest sürecini çalıştırır.
+
+    Args:
+        start_date: Backtest başlangıç tarihi.
+        end_date: Backtest bitiş tarihi.
+    """
     logger.info("\n" + "=" * 70)
     logger.info("📈 ALPHA BIST — WALK-FORWARD BACKTEST")
     logger.info(f"   {start_date} → {end_date}")
@@ -76,7 +85,7 @@ def run_backtest(start_date: str, end_date: str) -> Any:
 
 
 def main() -> Any:
-    """Otomatik eklendi."""
+    """Komut satırı argümanlarını ayrıştırarak günlük çıkarım veya backtest modunu tetikler."""
     parser = argparse.ArgumentParser(description="ALPHA BIST v4.2 — Yeni LightGBM ve FeatureEngine Entegrasyonu")
     parser.add_argument("--mode", choices=["daily", "backtest"], default="daily", help="Calistirma modu")
     parser.add_argument("--date", default=datetime.now(UTC).strftime("%Y-%m-%d"), help="Islem tarihi (YYYY-MM-DD)")

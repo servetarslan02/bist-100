@@ -556,7 +556,7 @@ async def test_auth_manager_multi_provider() -> Any:
 
 
 async def run_all() -> Any:
-    """Otomatik eklendi."""
+    """Run all senaryosunu doğrular."""
     logger.info("=" * 60)
     logger.info("AUTONOMOUS OPERATIONS TESTLERİ")
     logger.info("=" * 60)
@@ -627,7 +627,7 @@ async def run_all() -> Any:
 
 
 def main() -> Any:
-    """Otomatik eklendi."""
+    """Main senaryosunu doğrular."""
     ok = asyncio.run(run_all())
     sys.exit(0 if ok else 1)
 

@@ -22,7 +22,7 @@ from services.learning.model_memory_store import ModelMemoryStore
 
 
 def run_large_scale_simulation() -> Any:
-    """Otomatik eklendi."""
+    """Large scale simulation sürecini veya işlevini yürütür."""
     store = ModelMemoryStore()
     pipeline = LearningPipeline(memory_store=store)
 

@@ -248,7 +248,7 @@ async def show_cache_hit_ratio() -> Any:
 
 
 async def main() -> Any:
-    """Otomatik eklendi."""
+    """Main sürecini veya işlevini yürütür."""
     parser = argparse.ArgumentParser(description="ALPHA BIST DB Performance Optimization")
     parser.add_argument("--analyze", action="store_true", help="Tüm tabloları ANALYZ et")
     parser.add_argument("--vacuum", action="store_true", help="Dead row'ları VACUUM et")

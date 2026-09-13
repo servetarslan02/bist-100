@@ -62,7 +62,7 @@ BENCHMARK_TICKER = "XU100.IS"
 
 
 def main() -> Any:
-    """Otomatik eklendi."""
+    """Main sürecini veya işlevini yürütür."""
     logger.info("=" * 85)
     logger.info("1. BIST-100 GEÇMİŞ VERİLERİ İNDİRİLİYOR (1997 - 2026)")
     logger.info("=" * 85)

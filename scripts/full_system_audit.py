@@ -35,7 +35,7 @@ logger = structlog.get_logger()
 
 @dataclass
 class AuditIssue:
-    """Otomatik eklendi."""
+    """Auditissue sürecini veya işlevini yürütür."""
     module: str
     severity: str  # P0, P1, P2, P3
     category: str  # CRITICAL BUG, LOGIC BUG, FINANCIAL MATH BUG, DATA BUG, LEAKAGE RISK, etc.
@@ -47,7 +47,7 @@ class AuditIssue:
 
 @dataclass
 class ModuleResult:
-    """Otomatik eklendi."""
+    """Moduleresult sürecini veya işlevini yürütür."""
     name: str
     status: str  # PASS, FAIL, CONDITIONAL PASS
     issues: list[AuditIssue] = field(default_factory=list)
@@ -55,9 +55,9 @@ class ModuleResult:
 
 
 class AuditReport:
-    """Otomatik eklendi."""
+    """Auditreport sürecini veya işlevini yürütür."""
     def __init__(self):
-        """Otomatik eklendi."""
+        """Init sürecini veya işlevini yürütür."""
         self.modules: dict[str, ModuleResult] = {}
         self.system_status = "PASS"
         self.critical_bugs = []
@@ -70,7 +70,7 @@ class AuditReport:
         self.missing_features = []
 
     def add_module(self, name: str, status: str, issues: list[AuditIssue] = None, details: str = "") -> Any:
-        """Otomatik eklendi."""
+        """Add module sürecini veya işlevini yürütür."""
         self.modules[name] = ModuleResult(name=name, status=status, issues=issues or [], details=details)
         if status == "FAIL":
             self.system_status = "FAIL"
@@ -96,7 +96,7 @@ class AuditReport:
                 self.missing_features.append(issue)
 
     def print_report(self) -> Any:
-        """Otomatik eklendi."""
+        """Print report sürecini veya işlevini yürütür."""
         logger.info("\n" + "=" * 70)
         logger.info("ALPHA BIST — FULL SYSTEM FORENSIC AUDIT REPORT")
         logger.info(f"Tarih: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -2269,7 +2269,7 @@ def audit_security(report: AuditReport) -> Any:
 
 
 def main() -> Any:
-    """Otomatik eklendi."""
+    """Main sürecini veya işlevini yürütür."""
     logger.info("=" * 70)
     logger.info("ALPHA BIST — FULL SYSTEM FORENSIC AUDIT")
     logger.info(f"Tarih: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")

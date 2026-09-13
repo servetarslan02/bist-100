@@ -99,7 +99,7 @@ PORTS_TO_CHECK = [
 
 
 def check_tcp(host: str, port: int, timeout: float = 2.0) -> tuple[bool, float, str]:
-    """Otomatik eklendi."""
+    """Check tcp sürecini veya işlevini yürütür."""
     t0 = time.time()
     try:
         with socket.create_connection((host, port), timeout=timeout):
@@ -111,7 +111,7 @@ def check_tcp(host: str, port: int, timeout: float = 2.0) -> tuple[bool, float, 
 
 
 def check_http(url: str, timeout: float = 2.5) -> tuple[bool, float, str]:
-    """Otomatik eklendi."""
+    """Check http sürecini veya işlevini yürütür."""
     t0 = time.time()
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "Alpha-Healthcheck/1.0"})
@@ -131,7 +131,7 @@ def check_http(url: str, timeout: float = 2.5) -> tuple[bool, float, str]:
 
 
 def run_suite() -> Any:
-    """Otomatik eklendi."""
+    """Suite sürecini veya işlevini yürütür."""
     logger.info("=" * 80)
     logger.info("  ALPHA BIST — CANLI AĞ, PORT & SERVİS ENTEGRASYON TESTİ")
     logger.info(f"  Zaman: {time.strftime('%Y-%m-%d %H:%M:%S')}")

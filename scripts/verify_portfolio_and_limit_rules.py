@@ -30,7 +30,7 @@ logger.info("\n[1. KURAL] Tavan / Taban ve Devre Kesici Likidite Yönetimi:")
 
 
 def check_limit_execution(price, prev_close, is_limit_up_locked, is_limit_down_locked) -> Any:
-    """Otomatik eklendi."""
+    """Check limit execution sürecini veya işlevini yürütür."""
     chg = ((price - prev_close) / prev_close) * 100.0
     if is_limit_up_locked or chg >= 9.90:
         return (

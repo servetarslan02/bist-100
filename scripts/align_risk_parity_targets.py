@@ -32,7 +32,7 @@ from services.risk.risk_parity_engine import RiskParityEngine, RiskParityParamet
 
 
 def main() -> Any:
-    """Otomatik eklendi."""
+    """Main sürecini veya işlevini yürütür."""
     logger.info("=" * 105)
     logger.info("🎯 ALPHA BIST — HEDEF METRİKLER (MAX DD < %25, PF > 1.2, SHARPE > 0.7) DOĞRULAMA ÇALIŞMASI")
     logger.info("=" * 105)

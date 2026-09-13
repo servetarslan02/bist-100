@@ -111,7 +111,7 @@ def ensure_env_file() -> Any:
 
     # Otomatik güçlü şifreler üret
     def gen_password(length=24) -> Any:
-        """Otomatik eklendi."""
+        """Kriptografik güvenliğe sahip rastgele şifre üretir."""
         return secrets.token_urlsafe(length)
 
     pg_password = gen_password()
@@ -690,7 +690,7 @@ def print_access_points() -> Any:
 
 
 def main() -> Any:
-    """Otomatik eklendi."""
+    """Tüm Alpha BIST otonom sistemini, donanım limitlerini ve Docker servislerini başlatır."""
     logger.info("=" * 72)
     logger.info("      ALPHA BIST — OTONOM PIYASA ZEKASI VE QUANT PLATFORMU")
     logger.info("      v2.0 — Resilience-Enhanced Startup")

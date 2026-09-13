@@ -4,8 +4,6 @@ Verifies __repr__, lack of placeholders, calculations, and complete __all__ expo
 """
 
 from datetime import datetime
-import numpy as np
-import pytest
 
 from services.portfolio import (
     AllocationPlan,
@@ -33,9 +31,6 @@ from services.portfolio import (
     RebalanceDecision,
     TaxModel,
     Trade,
-    portfolio_enhancements,
-    portfolio_manager,
-    portfolio_optimizer,
 )
 
 

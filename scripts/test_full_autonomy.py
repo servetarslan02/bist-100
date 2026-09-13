@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import asyncio
 import io
-import subprocess
 import sys
 import tempfile
 import time
@@ -39,7 +38,7 @@ def skip(name: str, detail: str = "") -> None:
 
 
 def section(title: str) -> None:
-    print(f"\n" + "-" * 60, flush=True)
+    print("\n" + "-" * 60, flush=True)
     print(f"  {title}", flush=True)
     print("-" * 60, flush=True)
 
@@ -173,9 +172,10 @@ def test_downtime_tracker_isolated() -> None:
 
 async def test_offline_queue_isolated() -> None:
     section("TEST 2 - OfflineQueue (DuckDB izole)")
+    import uuid
+
     import duckdb
     import orjson
-    import uuid
 
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = str(Path(tmpdir) / "oq.duckdb")
@@ -489,7 +489,7 @@ async def test_startup_recovery_logic() -> None:
 
         # Adim 1: config_load
         config = {"env": "development", "universe": "BIST_ALL"}
-        steps.append({"step": "config_load", "status": "OK", "has_config": True})
+        steps.append({"step": "config_load", "status": "OK", "has_config": True, "config": config})
         ok("recover -> config_load", "OK")
 
         # Adim 2: snapshot_load (yok, skip)
@@ -729,9 +729,10 @@ def test_autonomy_source_analysis() -> None:
 
 async def test_internet_outage_simulation() -> None:
     section("TEST 9 - Internet Kesintisi: Offline -> Queue -> Flush")
+    import uuid
+
     import duckdb
     import orjson
-    import uuid
 
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = str(Path(tmpdir) / "offline_sim.duckdb")
