@@ -1,12 +1,13 @@
-import structlog
-
-logger = structlog.get_logger(__name__)
 """ALPHA BIST — 3 Temel Öğrenme Eksikliğinin Giderildiğinin Kanıtı ve Doğrulama Betiği.
 
 1. Kanıt: Otonom Kapalı Devre Yeniden Eğitim (Closed-Loop Retraining Hook)
 2. Kanıt: 70 Canonical Feature Entegrasyonu
 3. Kanıt: Olasılık Kalibrasyonu (Probability Calibration - Platt Scaling / Isotonic)
 """
+
+import structlog
+
+logger = structlog.get_logger(__name__)
 
 import sys
 

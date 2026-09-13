@@ -1,8 +1,7 @@
-from typing import Any
-
 """FAZ 28: VOLATILITY REGIME ROBUSTNESS STRESS TEST"""
 
 import warnings
+from typing import Any
 
 import numpy as np
 import pandas as pd

@@ -1,5 +1,3 @@
-from typing import Any
-
 """ALPHA BIST — Walk-Forward Root-Cause Diagnostic & Friction Analyzer
 
 Bu modül:
@@ -10,6 +8,7 @@ Bu modül:
 """
 
 from datetime import timedelta
+from typing import Any
 
 import numpy as np
 import pandas as pd

@@ -1,8 +1,7 @@
-from typing import Any
-
 """FAZ 10: ALPHA MODEL ROOT-CAUSE & LABEL/OBJECTIVE AUDIT"""
 
 import warnings
+from typing import Any
 
 import numpy as np
 import pandas as pd

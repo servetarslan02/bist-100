@@ -1,7 +1,4 @@
-from typing import Any
-
-"""
-ALPHA BIST — Timestamped KAP Market Restriction & VBTS Registry
+"""ALPHA BIST — Timestamped KAP Market Restriction & VBTS Registry
 
 Bu modül, kamuya açık yayımlanmış VBTS (Volatilite Bazlı Tedbir Sistemi) kararlarını,
 brüt takas, kredili işlem yasağı ve işlem sırası durdurma bildirimlerini zaman damgalı olarak tutar.
@@ -13,6 +10,7 @@ Kritik İlke:
 """
 
 from dataclasses import dataclass
+from typing import Any
 
 import structlog
 

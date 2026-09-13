@@ -82,19 +82,56 @@ def compute_social_features(social_data: dict[str, Any], ticker: str) -> dict[st
     except (TypeError, ValueError):
         features["social_sentiment_momentum"] = 0.0
 
-    features["social_manipulation_score"] = _clamp(social_data.get("manipulation_score", 0), 0.0, 1.0)
+    manipulation_score = _clamp(social_data.get("manipulation_score", 0), 0.0, 1.0)
+    features["social_manipulation_score"] = manipulation_score
 
-    # Platform bazlı dağılım
+    # 1. Manipülasyon İndirimli Gerçek Duygu (Bot/Pump filtresi)
+    # Manipülasyon riski arttıkça ham duygu sıfıra bastırılır
+    sentiment = features["social_sentiment"]
+    features["social_manipulation_adjusted_sentiment"] = round(sentiment * (1.0 - manipulation_score), 4)
+
+    # 2. Bireysel Yatırımcı Coşku (FOMO) ve Panik Satış Skorları (0 - 100 bazında)
+    pos_ratio = features["social_positive_ratio"]
+    engagement = features["social_engagement"]
+    is_viral = features["social_viral"] > 0.5
+    vol = features["social_volume"]
+
+    # FOMO: Yüksek pozitiflik, viral yayılma, yüksek hacim ve yüksek etkileşim kombinasyonu
+    vol_bonus = min(20.0, (vol / 100.0) * 10.0) if vol > 0 else 0.0
+    fomo_intensity = (pos_ratio * 40.0) + (engagement * 30.0) + vol_bonus + (10.0 if is_viral else 0.0)
+    features["social_fomo_score"] = round(min(100.0, max(0.0, fomo_intensity)) if sentiment > 0.2 else 0.0, 2)
+
+    # Panik Satış: Aşırı negatif oran ve yüksek hacimli panik etkileşimi
+    panic_intensity = ((1.0 - pos_ratio) * 60.0) + (engagement * 40.0)
+    features["social_panic_score"] = round(min(100.0, max(0.0, panic_intensity)) if sentiment < -0.2 else 0.0, 2)
+
+    # Platform bazlı dağılım ve Platformlar Arası Mutabakat (Consensus)
+    platform_sentiments: list[float] = []
     platforms = social_data.get("platforms", {})
     if isinstance(platforms, dict):
         for platform in ["twitter", "reddit", "eksi", "investing", "telegram"]:
             if platform in platforms and isinstance(platforms[platform], dict):
                 plat_data = platforms[platform]
-                features[f"social_{platform}_sentiment"] = _clamp(plat_data.get("sentiment", 0), -1.0, 1.0)
+                plat_sent = _clamp(plat_data.get("sentiment", 0), -1.0, 1.0)
+                features[f"social_{platform}_sentiment"] = plat_sent
+                platform_sentiments.append(plat_sent)
                 try:
                     features[f"social_{platform}_volume"] = float(plat_data.get("volume", 0))
                 except (TypeError, ValueError):
                     features[f"social_{platform}_volume"] = 0.0
+
+    # 3. Platformlar Arası Konsensüs ve Dağılım Skoru
+    if len(platform_sentiments) >= 2:
+        import numpy as np
+        dispersion = float(np.std(platform_sentiments))
+        consensus = max(0.0, min(1.0, 1.0 - (dispersion / 1.0)))
+    else:
+        consensus = 1.0 if platform_sentiments else 0.5
+    features["social_cross_platform_consensus"] = round(consensus, 4)
+
+    # 4. Kurumsal Güven Skoru (Retail Conviction Score: 0 - 100)
+    conviction = (abs(sentiment) * 40.0) + (engagement * 30.0) + (consensus * 30.0)
+    features["social_retail_conviction_score"] = round(min(100.0, max(0.0, conviction)), 2)
 
     return features
 

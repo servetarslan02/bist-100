@@ -1,5 +1,3 @@
-from typing import Any
-
 """ALPHA BIST — Phase 1 & 2: Train/Validation Research & Root-Cause Engine
 
 Bu modül:
@@ -11,6 +9,7 @@ Bu modül:
 """
 
 from datetime import timedelta
+from typing import Any
 
 import numpy as np
 import pandas as pd

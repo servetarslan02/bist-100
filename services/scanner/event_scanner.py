@@ -1,7 +1,4 @@
-from typing import Any
-
-"""
-ALPHA BIST — Event-Driven Scanner v1.0
+"""ALPHA BIST — Event-Driven Scanner v1.0
 
 Haber/KAP/makro geldiğinde → affected stocks → immediate rescan
 
@@ -9,7 +6,10 @@ Normal mod: 5 dakika beklemez.
 Event geldiğinde Tier 0'dan Tier 3'e atlayabilir.
 """
 
+from __future__ import annotations
+
 from datetime import UTC, datetime
+from typing import Any
 
 import structlog
 

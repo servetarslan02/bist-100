@@ -1,5 +1,3 @@
-from typing import Any
-
 """ALPHA BIST — Market State API Endpoints v2.0
 
 REST API endpoint'leri:
@@ -12,7 +10,10 @@ REST API endpoint'leri:
 - GET /api/market/health     — Sağlık durumu
 """
 
+from __future__ import annotations
+
 from datetime import UTC, datetime
+from typing import Any
 
 import structlog
 

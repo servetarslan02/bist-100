@@ -1,8 +1,17 @@
+"""ALPHA BIST — Institutional-Grade Multi-Asset Backtest Runner.
+
+Tüm BIST hisse evreni üzerinde kurumsal seviye slippage, likidite filtreleri
+ve gerçekçi emir iletim modeliyle toplu simülasyon çalıştırır.
+"""
+
+from __future__ import annotations
+
+import gc
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger(__name__)
-import gc
-from typing import Any
 
 from services.core.alpha_engine import AlphaEngine
 from services.ml.hyper_optimizer import HyperOptimizer

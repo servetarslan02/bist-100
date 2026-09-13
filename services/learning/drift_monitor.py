@@ -1,8 +1,5 @@
-from __future__ import annotations
-
-from typing import Any, Sequence
-
 """ALPHA BIST — Feature & Prediction Drift Monitor v1.0
+
 Evidently-style istatistiksel veri kayması (drift) izleme motoru.
 
 Özellikler:
@@ -11,7 +8,10 @@ Evidently-style istatistiksel veri kayması (drift) izleme motoru.
 3. OpenTelemetry/Prometheus ile native uyum (Gauge metric export).
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
+from typing import Any, Sequence
 
 import numpy as np
 import structlog

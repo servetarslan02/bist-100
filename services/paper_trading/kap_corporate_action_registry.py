@@ -1,7 +1,4 @@
-from typing import Any
-
-"""
-ALPHA BIST — Timestamped KAP Corporate Action & VBTS Registry
+"""ALPHA BIST — Timestamped KAP Corporate Action & VBTS Registry
 
 Bu modül, kamuya açık yayımlanmış VBTS (Volatilite Bazlı Tedbir Sistemi) kararlarını,
 brüt takas, kredili işlem yasağı ve işlem sırası durdurma bildirimlerini zaman damgalı olarak tutar.
@@ -10,6 +7,7 @@ Eğer hissenin kurumsal/seans durumu doğrulanamıyorsa fail-safe olarak NO_TRAD
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from typing import Any
 
 import structlog
 

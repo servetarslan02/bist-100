@@ -1,16 +1,18 @@
-from typing import Any
+"""ALPHA BIST — Event Priority Queue v1.0
 
+Event'leri priority queue/worker yapısına taşır.
+50 hisseyi etkileyen makro olayların sistemi bloklamasını önler.
 """
-ALPHA BIST — Event Priority Queue v1.0
 
-4. Event'leri priority queue/worker yapısına taşı.
-50 hisseyi etkileyen makro olay bloklamaz.
-"""
+from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 import structlog
 
@@ -28,7 +30,7 @@ class EventTask:
     priority: int  # 1=en yüksek, 5=en düşük
     timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
-    def __lt__(self, other: "EventTask") -> bool:
+    def __lt__(self, other: EventTask) -> bool:
         """Tie-breaker for PriorityQueue ordering."""
         return self.timestamp < other.timestamp
 

@@ -1,9 +1,10 @@
-import structlog
-
-logger = structlog.get_logger(__name__)
 """
 ALPHA BIST — 70 Özellik Canlı Varyans ve Dinamiklik Testi (Doğrudan Scanner Motorundan)
 """
+
+import structlog
+
+logger = structlog.get_logger(__name__)
 import pandas as pd
 
 from services.ml.ranking_model import RankingModel

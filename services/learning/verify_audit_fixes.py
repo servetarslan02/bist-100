@@ -1,7 +1,8 @@
+"""Verification script for the 7 audit fixes and encoding repairs."""
+
 import structlog
 
 logger = structlog.get_logger(__name__)
-"""Verification script for the 7 audit fixes and encoding repairs."""
 
 import sys
 

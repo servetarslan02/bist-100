@@ -1,7 +1,4 @@
-from typing import Any
-
-"""
-ALPHA BIST — Live Scanner v1.0
+"""ALPHA BIST — Live Scanner v1.0
 
 Tick/event geldiğinde çalışan hafif tarayıcı.
 800 hisseyi baştan indirmez.
@@ -11,7 +8,10 @@ Pipeline:
   market.tick → state update → feature update → light scan → candidate?
 """
 
+from __future__ import annotations
+
 from datetime import UTC, datetime
+from typing import Any
 
 import numpy as np
 import structlog

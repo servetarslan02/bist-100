@@ -1,8 +1,16 @@
+"""ALPHA BIST — 454 Hisse 5 Yıllık Otonom Backtest Çalıştırıcı.
+
+Tüm BIST hisse evreni üzerinde 5 yıllık walk-forward alfa motoru backtestini çalıştırır.
+"""
+
+from __future__ import annotations
+
+import gc
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger(__name__)
-import gc
-from typing import Any
 
 from services.core.alpha_engine import AlphaEngine
 
