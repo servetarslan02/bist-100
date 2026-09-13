@@ -21,16 +21,39 @@ logger = structlog.get_logger()
 class FastPortfolioEngine:
     """Optimized portfolio simulator using pre-calculated scores."""
 
-    def __init__(self, features_by_ticker, xu100_close):
-        """Otomatik eklendi."""
+    def __init__(self, features_by_ticker: dict[str, pd.DataFrame], xu100_close: pd.Series) -> None:
+        """Hızlı portföy simülasyon motorunu başlatır.
+
+        Args:
+            features_by_ticker: Hisse bazında öznitelik ve fiyat veri çerçeveleri.
+            xu100_close: BIST 100 endeks kapanış serisi.
+        """
         self.features = features_by_ticker
         self.xu100 = xu100_close
         self.TRANSACTION_FEE_PCT = 0.00074
         self.SLIPPAGE_PCT = 0.00050
         self.TOTAL_FRICTION = self.TRANSACTION_FEE_PCT + self.SLIPPAGE_PCT
 
-    def run(self, eval_dates, cached_scores, filter_seed=None, shuffle_scores=False, random_selection=False) -> Any:
-        """Otomatik eklendi."""
+    def run(
+        self,
+        eval_dates: list[Any],
+        cached_scores: dict[Any, dict[str, float]],
+        filter_seed: int | None = None,
+        shuffle_scores: bool = False,
+        random_selection: bool = False,
+    ) -> tuple[list[float], list[dict[str, Any]]]:
+        """Önceden hesaplanmış skorlar ve belirlenen filtre/rastgelelik ayarlarıyla portföyü simüle eder.
+
+        Args:
+            eval_dates: Değerlendirilecek işlem günleri.
+            cached_scores: Gün bazlı hisse skorları sözlüğü.
+            filter_seed: Rastgele filtreleme için tohum değeri.
+            shuffle_scores: Skorların hisseler arasında rastgele karıştırılıp karıştırılmayacağı.
+            random_selection: Hisselerin tamamen rastgele seçilip seçilmeyeceği.
+
+        Returns:
+            (equity_curve, trade_log) demeti.
+        """
         if filter_seed is not None:
             random.seed(filter_seed)
             np.random.seed(filter_seed)
@@ -128,8 +151,19 @@ class FastPortfolioEngine:
         return portfolio_equity_curve, trade_log
 
 
-def precalculate_ranker_scores(eval_dates, features_by_ticker) -> Any:
-    """Otomatik eklendi."""
+def precalculate_ranker_scores(
+    eval_dates: list[Any],
+    features_by_ticker: dict[str, pd.DataFrame],
+) -> dict[Any, dict[str, float]]:
+    """Walk-forward adımları için LambdaRank skorlarını önceden hesaplayıp önbelleğe alır.
+
+    Args:
+        eval_dates: Değerlendirilecek tarih serisi.
+        features_by_ticker: Hisse bazlı öznitelik veri çerçeveleri.
+
+    Returns:
+        Tarih bazlı hisse skorları sözlüğü.
+    """
     logger.info("⏳ Model Puanları (M1 Ranker) Ön Belleğe Alınıyor (Tüm simülasyonlar için kullanılacak)...")
     feature_cols = [
         "roc_5d",
@@ -196,8 +230,16 @@ def precalculate_ranker_scores(eval_dates, features_by_ticker) -> Any:
     return cached_scores
 
 
-def calculate_metrics(eq_curve, trade_log) -> Any:
-    """Otomatik eklendi."""
+def calculate_metrics(eq_curve: list[float], trade_log: list[dict[str, Any]]) -> dict[str, Any]:
+    """Portföy sermaye eğrisi ve işlem geçmişinden CAGR, MDD ve Profit Factor metriklerini hesaplar.
+
+    Args:
+        eq_curve: Günlük portföy sermaye serisi.
+        trade_log: Kapanan işlem kayıtları listesi.
+
+    Returns:
+        Hesaplanan performans ve risk metrikleri sözlüğü.
+    """
     init = 10_000_000.0
     final = eq_curve[-1]
     cagr = ((final / init) ** (252.0 / len(eq_curve)) - 1.0) * 100.0

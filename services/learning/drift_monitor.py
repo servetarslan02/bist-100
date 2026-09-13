@@ -37,12 +37,19 @@ prediction_drift_gauge = meter.create_gauge(
 
 @dataclass
 class DriftResult:
-    """Otomatik eklendi."""
+    """Veri veya tahmin kayması analiz çıktısı."""
     feature_name: str
     drift_score: float
     is_drifted: bool
     drift_type: str  # "KS" veya "PSI"
     threshold: float
+
+    def __repr__(self) -> str:
+        """Kayma sonucunun okunabilir gösterimi."""
+        return (
+            f"DriftResult(feature={self.feature_name!r}, type={self.drift_type!r}, "
+            f"score={self.drift_score:.4f}, drifted={self.is_drifted})"
+        )
 
 
 class DataDriftMonitor:
@@ -99,7 +106,7 @@ class DataDriftMonitor:
         """Population Stability Index (PSI) hesaplar."""
 
         def build_buckets(data, breakpoints) -> Any:
-            """Otomatik eklendi."""
+            """Verilen eşik dilimlerine göre bağıl frekans dağılımını hesaplar."""
             # Verilen breakpoint'lere göre histogram oluştur ve yüzdelik oranları bul
             counts, _ = np.histogram(data, bins=breakpoints)
             return counts / max(1, len(data))

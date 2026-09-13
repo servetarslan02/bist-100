@@ -17,8 +17,15 @@ logger = structlog.get_logger()
 from services.learning.institutional_walkforward_engine import load_all_market_data
 
 
-def extract_forensic_features(df) -> Any:
-    """Otomatik eklendi."""
+def extract_forensic_features(df: pd.DataFrame) -> pd.DataFrame:
+    """Fiyat serilerinden üretim kalitesinde teknik göstergeleri ve hedef getirileri çıkarır.
+
+    Args:
+        df: OHLCV sütunlarını içeren hisse fiyat veri çerçevesi.
+
+    Returns:
+        Hesaplanan volatilite, hacim ve hedef getiri veri çerçevesi.
+    """
     feats = pd.DataFrame(index=df.index)
     close = df["Close"]
     volume = df["Volume"]
@@ -45,16 +52,24 @@ def extract_forensic_features(df) -> Any:
     return feats.dropna(subset=["volatility_20d", "price_vs_sma20", "volume_zscore"])
 
 
-def get_resid(y, x) -> Any:
-    """Otomatik eklendi."""
+def get_resid(y: Any, x: Any) -> Any:
+    """y serisini x faktöründen arındırarak dik artık serisini hesaplar.
+
+    Args:
+        y: Bağımlı hedef dizisi.
+        x: Bağımsız faktör dizisi.
+
+    Returns:
+        Ortogonalize edilmiş artık serisi.
+    """
     if len(x) < 2 or np.std(x) == 0:
         return y
     b = np.cov(x, y)[0, 1] / np.var(x)
     return y - b * x
 
 
-def run_phase_22() -> Any:
-    """Otomatik eklendi."""
+def run_phase_22() -> None:
+    """Üretim kalitesinde LambdaRank ve artık alfa modellerini yeniden eğitip walk-forward testini yürütür."""
     logger.info("🚀 FAZ 22: PRODUCTION-GRADE ALPHA MODEL REBUILD")
     logger.info("Kurallar: PnL YOK. Final Holdout KİLİTLİ. Offline Walk-Forward Audit.\n")
 

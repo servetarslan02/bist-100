@@ -1,9 +1,8 @@
-from typing import Any
-
 """FAZ 13: PRODUCTION INTEGRATION + WALK-FORWARD VALIDATION"""
 
 import warnings
 from datetime import timedelta
+from typing import Any
 
 import lightgbm as lgb
 import numpy as np
@@ -28,16 +27,25 @@ logger = structlog.get_logger()
 # M0: OLD TRAINER (REGRESSOR)
 # =====================================================================
 class ModelTrainerM0:
-    """Otomatik eklendi."""
-    def __init__(self, feature_cols):
-        """Otomatik eklendi."""
+    """Eski regresyon tabanlı model eğitim ve tahmin yürütücüsü (V3 Temel Çizgi)."""
+
+    def __init__(self, feature_cols: list[str]) -> None:
+        """Eski model eğitici sınıfını başlatır.
+
+        Args:
+            feature_cols: Eğitimde kullanılacak öznitelik sütunları listesi.
+        """
         self.feature_cols = feature_cols
         self.lgb_model = None
         self.cat_model = None
         self.xgb_model = None
 
-    def retrain_fold(self, train_df) -> Any:
-        """Otomatik eklendi."""
+    def retrain_fold(self, train_df: pd.DataFrame) -> None:
+        """Belirtilen walk-forward katmanı üzerinde regresyon modellerini yeniden eğitir.
+
+        Args:
+            train_df: Katmana ait eğitim verisi çerçevesi.
+        """
         if len(train_df) < 100:
             return
         X = train_df[self.feature_cols].values
@@ -79,8 +87,16 @@ class ModelTrainerM0:
         )
         self.xgb_model.fit(X, y_cls)
 
-    def predict_batch_day(self, tickers, features_list) -> Any:
-        """Otomatik eklendi."""
+    def predict_batch_day(self, tickers: list[str], features_list: list[dict[str, Any]]) -> dict[str, dict[str, float]]:
+        """Günün hisseleri için regresyon ve sinyal tahminlerini üretir.
+
+        Args:
+            tickers: Tahmin yapılacak hisse kodları listesi.
+            features_list: Her hisseye ait öznitelik sözlükleri listesi.
+
+        Returns:
+            Hisse başına model tahminlerini içeren iç içe sözlük.
+        """
         X_mat = np.array([f[self.feature_cols].values for f in features_list])
         n = len(tickers)
 
@@ -126,16 +142,25 @@ class ModelTrainerM0:
 # M1: NEW TRAINER (RANKER) - PRODUCTION READY
 # =====================================================================
 class ModelTrainerM1:
-    """Otomatik eklendi."""
-    def __init__(self, feature_cols):
-        """Otomatik eklendi."""
+    """Yeni LambdaRank tabanlı sıralama ve sınıflandırma modeli eğitici ve yürütücüsü (Üretime Hazır)."""
+
+    def __init__(self, feature_cols: list[str]) -> None:
+        """Sıralayıcı model eğitici sınıfını başlatır.
+
+        Args:
+            feature_cols: Eğitimde kullanılacak öznitelik sütunları listesi.
+        """
         self.feature_cols = feature_cols
         self.rank_model = None
         self.cat_model = None
         self.xgb_model = None
 
-    def retrain_fold(self, train_df) -> Any:
-        """Otomatik eklendi."""
+    def retrain_fold(self, train_df: pd.DataFrame) -> None:
+        """Belirtilen walk-forward katmanı üzerinde LambdaRank sıralama modelini eğitir.
+
+        Args:
+            train_df: Katmana ait eğitim verisi çerçevesi.
+        """
         if len(train_df) < 100:
             return
 
@@ -187,8 +212,16 @@ class ModelTrainerM1:
         )
         self.xgb_model.fit(X, y_cls)
 
-    def predict_batch_day(self, tickers, features_list) -> Any:
-        """Otomatik eklendi."""
+    def predict_batch_day(self, tickers: list[str], features_list: list[dict[str, Any]]) -> dict[str, dict[str, float]]:
+        """Günün hisseleri için LambdaRank sıralama skorları ve model tahminlerini üretir.
+
+        Args:
+            tickers: Tahmin yapılacak hisse kodları listesi.
+            features_list: Her hisseye ait öznitelik sözlükleri listesi.
+
+        Returns:
+            Hisse başına LambdaRank ve diğer model tahminleri sözlüğü.
+        """
         X_mat = np.array([f[self.feature_cols].values for f in features_list])
         n = len(tickers)
 
@@ -238,8 +271,18 @@ class ModelTrainerM1:
 # =====================================================================
 # WALK-FORWARD ENGINE
 # =====================================================================
-def run_simulation(trainer, eval_dates, features_by_ticker, xu100_close) -> Any:
-    """Otomatik eklendi."""
+def run_simulation(trainer: Any, eval_dates: list[Any], features_by_ticker: dict[str, Any], xu100_close: pd.Series) -> tuple[list[float], int, float, float]:
+    """Seçilen model eğiticisi ile portföy simülasyonunu walk-forward olarak yürütür.
+
+    Args:
+        trainer: Tahminleri üretecek model eğitici nesnesi (M0 veya M1).
+        eval_dates: Değerlendirme yapılacak takvim günleri listesi.
+        features_by_ticker: Hisse bazlı öznitelik veri çerçeveleri sözlüğü.
+        xu100_close: BIST 100 endeks kapanış serisi.
+
+    Returns:
+        (equity_curve, total_trades, gross_profits, gross_losses) sonuç demeti.
+    """
     # Portföy Değişkenleri
     INITIAL_CAPITAL = 10_000_000.0
     portfolio_cash = INITIAL_CAPITAL
@@ -429,8 +472,16 @@ if __name__ == "__main__":
     logger.info("Koşuluyor: M1 = V3 Rebuild (LambdaRank + Rank Label)...")
     eq_m1, tr_m1, gp_m1, gl_m1 = run_simulation(trainer_m1, val_dates, features_by_ticker, xu100_close)
 
-    def print_metrics(name, eq_curve, trades, gp, gl) -> Any:
-        """Otomatik eklendi."""
+    def print_metrics(name: str, eq_curve: list[float], trades: int, gp: float, gl: float) -> None:
+        """Simülasyon performans metriklerini hesaplar ve yapısal olarak loglar.
+
+        Args:
+            name: Model simülasyon adı.
+            eq_curve: Sermaye eğrisi serisi.
+            trades: Toplam gerçekleştirilen işlem sayısı.
+            gp: Brüt kâr tutarı.
+            gl: Brüt zarar tutarı.
+        """
         init = 10_000_000.0
         final = eq_curve[-1]
         cagr = ((final / init) ** (252.0 / len(eq_curve)) - 1.0) * 100.0

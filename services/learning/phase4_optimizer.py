@@ -20,7 +20,7 @@ logger = structlog.get_logger()
 
 
 def run_phase4_candidate(eval_dates, features_by_ticker, xu100_close, trainer, candidate_name) -> Any:
-    """Otomatik eklendi."""
+    """Faz 4 aday optimizasyon stratejisini simüle ederek sermaye eğrisi ve getiri metriklerini hesaplar."""
     portfolio_cash = 10_000_000.0
     positions = {}
     equity_curve = []

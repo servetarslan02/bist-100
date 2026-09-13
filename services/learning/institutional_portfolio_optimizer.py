@@ -26,7 +26,7 @@ from services.learning.institutional_walkforward_engine import (
 
 
 def run_institutional_portfolio_optimization() -> Any:
-    """Otomatik eklendi."""
+    """Gürültü filtreleme, devir hızı (turnover) optimizasyonu ve kurumsal portföy tahsisini yürütür."""
     logger.info("=================================================================")
     logger.info("ALPHA BIST — INSTITUTIONAL NOISE FILTER & TURNOVER OPTIMIZER")
     logger.info("=================================================================")

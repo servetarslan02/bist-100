@@ -16,8 +16,16 @@ logger = structlog.get_logger()
 from services.learning.institutional_walkforward_engine import detect_market_regime, load_all_market_data
 
 
-def evaluate_signal(df_liquid, signal_col) -> Any:
-    """Otomatik eklendi."""
+def evaluate_signal(df_liquid: pd.DataFrame, signal_col: str) -> dict[str, Any] | None:
+    """Likit hisse evreninde sinyalin IC, kuantil getiri yayılımı ve bootstrap istatistiklerini hesaplar.
+
+    Args:
+        df_liquid: Likit hisselerin verilerini ve artık getirilerini içeren veri çerçevesi.
+        signal_col: Değerlendirilecek sinyal sütununun adı.
+
+    Returns:
+        Hesaplanan performans, anlamlılık ve rejim metrikleri sözlüğü.
+    """
     res = []
     for d, grp in df_liquid.groupby("date"):
         if len(grp) < 10:
@@ -97,8 +105,8 @@ def evaluate_signal(df_liquid, signal_col) -> Any:
     return metrics
 
 
-def run_phase_25() -> Any:
-    """Otomatik eklendi."""
+def run_phase_25() -> None:
+    """Alternatif ekonomik alfa faktörlerinin (tersine dönüş, hacim, asimetri vb.) keşif analizini yürütür."""
     logger.info("🚀 FAZ 25: ALTERNATIVE ECONOMIC ALPHA DISCOVERY")
     logger.info("Kurallar: Holdout Kilitli. ML Yok. Sadece Likit Evren.\n")
 

@@ -64,7 +64,7 @@ ro = returns[(returns.index >= oos_start) & (returns.index <= HOLDOUT)]
 
 
 def cagr(ret_series) -> Any:
-    """Otomatik eklendi."""
+    """Yıllık bileşik büyüme oranını (CAGR) hesaplar."""
     c = (1 + ret_series).cumprod()
     if c.iloc[-1] <= 0:
         return -1.0
@@ -73,12 +73,12 @@ def cagr(ret_series) -> Any:
 
 
 def sharpe(ret_series) -> Any:
-    """Otomatik eklendi."""
+    """Yıllıklandırılmış Sharpe oranını hesaplar."""
     return (ret_series.mean() * 252) / (ret_series.std() * np.sqrt(252) + 1e-9)
 
 
 def maxdd(ret_series) -> Any:
-    """Otomatik eklendi."""
+    """Getiri serisinden maksimum tepe-dip düşüşünü (Max Drawdown) hesaplar."""
     c = (1 + ret_series).cumprod()
     return (c / c.cummax() - 1).min()
 
@@ -87,7 +87,7 @@ results = []
 
 
 def evaluate(name, daily_ret_full, daily_ret_oos) -> Any:
-    """Otomatik eklendi."""
+    """Strateji performansını In-Sample ve Out-of-Sample dönemleri için karşılaştırmalı değerlendirir."""
     c_full = cagr(daily_ret_full) * 100
     c_oos = cagr(daily_ret_oos) * 100
     s_full = sharpe(daily_ret_full)
@@ -132,7 +132,7 @@ logger.info("\n─── S2: 12-1 Momentum ───")
 
 
 def momentum_strategy(prices, returns, lookback=252, skip=21, top_n=10, rebal="ME") -> Any:
-    """Otomatik eklendi."""
+    """12-1 momentum stratejisini aylık yeniden dengeleme ile simüle eder."""
     monthly_idx = prices.resample(rebal).last().index
     port_rets = []
     for i in range(1, len(monthly_idx)):
@@ -179,7 +179,7 @@ logger.info("\n─── S3: 52-Hafta Yuksegi Kirisi ───")
 
 
 def breakout_strategy(prices, returns, window=252, top_n=10) -> Any:
-    """Otomatik eklendi."""
+    """52 haftalık zirve kırılımı stratejisini simüle eder."""
     monthly_idx = prices.resample("ME").last().index
     port_rets = []
     for i in range(1, len(monthly_idx)):
@@ -235,7 +235,7 @@ logger.info("\n─── S5: Volatilite Kirisi ───")
 
 
 def vol_breakout(prices, returns, vol_window=20, mom_window=5, top_n=10) -> Any:
-    """Otomatik eklendi."""
+    """Hacim ve volatilite artışıyla desteklenen kırılım stratejisini simüle eder."""
     monthly_idx = prices.resample("ME").last().index
     port_rets = []
     for i in range(1, len(monthly_idx)):
@@ -277,7 +277,7 @@ logger.info("\n─── S6: Trend Filtreli Momentum (200 SMA) ───")
 
 
 def trend_filtered_momentum(prices, returns, top_n=10, lb=126) -> Any:
-    """Otomatik eklendi."""
+    """200 SMA trend filtresi uygulayarak yükseliş trendindeki momentum hisselerini simüle eder."""
     monthly_idx = prices.resample("ME").last().index
     port_rets = []
     for i in range(1, len(monthly_idx)):
@@ -323,7 +323,7 @@ logger.info("\n─── S7: Aylik Geri Donus ───")
 
 
 def reversal_strategy(prices, returns, lb=21, top_n=10) -> Any:
-    """Otomatik eklendi."""
+    """Kısa vadeli aşırı satılmış hisselerin ortalamaya dönüş (reversal) stratejisini simüle eder."""
     monthly_idx = prices.resample("ME").last().index
     port_rets = []
     for i in range(1, len(monthly_idx)):

@@ -1,7 +1,6 @@
 """FAZ 24: LOW-VOL + LIQUIDITY ALPHA VALIDATION"""
 
 import warnings
-from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -16,8 +15,8 @@ logger = structlog.get_logger()
 from services.learning.institutional_walkforward_engine import detect_market_regime, load_all_market_data
 
 
-def run_phase_24() -> Any:
-    """Otomatik eklendi."""
+def run_phase_24() -> None:
+    """Düşük volatilite ve likidite filtresi kombinasyonunu makine öğrenimi olmaksızın doğrular."""
     logger.info("🚀 FAZ 24: LOW-VOL + LIQUIDITY ALPHA VALIDATION (No ML)")
     logger.info("Kurallar: PnL YOK. Final Holdout KİLİTLİ. Threshold Optimize Etmek YASAK.\n")
 
@@ -90,8 +89,15 @@ def run_phase_24() -> Any:
     med_mv = market_vols.median()
     df_all["is_high_vol"] = df_all["date"].map(lambda d: market_vols[d] > med_mv)
 
-    def eval_universe(df_u) -> Any:
-        """Otomatik eklendi."""
+    def eval_universe(df_u: pd.DataFrame) -> pd.DataFrame:
+        """Belirtilen hisse evreni üzerinde günlük IC ve portföy getiri yayılımını (spread) hesaplar.
+
+        Args:
+            df_u: Analiz edilecek hisse ve sinyal alt kümesi.
+
+        Returns:
+            Günlük IC ve yayılım sonuçlarını içeren veri çerçevesi.
+        """
         res = []
         for d, grp in df_u.groupby("date"):
             if len(grp) < 10:

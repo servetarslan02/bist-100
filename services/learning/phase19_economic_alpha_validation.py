@@ -16,8 +16,15 @@ logger = structlog.get_logger()
 from services.learning.institutional_walkforward_engine import detect_market_regime, load_all_market_data
 
 
-def extract_forensic_features(df) -> Any:
-    """Otomatik eklendi."""
+def extract_forensic_features(df: pd.DataFrame) -> pd.DataFrame:
+    """Fiyat serilerinden V3 özniteliklerini ve değerlendirme hedef getirilerini çıkarır.
+
+    Args:
+        df: OHLCV sütunlarını içeren hisse fiyat veri çerçevesi.
+
+    Returns:
+        Hesaplanan öznitelik veri çerçevesi.
+    """
     feats = pd.DataFrame(index=df.index)
     close = df["Close"]
     high = df["High"]
@@ -56,16 +63,24 @@ def extract_forensic_features(df) -> Any:
     return feats.dropna(subset=["roc_20d", "volatility_20d"])
 
 
-def get_resid(y, x) -> Any:
-    """Otomatik eklendi."""
+def get_resid(y: Any, x: Any) -> Any:
+    """y serisinden x serisinin doğrusal projeksiyonunu çıkararak artık (residual) serisini döndürür.
+
+    Args:
+        y: Bağımlı değişken serisi veya dizisi.
+        x: Bağımsız değişken serisi veya dizisi.
+
+    Returns:
+        Ortogonalize edilmiş artık (residual) değerleri.
+    """
     if len(x) < 2 or x.std() == 0:
         return y
     b = np.cov(x, y)[0, 1] / np.var(x)
     return y - b * x
 
 
-def run_economic_alpha_validation() -> Any:
-    """Otomatik eklendi."""
+def run_economic_alpha_validation() -> None:
+    """Ekonomik alfa faktörlerinin rejim bazlı bilgi katsayılarını (IC) ve kalıcılıklarını doğrular."""
     logger.info("🚀 FAZ 19: ECONOMIC ALPHA VALIDATION")
     logger.info("Kurallar: Model Eğitimi YOK. Sadece Feature-Level İstatistik. Final Holdout KİLİTLİ.\n")
 

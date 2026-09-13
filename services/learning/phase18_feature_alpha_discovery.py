@@ -1,7 +1,6 @@
 """FAZ 18: FEATURE-LEVEL ALPHA DISCOVERY & ECONOMIC SIGNAL AUDIT"""
 
 import warnings
-from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -16,8 +15,15 @@ logger = structlog.get_logger()
 from services.learning.institutional_walkforward_engine import detect_market_regime, load_all_market_data
 
 
-def extract_forensic_features(df) -> Any:
-    """Otomatik eklendi."""
+def extract_forensic_features(df: pd.DataFrame) -> pd.DataFrame:
+    """Fiyat serilerinden V3 özniteliklerini ve geleceğe dönük getiri hedeflerini hesaplar.
+
+    Args:
+        df: OHLCV sütunlarını içeren hisse fiyat veri çerçevesi.
+
+    Returns:
+        Hesaplanan teknik ve ileriye dönük getiri öznitelikleri veri çerçevesi.
+    """
     feats = pd.DataFrame(index=df.index)
     close = df["Close"]
     high = df["High"]
@@ -60,8 +66,8 @@ def extract_forensic_features(df) -> Any:
     return feats.dropna(subset=["roc_20d", "volatility_20d"])
 
 
-def run_feature_discovery() -> Any:
-    """Otomatik eklendi."""
+def run_feature_discovery() -> None:
+    """Öznitelik düzeyinde Spearman IC, Rank Autocorrelation ve rejim bazlı Alpha keşfini yürütür."""
     logger.info("🚀 FAZ 18: FEATURE-LEVEL ALPHA DISCOVERY & ECONOMIC SIGNAL AUDIT")
     logger.info("Kurallar: PnL YOK. ML Model YOK. Sadece Feature Information Edge ölçümü.\n")
 

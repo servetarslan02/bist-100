@@ -1,8 +1,3 @@
-from typing import Any
-
-import structlog
-
-logger = structlog.get_logger()
 """ALPHA BIST — 100% REAL Historical BIST Walk-Forward Backtest & Learning Engine
 
 Bu modül:
@@ -16,6 +11,11 @@ Bu modül:
 """
 
 from datetime import timedelta
+from typing import Any
+
+import structlog
+
+logger = structlog.get_logger()
 
 import numpy as np
 import pandas as pd

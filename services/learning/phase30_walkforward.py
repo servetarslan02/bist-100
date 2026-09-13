@@ -4,7 +4,6 @@ FAZ 30 - WALK-FORWARD VALIDASYON + ENSEMBLE
 Yil yil performans + kombinasyon analizi
 """
 
-from typing import Any
 
 import structlog
 
@@ -48,26 +47,64 @@ returns = prices.pct_change()
 logger.info(f"Veri: {len(valid)} hisse, {prices.index[0].date()} -> {prices.index[-1].date()}")
 
 
-def cagr(s) -> Any:
-    """Otomatik eklendi."""
+def cagr(s: pd.Series) -> float:
+    """Getiri serisinden yıllıklandırılmış bileşik büyüme oranını (CAGR) hesaplar.
+
+    Args:
+        s: Günlük getiri serisi.
+
+    Returns:
+        Yüzdelik CAGR değeri.
+    """
     c = (1 + s).cumprod()
     ny = len(s) / 252
-    return ((c.iloc[-1]) ** (1 / ny) - 1) * 100 if c.iloc[-1] > 0 and ny > 0 else -100
+    return float(((c.iloc[-1]) ** (1 / ny) - 1) * 100) if c.iloc[-1] > 0 and ny > 0 else -100.0
 
 
-def sharpe(s) -> Any:
-    """Otomatik eklendi."""
-    return (s.mean() * 252) / (s.std() * np.sqrt(252) + 1e-9)
+def sharpe(s: pd.Series) -> float:
+    """Getiri serisinden yıllıklandırılmış Sharpe oranını hesaplar.
+
+    Args:
+        s: Günlük getiri serisi.
+
+    Returns:
+        Yıllıklandırılmış Sharpe oranı.
+    """
+    return float((s.mean() * 252) / (s.std() * np.sqrt(252) + 1e-9))
 
 
-def maxdd(s) -> Any:
-    """Otomatik eklendi."""
+def maxdd(s: pd.Series) -> float:
+    """Getiri serisinden tepe noktasına göre maksimum düşüş (Max Drawdown) oranını hesaplar.
+
+    Args:
+        s: Günlük getiri serisi.
+
+    Returns:
+        Yüzdelik maksimum düşüş oranı.
+    """
     c = (1 + s).cumprod()
-    return (c / c.cummax() - 1).min() * 100
+    return float((c / c.cummax() - 1).min() * 100)
 
 
-def momentum_top(prices, returns, lb, top_n, skip=21) -> Any:
-    """Otomatik eklendi."""
+def momentum_top(
+    prices: pd.DataFrame,
+    returns: pd.DataFrame,
+    lb: int,
+    top_n: int,
+    skip: int = 21,
+) -> tuple[pd.Series, dict[str, list[str]]]:
+    """Geriye dönük momentum puanına göre en yüksek n hisseyi seçip aylık portföy getirisini hesaplar.
+
+    Args:
+        prices: Hisse kapanış fiyatları veri çerçevesi.
+        returns: Hisse günlük getiri veri çerçevesi.
+        lb: Momentum geriye bakış periyodu (gün).
+        top_n: Seçilecek hisse adedi.
+        skip: Kısa vadeli tersine dönüşü filtrelemek için atlanacak son gün sayısı (varsayılan: 21).
+
+    Returns:
+        (strateji_getirisi, donem_bazli_secilenler) demeti.
+    """
     idx = prices.resample("ME").last().index
     rets = []
     selected = {}
@@ -101,8 +138,25 @@ def momentum_top(prices, returns, lb, top_n, skip=21) -> Any:
     return pd.concat(rets).sort_index(), selected
 
 
-def vol_breakout(prices, returns, vol_window=20, mom_window=5, top_n=10) -> Any:
-    """Otomatik eklendi."""
+def vol_breakout(
+    prices: pd.DataFrame,
+    returns: pd.DataFrame,
+    vol_window: int = 20,
+    mom_window: int = 5,
+    top_n: int = 10,
+) -> tuple[pd.Series, dict[str, list[str]]]:
+    """Düşük volatilite ve momentum kırılımı birleşik filtresine dayalı portföy getirisini hesaplar.
+
+    Args:
+        prices: Hisse kapanış fiyatları veri çerçevesi.
+        returns: Hisse günlük getiri veri çerçevesi.
+        vol_window: Volatilite hesaplama penceresi (gün).
+        mom_window: Momentum penceresi (gün).
+        top_n: Seçilecek en iyi hisse adedi.
+
+    Returns:
+        (kırılım_getirisi, donem_bazli_secilenler) demeti.
+    """
     idx = prices.resample("ME").last().index
     rets = []
     selected = {}
@@ -158,8 +212,15 @@ for yr in years:
     m2y = m2[m2.index >= ys] if len(m2) > 0 else pd.Series(dtype=float)
     v1y = v1[v1.index >= ys] if len(v1) > 0 else pd.Series(dtype=float)
 
-    def sc(s) -> Any:
-        """Otomatik eklendi."""
+    def sc(s: pd.Series) -> str:
+        """Getiri serisinden biçimlendirilmiş CAGR metnini üretir.
+
+        Args:
+            s: Günlük getiri serisi.
+
+        Returns:
+            Biçimlendirilmiş yüzdelik metin veya 'N/A'.
+        """
         return f"%{cagr(s):+.0f}" if len(s) > 5 else "N/A"
 
     # Ensemble: esit agirlik

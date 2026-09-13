@@ -62,7 +62,7 @@ class IntegratedLearningSystem:
     """Entegre öğrenme sistemi."""
 
     def __init__(self):
-        """Otomatik eklendi."""
+        """Entegre öğrenme sistemi tahmin, sonuç takibi ve geri bildirim tamponlarını başlatır."""
         self._predictions: deque = deque(maxlen=5000)
         self._outcomes: deque = deque(maxlen=5000)
         self._regime_accuracy: dict[str, dict] = defaultdict(lambda: {"correct": 0, "total": 0})

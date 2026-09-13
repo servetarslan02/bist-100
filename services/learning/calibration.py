@@ -67,7 +67,7 @@ class ConfidenceCalibrator:
     """Model confidence kalibrasyon motoru."""
 
     def __init__(self):
-        """Otomatik eklendi."""
+        """Model güven skoru kalibrasyon ve Platt ölçekleme motorunu başlatır."""
         self._calibration_history: deque = deque(maxlen=1000)
         self._platt_params: dict[str, PlattScalingParams] = {}  # regime → params
         self._last_calibration: CalibrationResult | None = None
@@ -233,7 +233,7 @@ class ConfidenceCalibrator:
         from scipy.optimize import minimize
 
         def loss(params) -> Any:
-            """Otomatik eklendi."""
+            """Platt ölçekleme parametreleri için çapraz entropi (cross-entropy) kayıp fonksiyonu."""
             a, b = params
             f = a * confidences + b
             # Numerik stabilite

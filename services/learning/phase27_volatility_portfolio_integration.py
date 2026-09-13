@@ -15,8 +15,23 @@ from services.learning.institutional_walkforward_engine import load_all_market_d
 logger = structlog.get_logger()
 
 
-def calc_metrics(ret_series, exposure_series, name, tc_per_trade=0.002) -> Any:
-    """Otomatik eklendi."""
+def calc_metrics(
+    ret_series: pd.Series,
+    exposure_series: pd.Series,
+    name: str,
+    tc_per_trade: float = 0.002,
+) -> dict[str, Any] | None:
+    """Portföy net getiri serisi üzerinden CAGR, Sharpe, Sortino, MaxDD ve blok analizlerini hesaplar.
+
+    Args:
+        ret_series: Brüt getiri zaman serisi.
+        exposure_series: Portföy maruziyet oranı zaman serisi.
+        name: Strateji veya varyasyon adı.
+        tc_per_trade: İşlem başına maliyet kesintisi (varsayılan: %0.20).
+
+    Returns:
+        Hesaplanan performans metrikleri sözlüğü.
+    """
     # Apply TC
     flips = exposure_series.diff().abs().fillna(0)
     net_ret = ret_series - (flips * tc_per_trade)
@@ -73,8 +88,8 @@ def calc_metrics(ret_series, exposure_series, name, tc_per_trade=0.002) -> Any:
     }
 
 
-def run_phase_27() -> Any:
-    """Otomatik eklendi."""
+def run_phase_27() -> None:
+    """Volatilite rejimi portföy entegrasyonu ve dinamik risk açık/kapalı (Risk ON/OFF) simülasyonunu yürütür."""
     logger.info("🚀 FAZ 27: VOLATILITY REGIME PORTFOLIO INTEGRATION TEST")
     logger.info("Kurallar: Holdout Kilitli. ML Yok. Realistic TC/Slippage.\n")
 

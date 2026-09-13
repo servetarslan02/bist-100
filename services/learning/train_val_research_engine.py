@@ -25,7 +25,7 @@ from services.learning.institutional_walkforward_engine import (
 
 
 def run_train_val_research() -> Any:
-    """Otomatik eklendi."""
+    """Eğitim ve doğrulama döneminde (holdout öncesi) alfa hipotezlerini araştırır ve doğrular."""
     logger.info("=================================================================")
     logger.info("ALPHA BIST — PHASE 1 & 2: TRAIN/VALIDATION RESEARCH ENGINE")
     logger.info("=================================================================")

@@ -50,7 +50,7 @@ class FeatureImportanceTracker:
     """SHAP-based feature importance tracking."""
 
     def __init__(self):
-        """Otomatik eklendi."""
+        """SHAP ve model tabanlı öznitelik önem takipçisi geçmişini ilklendirir."""
         self._history: deque = deque(maxlen=10000)
         self._last_importance: dict[str, float] = {}
         self._regime_importance: dict[str, dict[str, list[float]]] = defaultdict(lambda: defaultdict(list))

@@ -16,8 +16,15 @@ logger = structlog.get_logger()
 from services.learning.institutional_walkforward_engine import detect_market_regime, load_all_market_data
 
 
-def extract_forensic_features(df) -> Any:
-    """Otomatik eklendi."""
+def extract_forensic_features(df: pd.DataFrame) -> pd.DataFrame:
+    """Fiyat serisinden adli inceleme özniteliklerini ve 5 günlük hedef getiriyi çıkarır.
+
+    Args:
+        df: OHLCV sütunlarını içeren hisse fiyat veri çerçevesi.
+
+    Returns:
+        Hesaplanan teknik göstergeler ve getiri hedefi veri çerçevesi.
+    """
     feats = pd.DataFrame(index=df.index)
     close = df["Close"]
     df["High"]
@@ -38,16 +45,24 @@ def extract_forensic_features(df) -> Any:
     return feats.dropna(subset=["roc_20d", "volatility_20d"])
 
 
-def get_resid(y, x) -> Any:
-    """Otomatik eklendi."""
+def get_resid(y: Any, x: Any) -> Any:
+    """y serisinden x faktörünün etkisini regresyonla arındırıp artık (residual) serisini döndürür.
+
+    Args:
+        y: Hedef veya bağımlı değişken dizisi.
+        x: Etkisi arındırılacak bağımsız faktör dizisi.
+
+    Returns:
+        Ortogonalize edilmiş artık (residual) değerleri.
+    """
     if len(x) < 2 or np.std(x) == 0:
         return y
     b = np.cov(x, y)[0, 1] / np.var(x)
     return y - b * x
 
 
-def run_residual_discovery() -> Any:
-    """Otomatik eklendi."""
+def run_residual_discovery() -> None:
+    """Rejim duyarlı ve faktörden arındırılmış artık alfa sinyallerinin keşif analizini yürütür."""
     logger.info("🚀 FAZ 20: RESIDUAL & REGIME-AWARE ALPHA DISCOVERY")
     logger.info("Kurallar: Model Eğitimi YOK. Sadece Feature-Level İstatistik. Final Holdout KİLİTLİ.\n")
 

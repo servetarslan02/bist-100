@@ -415,7 +415,7 @@ def run_frozen_strategy(
 
 
 def print_full_report(m: dict[str, Any]) -> Any:
-    """Otomatik eklendi."""
+    """Dondurulmuş strateji motoru simülasyon çıktısını ve kıyaslama karnesini loglar."""
     logger.info(f"\n{'=' * 65}")
     logger.info(f"🏆 {m['label']} — SONUÇ RAPORU")
     logger.info(f"{'=' * 65}")

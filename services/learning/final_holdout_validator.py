@@ -32,7 +32,7 @@ from services.learning.institutional_walkforward_engine import (
 
 
 def run_final_holdout_validation() -> Any:
-    """Otomatik eklendi."""
+    """3 yönlü veri ayrımı (Train, Validation, Holdout) ile modelin nihai performansını doğrular."""
     logger.info("=================================================================")
     logger.info("ALPHA BIST — FINAL HOLDOUT VALIDATION (3-WAY SPLIT)")
     logger.info("=================================================================")
@@ -459,7 +459,7 @@ def run_final_holdout_validation() -> Any:
     rf_daily = 0.40 / 252.0
 
     def calc_metrics(eq_list, daily_rets_list, trades_count, wins_count, gross_win, gross_loss, total_costs) -> Any:
-        """Otomatik eklendi."""
+        """Sermaye eğrisi ve işlem geçmişinden detaylı finansal performans metriklerini hesaplar."""
         eq_s = pd.Series(eq_list)
         d_s = pd.Series(daily_rets_list)
         tot_ret = (eq_s.iloc[-1] / INITIAL_CAPITAL - 1.0) * 100.0

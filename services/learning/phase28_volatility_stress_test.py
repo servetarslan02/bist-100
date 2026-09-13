@@ -15,8 +15,23 @@ logger = structlog.get_logger()
 from services.learning.institutional_walkforward_engine import load_all_market_data
 
 
-def eval_signal(df, signal_series, ret_col="ret_1d", tc=0.002) -> Any:
-    """Otomatik eklendi."""
+def eval_signal(
+    df: pd.DataFrame,
+    signal_series: pd.Series,
+    ret_col: str = "ret_1d",
+    tc: float = 0.002,
+) -> dict[str, Any] | None:
+    """Volatilite sinyali için net getiri, CAGR, Sharpe, MaxDD ve devir hızını değerlendirir.
+
+    Args:
+        df: Piyasa getiri verilerini içeren veri çerçevesi.
+        signal_series: Değerlendirilecek sinyal veya maruziyet serisi.
+        ret_col: Getiri sütunu adı (varsayılan: "ret_1d").
+        tc: İşlem maliyeti oranı (varsayılan: %0.20).
+
+    Returns:
+        Hesaplanan performans ve stres testi metrikleri sözlüğü.
+    """
     net_ret = signal_series * df[ret_col] - signal_series.diff().abs().fillna(0) * tc
     valid_ret = net_ret.dropna()
 
@@ -48,8 +63,8 @@ def eval_signal(df, signal_series, ret_col="ret_1d", tc=0.002) -> Any:
     }
 
 
-def run_phase_28() -> Any:
-    """Otomatik eklendi."""
+def run_phase_28() -> None:
+    """Volatilite rejim sinyallerinin gecikme, maliyet ve eşik stres testlerini yürütür."""
     logger.info("🚀 FAZ 28: VOLATILITY REGIME ROBUSTNESS STRESS TEST")
     logger.info("Kurallar: Holdout Kilitli. ML Yok. Stres Testleri.\n")
 

@@ -20,7 +20,7 @@ logger = structlog.get_logger()
 
 
 def build_offline_dataset() -> Any:
-    """Otomatik eklendi."""
+    """Çevrimdışı araştırma için hisse öznitelikleri, rejim ve alternatif hedef etiketlerini içeren veri setini hazırlar."""
     stock_data, xu100_close = load_all_market_data()
     feature_cols = [
         "roc_5d",
@@ -107,7 +107,7 @@ def build_offline_dataset() -> Any:
 
 
 def walk_forward_offline(df, val_dates, feature_cols) -> Any:
-    """Otomatik eklendi."""
+    """Çevrimdışı walk-forward simülasyonu ile regresyon ve sıralama modellerinin tahminlerini üretir."""
     results = []
 
     # Prepare walk-forward logic (monthly retrain approximation to save time)
@@ -189,7 +189,7 @@ def walk_forward_offline(df, val_dates, feature_cols) -> Any:
 
 
 def analyze_models(res_df) -> Any:
-    """Otomatik eklendi."""
+    """Farklı model mimarilerinin (M0-M4) tahmin kalitesi ve IC metriklerini karşılaştırmalı analiz eder."""
     models = ["M0_pred", "M1_pred", "M2_pred", "M3_pred", "M4_pred"]
 
     logger.info("\n" + "=" * 50)
@@ -197,7 +197,7 @@ def analyze_models(res_df) -> Any:
     logger.info("=" * 50)
 
     def calc_ic(df_sub, pred_col) -> Any:
-        """Otomatik eklendi."""
+        """Tahmin kolonu ile gerçekleşen getiri arasındaki Spearman IC katsayısını hesaplar."""
         return (
             df_sub.groupby("date")
             .apply(lambda x: spearmanr(x[pred_col], x["fwd_5d"])[0] if len(x) > 5 else np.nan)

@@ -19,7 +19,7 @@ logger = structlog.get_logger()
 
 
 def run_robustness_test(eval_dates, features_by_ticker, xu100_close, trainer, breadth_mode="ACTUAL") -> Any:
-    """Otomatik eklendi."""
+    """Piyasa genişliği ve rejim değişimlerine karşı strateji sağlamlık (robustness) testini yürütür."""
     portfolio_cash = 10_000_000.0
     positions = {}
     equity_curve = []

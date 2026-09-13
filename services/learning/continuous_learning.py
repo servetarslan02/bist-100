@@ -60,7 +60,14 @@ class ContinuousLearningPipeline:
         performance_window: int | None = None,
         min_samples_for_retrain: int | None = None,
     ):
-        """Otomatik eklendi."""
+        """Sürekli öğrenme ve otomatik yeniden eğitim orkestratörünü ilklendirir.
+
+        Args:
+            retrain_interval_days: Yeniden eğitim periyodu (gün).
+            drift_check_interval: Veri kayması kontrol aralığı (gün).
+            performance_window: Performans izleme pencere boyutu.
+            min_samples_for_retrain: Yeniden eğitim için gereken asgari örnek sayısı.
+        """
         cfg = learning_settings
         self.retrain_interval_days = retrain_interval_days or cfg.retrain.max_interval_days
         self.drift_check_interval = drift_check_interval or cfg.drift.check_interval_days

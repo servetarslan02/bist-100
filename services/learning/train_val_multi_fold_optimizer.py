@@ -26,7 +26,7 @@ logger = structlog.get_logger()
 
 
 def run_multi_fold_optimization() -> Any:
-    """Otomatik eklendi."""
+    """Çoklu katlamalı (multi-fold) çapraz doğrulama ile aday model hiperparametrelerini optimize eder."""
     logger.info("=================================================================")
     logger.info("ALPHA BIST — PHASE 3 & 4: MULTI-FOLD CANDIDATE OPTIMIZER")
     logger.info("=================================================================")

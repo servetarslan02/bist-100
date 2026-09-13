@@ -21,7 +21,7 @@ logger = structlog.get_logger()
 
 
 def run_fact_check_audit(eval_dates, features_by_ticker, xu100_close, trainer) -> Any:
-    """Otomatik eklendi."""
+    """Model varsayımlarını ve işlem yürütme gerçeklerini denetleyen doğrulama simülasyonunu çalıştırır."""
     portfolio_cash = 10_000_000.0
     positions = {}
 

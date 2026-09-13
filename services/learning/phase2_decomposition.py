@@ -18,7 +18,7 @@ logger = structlog.get_logger()
 
 
 def run_loss_decomposition(eval_dates, features_by_ticker, xu100_close, trainer) -> Any:
-    """Otomatik eklendi."""
+    """Portföy kayıplarını işlem maliyeti, stop-loss, nakit sürüklenmesi ve rejim gecikmesi bileşenlerine ayrıştırır."""
     portfolio_cash = 10_000_000.0
     positions = {}
 

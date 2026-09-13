@@ -31,7 +31,7 @@ class ClosedLoopLearning:
     """Closed-loop learning system that tracks predictions and learns from outcomes."""
 
     def __init__(self, max_history: int = 10000):
-        """Otomatik eklendi."""
+        """Kapalı döngü öğrenme sistemini ve tahmin kayıt tamponunu başlatır."""
         self.max_history = max_history
         self._predictions: list[PredictionRecord] = []
         self._model_metrics: dict[str, dict[str, float]] = {}

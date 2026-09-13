@@ -29,7 +29,7 @@ class UpsideCaptureValidator:
     """Validates model's ability to capture upside vs downside moves."""
 
     def __init__(self, min_capture_ratio: float = 0.5):
-        """Otomatik eklendi."""
+        """Yukarı yönlü getiri yakalama doğrulama motorunu başlatır."""
         self.min_capture_ratio = min_capture_ratio
 
     def validate(

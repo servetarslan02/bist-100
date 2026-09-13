@@ -37,7 +37,7 @@ class ChampionChallengerEngine:
     """Champion-challenger yönetim motoru."""
 
     def __init__(self):
-        """Otomatik eklendi."""
+        """Şampiyon-meydan okuyan model yarışma motorunu ve kanarya dağıtım durumunu ilklendirir."""
         self._current_champion: ChampionRecord | None = None
         self._champion_history: deque = deque(maxlen=500)
         self._rejected_challengers: deque = deque(maxlen=500)

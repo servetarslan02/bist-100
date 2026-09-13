@@ -71,7 +71,7 @@ class AdvancedDriftDetector:
     """Gelişmiş drift detection motoru — çoklu yöntem."""
 
     def __init__(self):
-        """Otomatik eklendi."""
+        """Çoklu yöntemli gelişmiş veri ve kavram kayması tespit motorunu başlatır."""
         self._baseline_distributions: dict[str, dict] = {}  # feature → {mean, std, data}
         self._drift_history: list[ComprehensiveDriftReport] = []
         self._performance_history: list[dict] = []  # concept drift için

@@ -24,7 +24,7 @@ logger = structlog.get_logger()
 
 
 def run_forensics(eval_dates, features_by_ticker, stock_data, xu100_close, trainer) -> Any:
-    """Otomatik eklendi."""
+    """Alfa sinyallerinin tahmin gücünü ve rejim bazlı adli dökümünü çıkarır."""
     daily_records = []
 
     # Feature list based on Phase 8 extraction
@@ -86,13 +86,13 @@ def run_forensics(eval_dates, features_by_ticker, stock_data, xu100_close, train
 
 
 def analyze_forensics(df, feature_cols) -> Any:
-    """Otomatik eklendi."""
+    """Özniteliklerin boğa ve boğa dışı rejimlerdeki bilgi katsayısı (IC) adli analizini yapar."""
     logger.info("\n" + "=" * 50)
     logger.info("2. BULL vs NON-BULL FEATURE IC")
     logger.info("=" * 50)
 
     def calc_ic(grp, col) -> Any:
-        """Otomatik eklendi."""
+        """Grup bazlı günlük Spearman sıra bilgi katsayısını (IC) hesaplar."""
         # Calculate daily IC then average
         daily_ic = grp.groupby("date").apply(lambda x: spearmanr(x[col], x["fwd_5d"])[0] if len(x) > 5 else np.nan)
         return daily_ic.mean()

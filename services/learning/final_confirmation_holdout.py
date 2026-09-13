@@ -26,7 +26,7 @@ logger = structlog.get_logger()
 
 
 def run_final_confirmation() -> Any:
-    """Otomatik eklendi."""
+    """Dondurulmuş strateji kuralları ve gerçek işlem maliyetleriyle nihai doğrulama holdout testini yürütür."""
     logger.info("=================================================================")
     logger.info("ALPHA BIST — FINAL CONFIRMATION HOLDOUT TEST")
     logger.info("=================================================================")

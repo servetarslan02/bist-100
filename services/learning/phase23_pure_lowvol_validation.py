@@ -1,7 +1,6 @@
 """FAZ 23: PURE LOW-VOL ALPHA VALIDATION"""
 
 import warnings
-from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -16,8 +15,8 @@ logger = structlog.get_logger()
 from services.learning.institutional_walkforward_engine import detect_market_regime, load_all_market_data
 
 
-def run_phase_23() -> Any:
-    """Otomatik eklendi."""
+def run_phase_23() -> None:
+    """Saf düşük volatilite (Low-Vol) anomalisini makine öğrenimi olmaksızın doğrular ve rejim duyarlılığını analiz eder."""
     logger.info("🚀 FAZ 23: PURE LOW-VOL ALPHA VALIDATION (No ML)")
     logger.info("Kurallar: PnL YOK. Final Holdout KİLİTLİ. Offline Audit.\n")
 

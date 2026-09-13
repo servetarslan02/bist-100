@@ -25,14 +25,15 @@ logger = structlog.get_logger()
 
 
 class AlphaModel:
-    """Otomatik eklendi."""
+    """Üretim seviyesinde LambdaRank enine kesit sıralama alfa modeli."""
+
     def __init__(self, feature_cols):
-        """Otomatik eklendi."""
+        """Model başlatıcı."""
         self.feature_cols = feature_cols
         self.model = None
 
     def _prepare_labels(self, train_df) -> Any:
-        """Otomatik eklendi."""
+        """Eğitim verisi için enine kesit sıra yüzdeliklerini ve LambdaRank relevans gruplarını oluşturur."""
         # 1. LABEL DESIGN: Cross-Sectional Rank
         # Note: Ranking absolute return cross-sectionally is mathematically 100% equivalent
         # to ranking excess return (relative to benchmark), because the benchmark return
@@ -51,7 +52,7 @@ class AlphaModel:
         return df_sorted, groups
 
     def retrain_fold(self, train_df) -> Any:
-        """Otomatik eklendi."""
+        """Belirtilen fold için LambdaRank modelini eğitir."""
         if len(train_df) < 50:
             return
 
@@ -74,7 +75,7 @@ class AlphaModel:
         self.model.fit(X, y, group=groups)
 
     def predict_batch_day(self, tickers, features_list) -> Any:
-        """Otomatik eklendi."""
+        """Günlük hisse listesi için sıralama skorlarını hesaplar ve [-1, 1] aralığına normalize eder."""
         if not self.model:
             return {tk: 0.0 for tk in tickers}
 
@@ -97,7 +98,7 @@ class AlphaModel:
 
 
 def run_tests() -> Any:
-    """Otomatik eklendi."""
+    """Yeniden inşa edilen alfa modelinin sentetik ve gerçek BIST verileri üzerindeki doğrulama testlerini çalıştırır."""
     logger.info("🚀 FAZ 12: PRODUCTION-GRADE ALPHA MODEL REBUILD TESTS\n")
 
     stock_data, xu100_close = load_all_market_data()

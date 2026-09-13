@@ -15,16 +15,32 @@ logger = structlog.get_logger()
 from services.learning.institutional_walkforward_engine import load_all_market_data
 
 
-def calc_max_dd(rets) -> Any:
-    """Otomatik eklendi."""
+def calc_max_dd(rets: pd.Series) -> float:
+    """Getiri serisinden maksimum düşüş (Max Drawdown) oranını hesaplar.
+
+    Args:
+        rets: Dönemsel getiri serisi.
+
+    Returns:
+        Maksimum düşüş oranı.
+    """
     cum = (1 + rets).cumprod()
     peak = cum.cummax()
     dd = (cum - peak) / peak
-    return dd.min()
+    return float(dd.min())
 
 
-def evaluate_timing(xu100_df, signal_col, tc=0.001) -> Any:
-    """Otomatik eklendi."""
+def evaluate_timing(xu100_df: pd.DataFrame, signal_col: str, tc: float = 0.001) -> dict[str, Any] | None:
+    """Piyasa zamanlama sinyalinin getiri, Sharpe, MaxDD, maruziyet ve anlamlılık istatistiklerini değerlendirir.
+
+    Args:
+        xu100_df: Endeks getiri ve sinyal verilerini içeren veri çerçevesi.
+        signal_col: Değerlendirilecek pozisyon/maruziyet sinyal sütunu.
+        tc: İşlem maliyeti oranı (varsayılan: %0.10).
+
+    Returns:
+        Zamanlama stratejisi metrikleri sözlüğü.
+    """
     df = xu100_df.copy()
 
     # Strat return (signal at T determines exposure at T+1)
@@ -102,8 +118,8 @@ def evaluate_timing(xu100_df, signal_col, tc=0.001) -> Any:
     }
 
 
-def run_phase_26() -> Any:
-    """Otomatik eklendi."""
+def run_phase_26() -> None:
+    """Piyasa rejimi ve zamanlama sinyallerinin (hareketli ortalamalar, volatilite rejimleri vb.) keşif analizini yürütür."""
     logger.info("🚀 FAZ 26: MARKET REGIME & TIMING ALPHA DISCOVERY")
     logger.info("Kurallar: Holdout Kilitli. ML Yok. Market Timing & Downside Protection.\n")
 

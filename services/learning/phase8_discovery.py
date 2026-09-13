@@ -22,7 +22,7 @@ logger = structlog.get_logger()
 
 
 def run_structural_discovery(eval_dates, features_by_ticker, stock_data, xu100_close, trainer) -> Any:
-    """Otomatik eklendi."""
+    """Yapısal alfa keşfi, IC değerleri ve yukarı yönlü getiri kaybı analizi yürütür."""
     daily_ic = []
     bucket_data = []  # (score, fwd_1d, fwd_5d, fwd_10d)
     oracle_logs = []

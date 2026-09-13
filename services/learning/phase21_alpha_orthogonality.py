@@ -16,8 +16,15 @@ logger = structlog.get_logger()
 from services.learning.institutional_walkforward_engine import detect_market_regime, load_all_market_data
 
 
-def extract_forensic_features(df) -> Any:
-    """Otomatik eklendi."""
+def extract_forensic_features(df: pd.DataFrame) -> pd.DataFrame:
+    """Fiyat serisinden momentum, volatilite ve ileriye dönük hedef getirileri çıkarır.
+
+    Args:
+        df: OHLCV sütunlarını içeren hisse fiyat veri çerçevesi.
+
+    Returns:
+        Öznitelik ve hedef getiri serilerini içeren veri çerçevesi.
+    """
     feats = pd.DataFrame(index=df.index)
     close = df["Close"]
     feats["roc_5d"] = (close / close.shift(5) - 1.0) * 100.0
@@ -32,16 +39,24 @@ def extract_forensic_features(df) -> Any:
     return feats.dropna(subset=["roc_20d", "volatility_20d", "roc_5d"])
 
 
-def get_resid(y, x) -> Any:
-    """Otomatik eklendi."""
+def get_resid(y: Any, x: Any) -> Any:
+    """y serisini x faktörüne göre doğrusal arındırarak dik (ortogonal) bileşeni döndürür.
+
+    Args:
+        y: Arındırılacak bağımlı değişken dizisi.
+        x: Bağımsız faktör dizisi.
+
+    Returns:
+        Ortogonalize edilmiş artık değer dizisi.
+    """
     if len(x) < 2 or np.std(x) == 0:
         return y
     b = np.cov(x, y)[0, 1] / np.var(x)
     return y - b * x
 
 
-def run_alpha_orthogonality() -> Any:
-    """Otomatik eklendi."""
+def run_alpha_orthogonality() -> None:
+    """Alfa faktörlerinin ortogonalite, rejim duyarlılığı ve korelasyon stabilitesini denetler."""
     logger.info("🚀 FAZ 21: ALPHA ORTHOGONALITY & STABILITY AUDIT")
     logger.info("Kurallar: Model Eğitimi YOK. Sadece Feature-Level İstatistik. Final Holdout KİLİTLİ.\n")
 

@@ -336,7 +336,7 @@ async def _health_server(port: int = 8080) -> Any:
     from aiohttp import web
 
     async def health_handler(request) -> Any:
-        """Otomatik eklendi."""
+        """Servisin canlılık durumunu doğrulayan HTTP sağlık kontrol uç noktası."""
         return web.json_response({"status": "healthy", "service": "learning"})
 
     app = web.Application()

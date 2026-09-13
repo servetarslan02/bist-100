@@ -51,7 +51,7 @@ BASE_PARAMS = {
 
 
 def run_candidate(eval_dates, features_by_ticker, xu100_close, trainer, candidate_name, initial_capital=10_000_000.0) -> Any:
-    """Otomatik eklendi."""
+    """Alternatif aday strateji mekanizmasını simüle ederek performans metriklerini hesaplar."""
     portfolio_cash = initial_capital
     positions = {}
     equity_curve = []

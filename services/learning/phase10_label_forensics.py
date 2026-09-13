@@ -22,7 +22,7 @@ logger = structlog.get_logger()
 
 
 def run_label_forensics() -> Any:
-    """Otomatik eklendi."""
+    """Farklı hedef etiketlerin (label) tahmin gücü ve bilgi katsayısı (IC) adli analizini yürütür."""
     stock_data, xu100_close = load_all_market_data()
     feature_cols = [
         "roc_5d",
@@ -124,7 +124,7 @@ def run_label_forensics() -> Any:
     logger.info("=" * 50)
 
     def calc_ic(label) -> Any:
-        """Otomatik eklendi."""
+        """Belirtilen hedef etiket için günlük Spearman sıra korelasyonu (IC) ortalamasını hesaplar."""
         return df.groupby("date").apply(lambda x: spearmanr(x["roc_20d"], x[label])[0] if len(x) > 5 else np.nan).mean()
 
     logger.info("ROC_20D Feature IC against different theoretically superior labels:")
@@ -140,7 +140,7 @@ def run_label_forensics() -> Any:
     bull_df = df[df["regime"] == "BULL_TREND"]
 
     def calc_ic_feature(grp, feature, target="fwd_5d_raw") -> Any:
-        """Otomatik eklendi."""
+        """Belirtilen rejim alt grubunda öznitelik ile hedef arasındaki IC değerini hesaplar."""
         return grp.groupby("date").apply(lambda x: spearmanr(x[feature], x[target])[0] if len(x) > 5 else np.nan).mean()
 
     features_to_check = ["roc_20d", "price_vs_sma20", "price_vs_sma200", "volume_zscore", "volatility_20d"]
