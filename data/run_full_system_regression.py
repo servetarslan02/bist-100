@@ -12,12 +12,12 @@ Bu betik tüm sistemi uçtan uca çalıştırır:
 """
 
 import asyncio
-import json
 import os
 import time
 from pathlib import Path
 
 import numpy as np
+import orjson
 import psutil
 import structlog
 
@@ -50,7 +50,7 @@ async def run_e2e_regression_suite():
     baseline_data = {}
     if baseline_file.exists():
         with open(baseline_file, encoding="utf-8") as f:
-            baseline_data = json.load(f)
+            baseline_data = orjson.loads(f.read())
 
     measure_system_resources()
 
