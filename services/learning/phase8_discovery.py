@@ -1,10 +1,9 @@
-from typing import Any
-
 """FAZ 8: STRUCTURAL ALPHA DISCOVERY
 V3'ün getiri darboğazlarını Alpha, Threshold, Allocation ve Exit olarak ayrıştırır.
 """
 
 from datetime import timedelta
+from typing import Any
 
 import numpy as np
 import pandas as pd

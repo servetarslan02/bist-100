@@ -1,9 +1,8 @@
-from typing import Any
-
 """FAZ 9: ALPHA MODEL FORENSICS & REGIME-CONDITIONAL ALPHA"""
 
 import warnings
 from datetime import timedelta
+from typing import Any
 
 import numpy as np
 import pandas as pd

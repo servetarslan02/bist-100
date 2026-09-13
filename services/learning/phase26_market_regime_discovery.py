@@ -1,8 +1,7 @@
-from typing import Any
-
 """FAZ 26: MARKET REGIME & TIMING ALPHA DISCOVERY"""
 
 import warnings
+from typing import Any
 
 import numpy as np
 import pandas as pd

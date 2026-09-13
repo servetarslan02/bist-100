@@ -1,7 +1,4 @@
-from typing import Any
-
-"""
-ALPHA BIST — Confidence Calibrator v1.0
+"""ALPHA BIST — Confidence Calibrator v1.0
 
 Model confidence kalibrasyonu:
 - Calibration curve hesaplama
@@ -19,6 +16,7 @@ Kullanım:
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from typing import Any
 
 import numpy as np
 import structlog

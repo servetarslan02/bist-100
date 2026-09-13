@@ -1,10 +1,9 @@
-from typing import Any
-
 """FAZ 15: RANDOM FILTER FORENSICS & TRADE TIMING AUDIT"""
 
 import random
 import warnings
 from datetime import timedelta
+from typing import Any
 
 import lightgbm as lgb
 import numpy as np

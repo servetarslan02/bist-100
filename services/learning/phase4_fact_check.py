@@ -1,9 +1,9 @@
-from typing import Any
-
 """FAZ 4 ÖNCESİ EK DOĞRULAMA (FACT-CHECKING)
 1. BULL_TREND zararlarının kök nedenini işlem bazında MFE/MAE ile kanıtlama.
 2. V-Dip fırsat kaybını Breadth vs XU100 Getiri gecikmesiyle günlük olarak kanıtlama.
 """
+
+from typing import Any
 
 import numpy as np
 import pandas as pd

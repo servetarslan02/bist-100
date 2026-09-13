@@ -1,8 +1,7 @@
-from typing import Any
-
 """FAZ 7: CAUSAL VALIDATION & ROBUSTNESS AUDIT FOR CANDIDATE C"""
 
 from datetime import timedelta
+from typing import Any
 
 import numpy as np
 import pandas as pd

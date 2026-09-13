@@ -1,8 +1,7 @@
-from typing import Any
-
 """FAZ 23: PURE LOW-VOL ALPHA VALIDATION"""
 
 import warnings
+from typing import Any
 
 import numpy as np
 import pandas as pd

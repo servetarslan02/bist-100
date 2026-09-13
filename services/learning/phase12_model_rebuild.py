@@ -1,10 +1,9 @@
-from typing import Any
-
 """FAZ 12: PRODUCTION-GRADE ALPHA MODEL REBUILD
 (OFFLINE DIAGNOSTICS & PIPELINE RE-ARCHITECTURE)
 """
 
 import warnings
+from typing import Any
 
 import lightgbm as lgb
 import numpy as np

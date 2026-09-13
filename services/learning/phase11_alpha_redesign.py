@@ -1,9 +1,8 @@
-from typing import Any
-
 """FAZ 11: ALPHA MODEL RE-DESIGN RESEARCH & OFFLINE VALIDATION"""
 
 import warnings
 from datetime import timedelta
+from typing import Any
 
 import lightgbm as lgb
 import numpy as np

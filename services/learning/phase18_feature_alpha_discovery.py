@@ -1,8 +1,7 @@
-from typing import Any
-
 """FAZ 18: FEATURE-LEVEL ALPHA DISCOVERY & ECONOMIC SIGNAL AUDIT"""
 
 import warnings
+from typing import Any
 
 import numpy as np
 import pandas as pd

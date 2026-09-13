@@ -1,8 +1,7 @@
-from typing import Any
-
 """FAZ 19: ECONOMIC ALPHA VALIDATION"""
 
 import warnings
+from typing import Any
 
 import numpy as np
 import pandas as pd

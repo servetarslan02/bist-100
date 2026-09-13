@@ -1,7 +1,4 @@
-from typing import Any
-
-"""
-ALPHA BIST — Attribution Engine v1.0
+"""ALPHA BIST — Attribution Engine v1.0
 
 Bir işlem kazandı/kaybetti → NEDEN?
 
@@ -19,6 +16,7 @@ Attribution:
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any
 
 import structlog
 

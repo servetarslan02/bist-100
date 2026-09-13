@@ -1,5 +1,3 @@
-from typing import Any
-
 """Phase 3 & 4: Alternative Strategies Optimizer (Maximum Sustainable Alpha)
 Test edilecek hipotezler:
 A) Dynamic Trailing (Kar > %8 ise ATR çarpanı 2.5 -> 1.5)
@@ -8,6 +6,7 @@ C) Combined (A + B)
 """
 
 from datetime import timedelta
+from typing import Any
 
 import numpy as np
 import pandas as pd

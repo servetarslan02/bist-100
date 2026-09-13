@@ -1,8 +1,7 @@
-from typing import Any
-
 """FAZ 22: PRODUCTION-GRADE ALPHA MODEL REBUILD"""
 
 import warnings
+from typing import Any
 
 import lightgbm as lgb
 import numpy as np
