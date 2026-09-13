@@ -57,6 +57,19 @@ CREATE TABLE instruments (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS daily_bars (
+    ticker VARCHAR(20) NOT NULL,
+    trade_date DATE NOT NULL,
+    open NUMERIC(12, 4),
+    high NUMERIC(12, 4),
+    low NUMERIC(12, 4),
+    close NUMERIC(12, 4),
+    volume BIGINT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (ticker, trade_date)
+);
+CREATE INDEX IF NOT EXISTS idx_daily_bars_ticker_date ON daily_bars (ticker, trade_date DESC);
+
 CREATE TABLE indices (
     id SERIAL PRIMARY KEY,
     symbol VARCHAR(20) UNIQUE NOT NULL,
