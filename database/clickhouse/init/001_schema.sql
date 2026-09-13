@@ -3,13 +3,13 @@
 -- ReplicatedMergeTree ile data redundancy
 -- =====================================================
 
-CREATE DATABASE IF NOT EXISTS alpha_bist ON CLUSTER '{cluster}';
+CREATE DATABASE IF NOT EXISTS alpha_bist;
 
 -- =====================================================
 -- MARKET DATA (High-volume time-series)
 -- =====================================================
 
-CREATE TABLE IF NOT EXISTS alpha_bist.market_ticks ON CLUSTER '{cluster}' (
+CREATE TABLE IF NOT EXISTS alpha_bist.market_ticks (
     instrument_id UInt32,
     timestamp DateTime64(3, 'Europe/Istanbul'),
     price Decimal(12, 4),
@@ -19,13 +19,13 @@ CREATE TABLE IF NOT EXISTS alpha_bist.market_ticks ON CLUSTER '{cluster}' (
     trade_count UInt32 DEFAULT 0,
     source LowCardinality(String),
     quality Float32 DEFAULT 1.0
-) ENGINE = ReplicatedMergeTree('/clickhouse/tables/{shard}/market_ticks', '{replica}')
+) ENGINE = MergeTree()
 PARTITION BY toYYYYMMDD(timestamp)
 ORDER BY (instrument_id, timestamp)
 TTL toDateTime(timestamp) + INTERVAL 5 YEAR
 SETTINGS index_granularity = 8192;
 
-CREATE TABLE IF NOT EXISTS alpha_bist.market_trades ON CLUSTER '{cluster}' (
+CREATE TABLE IF NOT EXISTS alpha_bist.market_trades (
     instrument_id UInt32,
     timestamp DateTime64(3, 'Europe/Istanbul'),
     price Decimal(12, 4),
@@ -33,12 +33,12 @@ CREATE TABLE IF NOT EXISTS alpha_bist.market_trades ON CLUSTER '{cluster}' (
     side Enum8('BUY' = 1, 'SELL' = 2),
     trade_id String,
     source LowCardinality(String)
-) ENGINE = ReplicatedMergeTree('/clickhouse/tables/{shard}/market_trades', '{replica}')
+) ENGINE = MergeTree()
 PARTITION BY toYYYYMMDD(timestamp)
 ORDER BY (instrument_id, timestamp)
 TTL toDateTime(timestamp) + INTERVAL 5 YEAR;
 
-CREATE TABLE IF NOT EXISTS alpha_bist.orderbook_snapshots ON CLUSTER '{cluster}' (
+CREATE TABLE IF NOT EXISTS alpha_bist.orderbook_snapshots (
     instrument_id UInt32,
     timestamp DateTime64(3, 'Europe/Istanbul'),
     bid_prices Array(Decimal(12, 4)),
@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS alpha_bist.orderbook_snapshots ON CLUSTER '{cluster}'
     spread Decimal(12, 4),
     mid_price Decimal(12, 4),
     source LowCardinality(String)
-) ENGINE = ReplicatedMergeTree('/clickhouse/tables/{shard}/orderbook_snapshots', '{replica}')
+) ENGINE = MergeTree()
 PARTITION BY toYYYYMMDD(timestamp)
 ORDER BY (instrument_id, timestamp)
 TTL toDateTime(timestamp) + INTERVAL 1 YEAR;
@@ -57,7 +57,7 @@ TTL toDateTime(timestamp) + INTERVAL 1 YEAR;
 -- OHLCV (Aggregated candles)
 -- =====================================================
 
-CREATE TABLE IF NOT EXISTS alpha_bist.ohlcv ON CLUSTER '{cluster}' (
+CREATE TABLE IF NOT EXISTS alpha_bist.ohlcv (
     instrument_id UInt32,
     timestamp DateTime('Europe/Istanbul'),
     timeframe Enum16('1m' = 1, '5m' = 5, '15m' = 15, '1h' = 60, '1d' = 1440),
@@ -68,7 +68,7 @@ CREATE TABLE IF NOT EXISTS alpha_bist.ohlcv ON CLUSTER '{cluster}' (
     volume UInt64,
     trade_count UInt32 DEFAULT 0,
     vwap Decimal(12, 4)
-) ENGINE = ReplicatedReplacingMergeTree('/clickhouse/tables/{shard}/ohlcv', '{replica}')
+) ENGINE = ReplacingMergeTree()
 PARTITION BY (toYYYYMMDD(timestamp), timeframe)
 ORDER BY (instrument_id, timeframe, timestamp)
 TTL toDateTime(timestamp) + INTERVAL 5 YEAR;
@@ -77,14 +77,14 @@ TTL toDateTime(timestamp) + INTERVAL 5 YEAR;
 -- FEATURES (Computed features per instrument)
 -- =====================================================
 
-CREATE TABLE IF NOT EXISTS alpha_bist.features ON CLUSTER '{cluster}' (
+CREATE TABLE IF NOT EXISTS alpha_bist.features (
     instrument_id UInt32,
     timestamp DateTime64(3, 'Europe/Istanbul'),
     feature_name LowCardinality(String),
     feature_value Float64,
     feature_version UInt32 DEFAULT 1,
     source LowCardinality(String)
-) ENGINE = ReplicatedReplacingMergeTree('/clickhouse/tables/{shard}/features', '{replica}', feature_version)
+) ENGINE = ReplacingMergeTree(feature_version)
 PARTITION BY toYYYYMMDD(timestamp)
 ORDER BY (instrument_id, feature_name, timestamp)
 TTL toDateTime(timestamp) + INTERVAL 3 YEAR;
@@ -93,7 +93,7 @@ TTL toDateTime(timestamp) + INTERVAL 3 YEAR;
 -- ASSET STATES (Current state per instrument)
 -- =====================================================
 
-CREATE TABLE IF NOT EXISTS alpha_bist.asset_states ON CLUSTER '{cluster}' (
+CREATE TABLE IF NOT EXISTS alpha_bist.asset_states (
     instrument_id UInt32,
     timestamp DateTime64(3, 'Europe/Istanbul'),
     state_name LowCardinality(String),
@@ -101,7 +101,7 @@ CREATE TABLE IF NOT EXISTS alpha_bist.asset_states ON CLUSTER '{cluster}' (
     state_string String DEFAULT '',
     confidence Float32 DEFAULT 1.0,
     updated_by LowCardinality(String) DEFAULT 'SYSTEM'
-) ENGINE = ReplicatedReplacingMergeTree('/clickhouse/tables/{shard}/asset_states', '{replica}')
+) ENGINE = ReplacingMergeTree()
 PARTITION BY toYYYYMMDD(timestamp)
 ORDER BY (instrument_id, state_name, timestamp);
 
@@ -109,7 +109,7 @@ ORDER BY (instrument_id, state_name, timestamp);
 -- MARKET STATES (Overall market regime)
 -- =====================================================
 
-CREATE TABLE IF NOT EXISTS alpha_bist.market_states ON CLUSTER '{cluster}' (
+CREATE TABLE IF NOT EXISTS alpha_bist.market_states (
     timestamp DateTime64(3, 'Europe/Istanbul'),
     regime LowCardinality(String),
     regime_confidence Float32,
@@ -119,7 +119,7 @@ CREATE TABLE IF NOT EXISTS alpha_bist.market_states ON CLUSTER '{cluster}' (
     liquidity_level LowCardinality(String),
     risk_appetite Float32,
     details String DEFAULT '{}'
-) ENGINE = ReplicatedReplacingMergeTree('/clickhouse/tables/{shard}/market_states', '{replica}')
+) ENGINE = ReplacingMergeTree()
 PARTITION BY toYYYYMMDD(timestamp)
 ORDER BY timestamp;
 
@@ -127,7 +127,7 @@ ORDER BY timestamp;
 -- WORLD STATES (Global macro state)
 -- =====================================================
 
-CREATE TABLE IF NOT EXISTS alpha_bist.world_states ON CLUSTER '{cluster}' (
+CREATE TABLE IF NOT EXISTS alpha_bist.world_states (
     timestamp DateTime64(3, 'Europe/Istanbul'),
     geopolitical_risk Float32,
     global_risk_appetite Float32,
@@ -139,7 +139,7 @@ CREATE TABLE IF NOT EXISTS alpha_bist.world_states ON CLUSTER '{cluster}' (
     vix_level Float32,
     news_shock Float32,
     details String DEFAULT '{}'
-) ENGINE = ReplicatedReplacingMergeTree('/clickhouse/tables/{shard}/world_states', '{replica}')
+) ENGINE = ReplacingMergeTree()
 PARTITION BY toYYYYMMDD(timestamp)
 ORDER BY timestamp;
 
@@ -147,7 +147,7 @@ ORDER BY timestamp;
 -- EVENTS (News, KAP, Social, Macro)
 -- =====================================================
 
-CREATE TABLE IF NOT EXISTS alpha_bist.events ON CLUSTER '{cluster}' (
+CREATE TABLE IF NOT EXISTS alpha_bist.events (
     event_id String,
     timestamp DateTime64(3, 'Europe/Istanbul'),
     event_type LowCardinality(String),
@@ -163,12 +163,12 @@ CREATE TABLE IF NOT EXISTS alpha_bist.events ON CLUSTER '{cluster}' (
     event_category LowCardinality(String) DEFAULT 'OTHER',
     raw_data String DEFAULT '',
     processed Boolean DEFAULT false
-) ENGINE = ReplicatedReplacingMergeTree('/clickhouse/tables/{shard}/events', '{replica}')
+) ENGINE = ReplacingMergeTree()
 PARTITION BY toYYYYMMDD(timestamp)
 ORDER BY (event_type, timestamp)
 TTL toDateTime(timestamp) + INTERVAL 3 YEAR;
 
-CREATE TABLE IF NOT EXISTS alpha_bist.kap_events ON CLUSTER '{cluster}' (
+CREATE TABLE IF NOT EXISTS alpha_bist.kap_events (
     kap_id String,
     timestamp DateTime64(3, 'Europe/Istanbul'),
     company_id UInt32,
@@ -181,12 +181,12 @@ CREATE TABLE IF NOT EXISTS alpha_bist.kap_events ON CLUSTER '{cluster}' (
     is_price_sensitive Boolean DEFAULT false,
     raw_html String DEFAULT '',
     processed Boolean DEFAULT false
-) ENGINE = ReplicatedReplacingMergeTree('/clickhouse/tables/{shard}/kap_events', '{replica}')
+) ENGINE = ReplacingMergeTree()
 PARTITION BY toYYYYMMDD(timestamp)
 ORDER BY (company_id, timestamp)
 TTL toDateTime(timestamp) + INTERVAL 5 YEAR;
 
-CREATE TABLE IF NOT EXISTS alpha_bist.news_events ON CLUSTER '{cluster}' (
+CREATE TABLE IF NOT EXISTS alpha_bist.news_events (
     news_id String,
     timestamp DateTime64(3, 'Europe/Istanbul'),
     source LowCardinality(String),
@@ -200,12 +200,12 @@ CREATE TABLE IF NOT EXISTS alpha_bist.news_events ON CLUSTER '{cluster}' (
     importance Float32 DEFAULT 0,
     event_type LowCardinality(String) DEFAULT 'NEWS',
     processed Boolean DEFAULT false
-) ENGINE = ReplicatedReplacingMergeTree('/clickhouse/tables/{shard}/news_events', '{replica}')
+) ENGINE = ReplacingMergeTree()
 PARTITION BY toYYYYMMDD(timestamp)
 ORDER BY (source, timestamp)
 TTL toDateTime(timestamp) + INTERVAL 2 YEAR;
 
-CREATE TABLE IF NOT EXISTS alpha_bist.social_events ON CLUSTER '{cluster}' (
+CREATE TABLE IF NOT EXISTS alpha_bist.social_events (
     social_id String,
     timestamp DateTime64(3, 'Europe/Istanbul'),
     platform LowCardinality(String),
@@ -217,12 +217,12 @@ CREATE TABLE IF NOT EXISTS alpha_bist.social_events ON CLUSTER '{cluster}' (
     engagement_score Float32 DEFAULT 0,
     is_influencer Boolean DEFAULT false,
     processed Boolean DEFAULT false
-) ENGINE = ReplicatedReplacingMergeTree('/clickhouse/tables/{shard}/social_events', '{replica}')
+) ENGINE = ReplacingMergeTree()
 PARTITION BY toYYYYMMDD(timestamp)
 ORDER BY (platform, timestamp)
 TTL toDateTime(timestamp) + INTERVAL 1 YEAR;
 
-CREATE TABLE IF NOT EXISTS alpha_bist.macro_events ON CLUSTER '{cluster}' (
+CREATE TABLE IF NOT EXISTS alpha_bist.macro_events (
     macro_id String,
     timestamp DateTime64(3, 'Europe/Istanbul'),
     event_type LowCardinality(String),
@@ -235,7 +235,7 @@ CREATE TABLE IF NOT EXISTS alpha_bist.macro_events ON CLUSTER '{cluster}' (
     importance Float32,
     source LowCardinality(String) DEFAULT 'TCMB',
     processed Boolean DEFAULT false
-) ENGINE = ReplicatedReplacingMergeTree('/clickhouse/tables/{shard}/macro_events', '{replica}')
+) ENGINE = ReplacingMergeTree()
 PARTITION BY toYYYYMMDD(timestamp)
 ORDER BY (event_type, timestamp);
 
@@ -243,7 +243,7 @@ ORDER BY (event_type, timestamp);
 -- SIGNALS (Generated trading signals)
 -- =====================================================
 
-CREATE TABLE IF NOT EXISTS alpha_bist.signals_history ON CLUSTER '{cluster}' (
+CREATE TABLE IF NOT EXISTS alpha_bist.signals_history (
     signal_id UInt64,
     instrument_id UInt32,
     timestamp DateTime64(3, 'Europe/Istanbul'),
@@ -259,7 +259,7 @@ CREATE TABLE IF NOT EXISTS alpha_bist.signals_history ON CLUSTER '{cluster}' (
     model_version LowCardinality(String) DEFAULT '',
     strategy_id UInt32 DEFAULT 0,
     status LowCardinality(String) DEFAULT 'ACTIVE'
-) ENGINE = ReplicatedMergeTree('/clickhouse/tables/{shard}/signals_history', '{replica}')
+) ENGINE = MergeTree()
 PARTITION BY toYYYYMMDD(timestamp)
 ORDER BY (instrument_id, timestamp);
 
@@ -267,7 +267,7 @@ ORDER BY (instrument_id, timestamp);
 -- MODEL PREDICTIONS & OUTCOMES
 -- =====================================================
 
-CREATE TABLE IF NOT EXISTS alpha_bist.model_predictions ON CLUSTER '{cluster}' (
+CREATE TABLE IF NOT EXISTS alpha_bist.model_predictions (
     prediction_id UInt64,
     model_version_id UInt32,
     instrument_id UInt32,
@@ -280,11 +280,11 @@ CREATE TABLE IF NOT EXISTS alpha_bist.model_predictions ON CLUSTER '{cluster}' (
     confidence Float32,
     features_used String DEFAULT '{}',
     created_at DateTime DEFAULT now()
-) ENGINE = ReplicatedMergeTree('/clickhouse/tables/{shard}/model_predictions', '{replica}')
+) ENGINE = MergeTree()
 PARTITION BY toYYYYMM(prediction_date)
 ORDER BY (instrument_id, prediction_date, horizon_days);
 
-CREATE TABLE IF NOT EXISTS alpha_bist.model_outcomes ON CLUSTER '{cluster}' (
+CREATE TABLE IF NOT EXISTS alpha_bist.model_outcomes (
     prediction_id UInt64,
     actual_return_pct Float32,
     actual_direction Enum8('UP' = 1, 'DOWN' = 2, 'NEUTRAL' = 3),
@@ -293,7 +293,7 @@ CREATE TABLE IF NOT EXISTS alpha_bist.model_outcomes ON CLUSTER '{cluster}' (
     is_correct UInt8,
     outcome_date Date,
     created_at DateTime DEFAULT now()
-) ENGINE = ReplicatedMergeTree('/clickhouse/tables/{shard}/model_outcomes', '{replica}')
+) ENGINE = MergeTree()
 PARTITION BY toYYYYMM(outcome_date)
 ORDER BY (prediction_id, outcome_date);
 
@@ -301,7 +301,7 @@ ORDER BY (prediction_id, outcome_date);
 -- ANOMALY DETECTION LOG
 -- =====================================================
 
-CREATE TABLE IF NOT EXISTS alpha_bist.anomalies ON CLUSTER '{cluster}' (
+CREATE TABLE IF NOT EXISTS alpha_bist.anomalies (
     anomaly_id UInt64,
     instrument_id UInt32,
     timestamp DateTime64(3, 'Europe/Istanbul'),
@@ -313,7 +313,7 @@ CREATE TABLE IF NOT EXISTS alpha_bist.anomalies ON CLUSTER '{cluster}' (
     evidence String DEFAULT '{}',
     resolved Boolean DEFAULT false,
     resolved_at Nullable(DateTime64(3, 'Europe/Istanbul'))
-) ENGINE = ReplicatedMergeTree('/clickhouse/tables/{shard}/anomalies', '{replica}')
+) ENGINE = MergeTree()
 PARTITION BY toYYYYMMDD(timestamp)
 ORDER BY (instrument_id, timestamp);
 
@@ -321,7 +321,7 @@ ORDER BY (instrument_id, timestamp);
 -- REGIME HISTORY
 -- =====================================================
 
-CREATE TABLE IF NOT EXISTS alpha_bist.regime_history ON CLUSTER '{cluster}' (
+CREATE TABLE IF NOT EXISTS alpha_bist.regime_history (
     timestamp DateTime64(3, 'Europe/Istanbul'),
     previous_regime LowCardinality(String),
     new_regime LowCardinality(String),
@@ -329,7 +329,7 @@ CREATE TABLE IF NOT EXISTS alpha_bist.regime_history ON CLUSTER '{cluster}' (
     trigger String,
     duration_hours Float32,
     details String DEFAULT '{}'
-) ENGINE = ReplicatedMergeTree('/clickhouse/tables/{shard}/regime_history', '{replica}')
+) ENGINE = MergeTree()
 PARTITION BY toYYYYMMDD(timestamp)
 ORDER BY timestamp;
 
@@ -337,7 +337,7 @@ ORDER BY timestamp;
 -- DATA QUALITY LOG
 -- =====================================================
 
-CREATE TABLE IF NOT EXISTS alpha_bist.data_quality_log ON CLUSTER '{cluster}' (
+CREATE TABLE IF NOT EXISTS alpha_bist.data_quality_log (
     timestamp DateTime64(3, 'Europe/Istanbul'),
     source LowCardinality(String),
     data_type LowCardinality(String),
@@ -348,7 +348,7 @@ CREATE TABLE IF NOT EXISTS alpha_bist.data_quality_log ON CLUSTER '{cluster}' (
     missing_count UInt32 DEFAULT 0,
     duplicate_count UInt32 DEFAULT 0,
     details String DEFAULT ''
-) ENGINE = ReplicatedMergeTree('/clickhouse/tables/{shard}/data_quality_log', '{replica}')
+) ENGINE = MergeTree()
 PARTITION BY toYYYYMMDD(timestamp)
 ORDER BY (source, data_type, timestamp)
 TTL toDateTime(timestamp) + INTERVAL 6 MONTH;
@@ -357,24 +357,24 @@ TTL toDateTime(timestamp) + INTERVAL 6 MONTH;
 -- MATERIALIZED VIEWS (Auto-aggregations)
 -- =====================================================
 
-CREATE MATERIALIZED VIEW IF NOT EXISTS alpha_bist.ohlcv_daily_mv ON CLUSTER '{cluster}'
+CREATE MATERIALIZED VIEW IF NOT EXISTS alpha_bist.ohlcv_daily_mv
 TO alpha_bist.ohlcv
 AS SELECT
     instrument_id,
-    toStartOfDay(timestamp) AS timestamp,
+    toStartOfDay(market_ticks.timestamp) AS timestamp,
     '1d' AS timeframe,
-    argMin(open, timestamp) AS open,
-    max(high) AS high,
-    min(low) AS low,
-    argMax(close, timestamp) AS close,
-    sum(volume) AS volume,
+    argMin(price, market_ticks.timestamp) AS open,
+    max(price) AS high,
+    min(price) AS low,
+    argMax(price, market_ticks.timestamp) AS close,
+    sum(market_ticks.volume) AS volume,
     count() AS trade_count,
-    sum(price * volume) / sum(volume) AS vwap
+    sum(price * market_ticks.volume) / nullIf(sum(market_ticks.volume), 0) AS vwap
 FROM alpha_bist.market_ticks
-GROUP BY instrument_id, toStartOfDay(timestamp);
+GROUP BY instrument_id, toStartOfDay(market_ticks.timestamp);
 
-CREATE MATERIALIZED VIEW IF NOT EXISTS alpha_bist.volume_hourly_mv ON CLUSTER '{cluster}'
-ENGINE = ReplicatedAggregatingMergeTree('/clickhouse/tables/{shard}/volume_hourly_mv', '{replica}')
+CREATE MATERIALIZED VIEW IF NOT EXISTS alpha_bist.volume_hourly_mv
+ENGINE = AggregatingMergeTree()
 PARTITION BY toYYYYMMDD(hour)
 ORDER BY (instrument_id, hour)
 AS SELECT

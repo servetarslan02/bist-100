@@ -354,6 +354,7 @@ class ModelMemoryStore:
         evaluated_at: str | None = None,
     ) -> dict[str, Any] | None:
         """Bekleyen tahmine gerçek piyasa sonucunu bağlar ve net PnL hesaplar."""
+        self.flush()
         now = evaluated_at or datetime.now(UTC).isoformat()
         with self._get_conn() as conn:
             row = conn.execute(

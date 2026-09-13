@@ -99,6 +99,7 @@ class LearningPipeline:
         current_regime: str = "BULL_MOMENTUM",
     ) -> dict[str, Any]:
         """3. Adım: Tüm modellerin geçmişini değerlendir, güven skorlarını ve sinyal ağırlıklarını güncelle."""
+        self.store.flush()
         all_metrics: list[PerformanceMetrics] = []
         all_trust_scores: list[ModelTrustScore] = []
         window_250_metrics: list[PerformanceMetrics] = []
@@ -159,6 +160,7 @@ class LearningPipeline:
             )
 
         self.store.record_fusion_weights(fusion_weights, current_regime)
+        self.store.flush()
 
         # Otomatik rapor üret
         window_comp = (

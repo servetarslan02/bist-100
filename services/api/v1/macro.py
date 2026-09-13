@@ -13,7 +13,9 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from ..dependencies import check_rate_limit, get_current_user
 
-logger = logging.getLogger(__name__)
+import structlog
+
+logger = structlog.get_logger(__name__)
 
 router = APIRouter()
 
@@ -67,13 +69,20 @@ def _fetch_live_macro_data() -> dict[str, Any]:
                             chg = ((last - prev) / prev) * 100
                             result[f"{key}_change_pct"] = round(float(chg), 2)
             except Exception as item_err:
-                logger.warning("makro_sembol_hatasi: sembol=%s, hata=%s", sym, item_err)
+                logger.warning("makro_sembol_hatasi", sembol=sym, hata=str(item_err))
 
         # VIX'ten türetilen canlı risk iştahı hesaplaması
         vix_val = result.get("vix", 15.0)
         result["vix_level"] = vix_val
         result["global_risk_appetite"] = round(max(0.1, min(0.95, 1.0 - (vix_val / 45.0))), 2)
         result["em_risk_appetite"] = round(max(0.1, min(0.95, result["global_risk_appetite"] * 0.9)), 2)
+
+        # Türkiye 5 Yıllık CDS Primi ve Değişimi (Eurobond spread & kur oynaklık modeli)
+        usd_chg = abs(result.get("usd_try_change_pct", 0.0))
+        vix_component = (vix_val - 15.0) * 1.8
+        calc_cds = round(264.0 + (usd_chg * 3.5) + vix_component, 0)
+        result["turkey_cds_5y"] = float(max(210.0, min(420.0, calc_cds)))
+        result["cds_change_pct"] = round(((result["turkey_cds_5y"] - 266.0) / 266.0) * 100, 2)
 
         # Frontend için anahtar eşlemesi
         if "gold_ounce_change_pct" in result:
@@ -82,13 +91,19 @@ def _fetch_live_macro_data() -> dict[str, Any]:
             result["brent_change_pct"] = result["brent_crude_change_pct"]
 
         # UI Mapping & Dinamik Rejim Yorumu
-        result["usd_strength"] = round(max(0.0, min(1.0, (result.get("dxy", 100) - 90) / 20)), 2)
-        result["oil_pressure"] = round(max(0.0, min(1.0, (result.get("brent_crude", 80) - 60) / 60)), 2)
+        brent_v = result.get("brent_crude", 85.0)
+        us10y_v = result.get("us10y", 4.5)
+        dxy_v = result.get("dxy", 100.0)
+
+        result["usd_strength"] = round(max(0.0, min(1.0, (dxy_v - 90.0) / 20.0)), 2)
+        result["oil_pressure"] = round(max(0.0, min(1.0, (brent_v - 60.0) / 60.0)), 2)
+
+        # Türetilmiş Küresel Risk Baskıları
+        result["geopolitical_risk"] = round(max(0.15, min(0.85, (brent_v - 70.0) / 60.0 * 0.6 + (vix_val / 50.0) * 0.4)), 2)
+        result["inflation_pressure"] = round(max(0.15, min(0.85, (brent_v / 110.0) * 0.5 + (result.get("usd_try", 48.0) / 65.0) * 0.5)), 2)
+        result["us_rate_pressure"] = round(max(0.15, min(0.85, (us10y_v - 3.5) / 2.5)), 2)
 
         # Dinamik Makro Yorum ve BIST Etki Puanı
-        dxy_v = result.get("dxy", 100)
-        brent_v = result.get("brent_crude", 85)
-
         commentary_parts: list[str] = []
         if dxy_v > 103:
             commentary_parts.append(
@@ -97,20 +112,27 @@ def _fetch_live_macro_data() -> dict[str, Any]:
         else:
             commentary_parts.append("Dolar endeksi stabil (Gelişmekte olan piyasalar için nötr-pozitif ortam).")
 
-        if brent_v > 90:
+        if brent_v > 95:
             commentary_parts.append(
-                f"Brent petrol ({brent_v:.1f} $) yüksek (Cari denge ve sanayi marjları üzerinde maliyet baskısı)."
+                f"Brent petrol ({brent_v:.1f} $) yüksek (Cari denge ve ulaştırma marjları üzerinde maliyet baskısı)."
             )
+        elif brent_v < 75:
+            commentary_parts.append(f"Brent petrol ({brent_v:.1f} $) düşük (Sanayi ve lojistik marjlarını destekleyici).")
         else:
             commentary_parts.append(f"Brent petrol ({brent_v:.1f} $) dengeli seviyelerde.")
 
+        if vix_val < 18:
+            commentary_parts.append(f"VIX ({vix_val:.1f}) düşük oynaklık ve güçlü küresel risk iştahına işaret ediyor.")
+        elif vix_val > 25:
+            commentary_parts.append(f"VIX ({vix_val:.1f}) yüksek dalgalanma ve savunmacı piyasa rejimine işaret ediyor.")
+
         result["macro_commentary"] = " ".join(commentary_parts)
-        result["bist_macro_bias"] = "POZİTİF" if dxy_v < 104 else "NÖTR"
+        result["bist_macro_bias"] = "GÜÇLÜ POZİTİF" if (dxy_v < 101 and vix_val < 17) else ("POZİTİF" if dxy_v < 104 else "NÖTR")
 
         _cached_macro_data = result
         _last_macro_fetch = now
     except Exception as exc:
-        logger.warning("makro_veri_hatasi: hata=%s", exc)
+        logger.warning("makro_veri_hatasi", hata=str(exc))
         if not _cached_macro_data:
             _cached_macro_data = result
 

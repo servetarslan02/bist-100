@@ -5,8 +5,9 @@
 
 -- Extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "vector";       -- pgvector: vektör araması
-CREATE EXTENSION IF NOT EXISTS "timescaledb";   -- TimescaleDB: zaman serisi optimizasyonu
+CREATE EXTENSION IF NOT EXISTS "vector";             -- pgvector: vektör araması
+CREATE EXTENSION IF NOT EXISTS "timescaledb";         -- TimescaleDB: zaman serisi optimizasyonu
+CREATE EXTENSION IF NOT EXISTS "pg_stat_statements"; -- Query performans analizi
 
 -- =====================================================
 -- REFERENCE DATA
@@ -226,7 +227,7 @@ CREATE TABLE model_versions (
 );
 
 CREATE TABLE model_predictions (
-    id SERIAL PRIMARY KEY,
+    id SERIAL,
     model_version_id INTEGER REFERENCES model_versions(id),
     instrument_id INTEGER REFERENCES instruments(id),
     prediction_date DATE NOT NULL,
@@ -237,12 +238,14 @@ CREATE TABLE model_predictions (
     predicted_volatility_pct DECIMAL(8,4),
     confidence DECIMAL(5,4),
     features_used JSONB DEFAULT '{}',
-    created_at TIMESTAMPTZ DEFAULT NOW()
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (id, prediction_date)
 );
 
 CREATE TABLE model_outcomes (
     id SERIAL PRIMARY KEY,
-    prediction_id INTEGER REFERENCES model_predictions(id),
+    prediction_id INTEGER,
+    prediction_date DATE,
     actual_return_pct DECIMAL(8,4),
     actual_direction VARCHAR(10),
     actual_volatility_pct DECIMAL(8,4),
@@ -294,7 +297,7 @@ CREATE TABLE market_event_embeddings (
 -- =====================================================
 
 CREATE TABLE alerts (
-    id SERIAL PRIMARY KEY,
+    id SERIAL,
     alert_type VARCHAR(50) NOT NULL,
     severity VARCHAR(20) NOT NULL,
     title VARCHAR(200) NOT NULL,
@@ -303,28 +306,31 @@ CREATE TABLE alerts (
     data JSONB DEFAULT '{}',
     acknowledged BOOLEAN DEFAULT FALSE,
     acknowledged_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ DEFAULT NOW()
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (id, created_at)
 );
 
 CREATE TABLE audit_logs (
-    id SERIAL PRIMARY KEY,
+    id SERIAL,
     action VARCHAR(50) NOT NULL,
     entity_type VARCHAR(50),
     entity_id INTEGER,
     actor VARCHAR(50) DEFAULT 'SYSTEM',
     details JSONB DEFAULT '{}',
     ip_address INET,
-    created_at TIMESTAMPTZ DEFAULT NOW()
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (id, created_at)
 );
 
 CREATE TABLE system_events (
-    id SERIAL PRIMARY KEY,
+    id SERIAL,
     event_type VARCHAR(50) NOT NULL,
     severity VARCHAR(20) DEFAULT 'INFO',
     source VARCHAR(50),
     message TEXT,
     data JSONB DEFAULT '{}',
-    created_at TIMESTAMPTZ DEFAULT NOW()
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (id, created_at)
 );
 
 -- =====================================================
@@ -462,7 +468,7 @@ CREATE INDEX idx_position_history_action ON position_history(action);
 -- =====================================================
 
 CREATE TABLE IF NOT EXISTS scan_results (
-    id SERIAL PRIMARY KEY,
+    id SERIAL,
     scan_id VARCHAR(50) NOT NULL,
     scan_type VARCHAR(50) NOT NULL,
     ticker VARCHAR(20) NOT NULL,
@@ -476,7 +482,8 @@ CREATE TABLE IF NOT EXISTS scan_results (
     volume BIGINT,
     features_json JSONB DEFAULT '{}',
     timestamp TIMESTAMPTZ NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT NOW()
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (id, timestamp)
 );
 
 CREATE INDEX idx_scan_results_scan ON scan_results(scan_id);
@@ -537,7 +544,7 @@ CREATE TABLE IF NOT EXISTS portfolio_state (
 -- =====================================================
 
 CREATE TABLE IF NOT EXISTS paper_trades (
-    trade_id VARCHAR(50) PRIMARY KEY,
+    trade_id VARCHAR(50) NOT NULL,
     date DATE NOT NULL,
     ticker VARCHAR(20) NOT NULL,
     side VARCHAR(10) NOT NULL,
@@ -548,7 +555,8 @@ CREATE TABLE IF NOT EXISTS paper_trades (
     commission DECIMAL(12, 4) DEFAULT 0,
     reason TEXT,
     json_data JSONB DEFAULT '{}',
-    created_at TIMESTAMPTZ DEFAULT NOW()
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (trade_id, created_at)
 );
 
 CREATE INDEX idx_paper_trades_ticker ON paper_trades(ticker);
@@ -646,7 +654,7 @@ CREATE INDEX idx_cash_ledger_type ON cash_ledger(entry_type);
 -- =====================================================
 
 CREATE TABLE IF NOT EXISTS equity_snapshots (
-    id SERIAL PRIMARY KEY,
+    id SERIAL,
     portfolio_id INTEGER REFERENCES portfolios(id),
     snapshot_date DATE NOT NULL,
     total_equity DECIMAL(15, 4) NOT NULL,
@@ -658,7 +666,8 @@ CREATE TABLE IF NOT EXISTS equity_snapshots (
     positions_count INTEGER DEFAULT 0,
     high_water_mark DECIMAL(15, 4) DEFAULT 0,
     drawdown_from_hwm DECIMAL(8, 4) DEFAULT 0,
-    created_at TIMESTAMPTZ DEFAULT NOW()
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (id, snapshot_date)
 );
 
 CREATE INDEX idx_equity_snapshots_portfolio ON equity_snapshots(portfolio_id);
@@ -669,7 +678,7 @@ CREATE INDEX idx_equity_snapshots_date ON equity_snapshots(snapshot_date DESC);
 -- =====================================================
 
 CREATE TABLE IF NOT EXISTS daily_pnl (
-    id SERIAL PRIMARY KEY,
+    id SERIAL,
     portfolio_id INTEGER REFERENCES portfolios(id),
     pnl_date DATE NOT NULL,
     realized_pnl DECIMAL(15, 4) DEFAULT 0,
@@ -679,6 +688,7 @@ CREATE TABLE IF NOT EXISTS daily_pnl (
     equity_start DECIMAL(15, 4) DEFAULT 0,
     equity_end DECIMAL(15, 4) DEFAULT 0,
     created_at TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (id, pnl_date),
     UNIQUE(portfolio_id, pnl_date)
 );
 
@@ -809,11 +819,7 @@ SELECT create_hypertable('paper_trades', 'created_at',
     migrate_data => TRUE
 );
 
--- Backtest runs → hypertable
-SELECT create_hypertable('backtest_runs', 'created_at',
-    if_not_exists => TRUE,
-    migrate_data => TRUE
-);
+-- Backtest runs: standalone metadata table (not hypertable due to foreign keys from backtest_trades)
 
 -- =====================================================
 -- TIMESCALEDB COMPRESSION (Otomatik sıkıştırma)
@@ -1174,10 +1180,10 @@ LIMIT 50;
 CREATE OR REPLACE VIEW v_table_sizes AS
 SELECT
     schemaname,
-    tablename,
-    pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) as total_size,
-    pg_size_pretty(pg_relation_size(schemaname||'.'||tablename)) as table_size,
-    pg_size_pretty(pg_indexes_size(schemaname||'.'||tablename)) as index_size,
+    relname AS tablename,
+    pg_size_pretty(pg_total_relation_size(schemaname||'.'||relname)) as total_size,
+    pg_size_pretty(pg_relation_size(schemaname||'.'||relname)) as table_size,
+    pg_size_pretty(pg_indexes_size(schemaname||'.'||relname)) as index_size,
     n_live_tup as row_count,
     n_dead_tup as dead_rows,
     last_vacuum,
@@ -1185,7 +1191,7 @@ SELECT
     last_analyze,
     last_autoanalyze
 FROM pg_stat_user_tables
-ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC;
+ORDER BY pg_total_relation_size(schemaname||'.'||relname) DESC;
 
 -- =====================================================
 -- INDEX KULLANIM VIEW
@@ -1194,8 +1200,8 @@ ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC;
 CREATE OR REPLACE VIEW v_index_usage AS
 SELECT
     schemaname,
-    tablename,
-    indexname,
+    relname AS tablename,
+    indexrelname AS indexname,
     idx_scan as index_scans,
     idx_tup_read as tuples_read,
     idx_tup_fetch as tuples_fetched,

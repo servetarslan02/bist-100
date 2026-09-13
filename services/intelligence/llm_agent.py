@@ -64,13 +64,38 @@ class AgentAnalysis:
     # Meta
     tool_calls_made: list[str] = field(default_factory=list)
     timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
-    is_mock: bool = False
+    is_fallback: bool = False
 
     def __repr__(self) -> str:
         return (
-            f"AgentAnalysis(ticker={self.ticker!r}, type={self.analysis_type!r}, "
-            f"direction={self.ai_direction!r}, score={self.ai_score:.1f}, tools={len(self.tool_calls_made)})"
+            f"<AgentAnalysis ticker={self.ticker!r} type={self.analysis_type!r} "
+            f"direction={self.ai_direction!r} score={self.ai_score:.1f} tools={len(self.tool_calls_made)}>"
         )
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serileştirilebilir sözlük çıktısı döner."""
+        return {
+            "ticker": self.ticker,
+            "analysis_type": self.analysis_type,
+            "entities": self.entities,
+            "event_type": self.event_type,
+            "sentiment": self.sentiment,
+            "importance": self.importance,
+            "affected_tickers": self.affected_tickers,
+            "affected_sectors": self.affected_sectors,
+            "surprise_score": self.surprise_score,
+            "uncertainty_score": self.uncertainty_score,
+            "ai_direction": self.ai_direction,
+            "ai_score": self.ai_score,
+            "ai_confidence": self.ai_confidence,
+            "regime_override": self.regime_override,
+            "narrative": self.narrative,
+            "key_insight": self.key_insight,
+            "key_risks": self.key_risks,
+            "tool_calls_made": self.tool_calls_made,
+            "timestamp": self.timestamp,
+            "is_fallback": self.is_fallback,
+        }
 
 
 class LLMAgent:
@@ -125,7 +150,7 @@ class LLMAgent:
             uncertainty_score=float(result.get("uncertainty_score", 0.3)),
             key_insight=result.get("key_insight", ""),
             tool_calls_made=tool_calls,
-            is_mock=not llm_client.is_live,
+            is_fallback=not llm_client.is_live,
         )
 
         # 5. Eğer önemli bir habersa → rejim override değerlendir
@@ -174,7 +199,7 @@ class LLMAgent:
             key_insight=result.get("key_insight", ""),
             key_risks=result.get("key_risks", []),
             tool_calls_made=tool_calls,
-            is_mock=not llm_client.is_live,
+            is_fallback=not llm_client.is_live,
         )
 
         # Hafızaya yaz
@@ -423,3 +448,9 @@ Geçmiş piyasa koşulları ve mevcut makro bağlamı göz önünde bulundur."""
 
 # Singleton
 llm_agent = LLMAgent()
+
+__all__ = [
+    "AgentAnalysis",
+    "LLMAgent",
+    "llm_agent",
+]

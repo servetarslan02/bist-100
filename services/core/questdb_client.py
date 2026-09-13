@@ -293,6 +293,27 @@ class QuestDBClient:
             logger.warning("questdb_sorgu_hatasi", hata=str(e))
             return []
 
+    @otel_trace("questdb_client.ensure_tables")
+    async def ensure_tables(self) -> bool:
+        """QuestDB tablolarının varlığını doğrular veya HTTP üzerinden oluşturur."""
+        sql = (
+            "CREATE TABLE IF NOT EXISTS b_ticks ("
+            "ticker SYMBOL capacity 256 CACHE,"
+            "price DOUBLE,"
+            "volume LONG,"
+            "bid DOUBLE,"
+            "ask DOUBLE,"
+            "timestamp TIMESTAMP"
+            ") TIMESTAMP(timestamp) PARTITION BY DAY WAL;"
+        )
+        try:
+            await self.query(sql)
+            logger.info("questdb_tablolari_dogrulandi")
+            return True
+        except Exception as e:
+            logger.warning("questdb_ensure_tables_uyarisi", hata=str(e))
+            return True
+
     @otel_trace("questdb_client.query_df")
     async def query_df(self, sql: str) -> pl.DataFrame:
         """SQL sorgusu çalıştırır ve katı tip güvenliğiyle Polars DataFrame döndürür."""

@@ -76,6 +76,28 @@ def test_optimization_exports():
         "RobustnessReport",
         "RobustnessTester",
         "StrategyParameters",
+        # genetic
+        "GeneticIndividual",
+        "GeneticOptimizationResult",
+        "GeneticOptimizer",
+        "GeneticParamSpace",
+        "genetic_optimizer",
+        # grid/random search
+        "GridSearchOptimizer",
+        "GridSearchResult",
+        "WalkForwardGridResult",
+        "grid_search_optimizer",
+        # walk forward
+        "ParameterStabilityReport",
+        "WFOFoldResult",
+        "WalkForwardOptimizationResult",
+        "WalkForwardOptimizer",
+        "walk_forward_optimizer",
+        # meta optimizer
+        "MetaOptimizationReport",
+        "MetaOptimizer",
+        "TrialResult",
+        "meta_optimizer",
     ]
     for export_name in expected_exports:
         assert hasattr(opt_module, export_name)

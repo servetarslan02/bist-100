@@ -7,6 +7,9 @@ global:
   evaluation_interval: 60s
   scrape_timeout: 10s
 
+rule_files:
+  - "/etc/prometheus/alert_rules.yml"
+
 scrape_configs:
   # === Application API ===
   - job_name: 'alpha-api'

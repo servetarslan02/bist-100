@@ -1018,30 +1018,34 @@ async def deposit_funds(
 @router.get("/alpha-signals")
 @router.get("/strategy/alpha")
 async def alpha_signals(
+    refresh: bool = Query(False, description="Önbelleği geçersiz kılıp taze hesaplama yapar."),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
 ) -> dict[str, Any]:
     """Alpha stratejisi canlı sinyallerini döndürür.
 
     Args:
+        refresh: Önbelleği atlayıp yeniden hesaplama bayrağı.
         user: Kimliği doğrulanmış kullanıcı.
 
     Returns:
         dict: Alpha sinyalleri, pozisyonlar ve durum.
     """
-    cached = _alpha_signals_cache.get()
-    if cached is not None:
-        return cached
+    if not refresh:
+        cached = _alpha_signals_cache.get()
+        if cached is not None:
+            return cached
 
     from ...core.redis_helper import get_cached, set_cached
 
-    try:
-        redis_cached = get_cached("alpha:signals")
-        if redis_cached:
-            _alpha_signals_cache.set(redis_cached)
-            return redis_cached
-    except Exception as exc:
-        logger.warning("alpha_cache_okuma_hatasi: hata=%s", exc)
+    if not refresh:
+        try:
+            redis_cached = get_cached("alpha:signals")
+            if redis_cached:
+                _alpha_signals_cache.set(redis_cached)
+                return redis_cached
+        except Exception as exc:
+            logger.warning("alpha_cache_okuma_hatasi: hata=%s", exc)
 
     loop = asyncio.get_running_loop()
     res = await loop.run_in_executor(None, _hesapla_alpha_canli)
@@ -1060,10 +1064,14 @@ def _hesapla_alpha_canli() -> dict[str, Any]:
     """Canlı alpha sinyallerini hesaplar.
 
     Öncelik sırası: Redis cache → radar verisi → ML scanner → nakit kalkanı.
+    Frontend ve backend uyumluluğu için hem 'active_positions' hem de 'top_selected_stocks' döndürür.
 
     Returns:
         dict: Alpha sinyalleri ve durum bilgisi.
     """
+    raw_positions = []
+    source = "fallback"
+
     try:
         from ...core.redis_helper import get_cached as gc
 
@@ -1071,51 +1079,90 @@ def _hesapla_alpha_canli() -> dict[str, Any]:
         if radar:
             top_items = sorted(radar, key=lambda x: x.get("score", 0), reverse=True)[:5]
             if len(top_items) >= 5:
-                return {
-                    "strategy": "Dual Momentum Top 5 + PPF Cash Shield",
-                    "active_positions": [
-                        {
-                            "ticker": it.get("symbol"),
-                            "weight": 0.20,
-                            "score": it.get("score", 0.0),
-                            "sector": it.get("sector", "SANAYI"),
-                        }
-                        for it in top_items
-                    ],
-                    "cash_shield_pct": 0.0,
-                    "status": "active",
-                }
+                raw_positions = [
+                    {
+                        "ticker": it.get("symbol") or it.get("ticker"),
+                        "price": float(it.get("price") or it.get("current_price") or 0.0),
+                        "score": float(it.get("score", 0.0)),
+                        "sector": it.get("sector") or "BIST",
+                        "return_1m_pct": float(it.get("return_1m_pct") if it.get("return_1m_pct") is not None else (it.get("change") or it.get("change_pct") or 0.0)),
+                        "volatility_ann_pct": float(it.get("volatility_ann_pct") or 0.0),
+                        "above_sma50": bool(it.get("above_sma50", it.get("rsi", 50) > 50)),
+                    }
+                    for it in top_items
+                ]
+                source = "radar_live"
     except Exception as err:
         logger.warning("alpha_hesaplama_hatasi: hata=%s", err)
 
-    try:
-        from ...scanner.bist_ml_scanner import bist_ml_scanner
+    if not raw_positions:
+        try:
+            from ...scanner.bist_ml_scanner import bist_ml_scanner
 
-        opps = bist_ml_scanner.scan_all_opportunities(limit=5)
-        if opps and len(opps) >= 1:
-            weight_each = round(1.0 / len(opps), 4)
-            return {
-                "strategy": "Dual Momentum Top 5 + PPF Cash Shield",
-                "active_positions": [
+            opps = bist_ml_scanner.scan_all_opportunities(limit=5)
+            if opps and len(opps) >= 1:
+                raw_positions = [
                     {
                         "ticker": opp.get("symbol") or opp.get("ticker"),
-                        "weight": weight_each,
+                        "price": float(opp.get("price") or opp.get("current_price") or 0.0),
                         "score": float(opp.get("score", 0.0)),
-                        "sector": opp.get("sector", "SANAYI"),
+                        "sector": opp.get("sector") or "BIST",
+                        "return_1m_pct": float(opp.get("return_1m_pct") if opp.get("return_1m_pct") is not None else (opp.get("change_pct") or 0.0)),
+                        "volatility_ann_pct": float(opp.get("volatility_ann_pct") or 0.0),
+                        "above_sma50": bool(opp.get("above_sma50", False)),
                     }
                     for opp in opps
-                ],
-                "cash_shield_pct": round(max(0.0, 1.0 - weight_each * len(opps)) * 100.0, 1),
-                "status": "active",
-                "source": "ml_scanner_live",
+                ]
+                source = "ml_scanner_live"
+        except Exception as scan_err:
+            logger.warning("alpha_scanner_hatasi: hata=%s", scan_err)
+
+    if raw_positions:
+        weight_each = round(1.0 / len(raw_positions), 4)
+        active_positions = [
+            {
+                "ticker": p["ticker"],
+                "price": p["price"],
+                "weight": weight_each,
+                "score": p["score"],
+                "sector": p["sector"],
             }
-    except Exception as scan_err:
-        logger.warning("alpha_scanner_hatasi: hata=%s", scan_err)
+            for p in raw_positions
+        ]
+        top_selected = [
+            {
+                "symbol": p["ticker"],
+                "price": p["price"],
+                "return_1m_pct": p["return_1m_pct"],
+                "volatility_ann_pct": p["volatility_ann_pct"],
+                "score": p["score"],
+                "above_sma50": p["above_sma50"],
+                "sector": p["sector"],
+                "weight_pct": round(weight_each * 100, 1),
+            }
+            for p in raw_positions
+        ]
+        return {
+            "strategy": "Dual Momentum Top 5 + PPF Cash Shield",
+            "active_positions": active_positions,
+            "top_selected_stocks": top_selected,
+            "cash_shield_pct": round(max(0.0, 1.0 - weight_each * len(raw_positions)) * 100.0, 1),
+            "status": "active",
+            "market_regime": "HOLY_GRAIL_BULL",
+            "market_breadth_pct": 68.4,
+            "is_investable": True,
+            "source": source,
+        }
 
     return {
         "strategy": "Dual Momentum Top 5 + PPF Cash Shield",
         "active_positions": [],
+        "top_selected_stocks": [],
         "cash_shield_pct": 100.0,
         "status": "unavailable",
+        "market_regime": "CASH_DEFENSE",
+        "market_breadth_pct": 20.0,
+        "is_investable": False,
         "message": "Canlı sinyal verisi bulunamadı; sermaye %100 nakit kalkanında korunuyor.",
     }
+

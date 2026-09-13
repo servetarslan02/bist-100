@@ -1,103 +1,54 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { usePolling, type PortfolioData, apiFetch } from "@/lib/api";
 import type { OrderData, PortfolioMetrics } from "@/types/api";
 import { 
   Briefcase, TrendingUp, TrendingDown, Wallet, ArrowUpRight, ArrowDownRight, 
-  RefreshCw, ShieldCheck, Activity, PieChart, Layers, Clock, CheckCircle2, 
-  AlertCircle, BarChart3, ArrowRight, Zap, Building2, Coins, Receipt
+  RefreshCw, PieChart, CheckCircle2, AlertCircle, Zap, Coins, Receipt,
+  Search, LayoutGrid, ListFilter, ArrowRight, ShieldCheck, Sparkles, Filter
 } from "lucide-react";
-import { SkeletonList, SkeletonCard, SkeletonTable, SkeletonChart } from "@/components/ui/Skeleton";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { useIstanbulClock } from "@/lib/time";
 
-function MetricCard({
-  title,
-  label,
-  value,
-  subtitle,
-  subtext,
-  change,
-  isPositive,
-  icon: Icon,
-  badge,
-  prefix,
-  suffix,
-  color,
-}: {
-  title?: string;
-  label?: string;
-  value: string | number;
-  subtitle?: string;
-  subtext?: string;
-  change?: string;
-  isPositive?: boolean;
-  icon?: React.ElementType;
-  badge?: string;
-  prefix?: string;
-  suffix?: string;
-  color?: string;
-}) {
-  const displayTitle = title || label || "";
-  const displaySub = subtitle || subtext;
-  const formattedVal = typeof value === "number" ? value.toLocaleString("tr-TR") : String(value);
-
-  return (
-    <div
-      className="p-4 rounded-xl relative overflow-hidden transition-all duration-200 hover:translate-y-[-2px] shadow-sm"
-      style={{
-        background: "var(--color-bg-card)",
-        border: "1px solid var(--color-border-subtle)",
-      }}
-    >
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
-          {displayTitle}
-        </span>
-        {Icon && (
-          <div
-            className="w-7 h-7 rounded-lg flex items-center justify-center"
-            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid var(--color-border-subtle)" }}
-          >
-            <Icon size={14} className="text-zinc-300" />
-          </div>
-        )}
-      </div>
-      <div className="flex items-baseline gap-1">
-        {prefix && <span className="text-sm font-semibold text-zinc-400">{prefix}</span>}
-        <span className="text-xl font-bold font-data text-zinc-100">{formattedVal}</span>
-        {suffix && <span className="text-xs text-zinc-500">{suffix}</span>}
-      </div>
-      {displaySub && (
-        <p className="text-[10px] text-zinc-500 mt-1 truncate">{displaySub}</p>
-      )}
-      {change && (
-        <span
-          className={`text-[10px] font-bold mt-1 inline-block ${
-            isPositive ? "text-emerald-400" : "text-rose-400"
-          }`}
-        >
-          {change}
-        </span>
-      )}
-    </div>
-  );
-}
+// Sektör renk paleti (Ultra lüks HSL tonları)
+const SECTOR_COLORS: Record<string, string> = {
+  "BANKACILIK": "#00e5a0",
+  "HAVACILIK": "#00c8ff",
+  "ENERJI": "#9966ff",
+  "SANAYI": "#ffaa00",
+  "HOLDING": "#38bdf8",
+  "PERAKENDE": "#f472b6",
+  "DEMIR_CELIK": "#fb923c",
+  "TELEKOM": "#a78bfa",
+  "GIDA": "#4ade80",
+  "OTOMOTIV": "#e879f9",
+  "NAKIT": "#71717a",
+  "DIGER": "#a1a1aa",
+};
 
 export default function PortfolioPage() {
   const router = useRouter();
   const clock = useIstanbulClock();
-  const { data, loading, refetch } = usePolling<PortfolioData | null>("/portfolio", 1500);
-  const { data: ordersData, refetch: refetchOrders } = usePolling<{ orders: OrderData[] } | null>("/portfolio/orders", 3000);
-  const { data: metricsData } = usePolling<PortfolioMetrics | null>("/portfolio/metrics", 5000);
+  
+  // Dengeli polling (SSD ve ağ koruması)
+  const { data, loading, refetch } = usePolling<PortfolioData | null>("/portfolio", 4000);
+  const { data: ordersData, refetch: refetchOrders } = usePolling<{ orders: OrderData[] } | null>("/portfolio/orders", 8000);
+  const { data: metricsData } = usePolling<PortfolioMetrics | null>("/portfolio/metrics", 10000);
   
   const [mounted, setMounted] = useState(false);
   const [triggering, setTriggering] = useState(false);
   const [actionMsg, setActionMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [flashMap, setFlashMap] = useState<Record<string, "up" | "down">>({});
-  const [orderTab, setOrderTab] = useState<"ALL" | "BUY" | "SELL">("ALL");
+  
+  // Görünüm ve Filtre State'leri
+  const [viewMode, setViewMode] = useState<"table" | "grid">("table");
+  const [mainTab, setMainTab] = useState<"positions" | "orders" | "t2">("positions");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [pnlFilter, setPnlFilter] = useState<"ALL" | "PROFIT" | "LOSS">("ALL");
+  const [orderFilter, setOrderFilter] = useState<"ALL" | "BUY" | "SELL">("ALL");
+
   const prevPricesRef = useRef<Record<string, number>>({});
 
   useEffect(() => {
@@ -107,25 +58,21 @@ export default function PortfolioPage() {
   const marketOpen = mounted ? clock.isMarketOpen : false;
 
   const rawP = (data?.portfolio ?? ((data as unknown) as Record<string, any>) ?? {}) as Record<string, any>;
-  const currentCapital = rawP.total_value ?? rawP.current_capital ?? 1000000;
-  const investedValue = rawP.invested_value ?? 0;
-  const cashBalance = rawP.cash ?? rawP.total_cash ?? rawP.settled_cash ?? 0;
-  const settledCash = rawP.settled_cash ?? cashBalance;
-  const unsettledT1 = rawP.unsettled_cash_t1 ?? 0;
-  const unsettledT2 = rawP.unsettled_cash_t2 ?? 0;
-  const purchasingPower = rawP.purchasing_power ?? cashBalance;
-  const totalPnl = rawP.total_pnl ?? rawP.unrealized_pnl ?? 0;
-  const totalReturnPct = rawP.total_return_pct ?? 0;
+  const currentCapital = Number(rawP.total_value ?? rawP.current_capital ?? 1000000);
+  const investedValue = Number(rawP.invested_value ?? (currentCapital - (rawP.cash ?? rawP.total_cash ?? 0)));
+  const cashBalance = Number(rawP.cash ?? rawP.total_cash ?? rawP.settled_cash ?? 0);
+  const settledCash = Number(rawP.settled_cash ?? cashBalance);
+  const unsettledT1 = Number(rawP.unsettled_cash_t1 ?? 0);
+  const unsettledT2 = Number(rawP.unsettled_cash_t2 ?? 0);
+  const purchasingPower = Number(rawP.purchasing_power ?? cashBalance);
+  const totalPnl = Number(rawP.total_pnl ?? rawP.unrealized_pnl ?? 0);
+  const totalReturnPct = Number(rawP.total_return_pct ?? (currentCapital > 1000000 ? ((currentCapital - 1000000) / 1000000) * 100 : 0));
   const positions = data?.positions ?? (rawP.positions as PortfolioData["positions"]) ?? [];
   const orders = ordersData?.orders ?? [];
-  const filteredOrders = orders.filter((ord) => {
-    if (orderTab === "BUY") return ord.side === "BUY";
-    if (orderTab === "SELL") return ord.side === "SELL";
-    return true;
-  });
-  const sectorWeights = rawP.sector_weights ?? {};
+  const sectorWeights = (rawP.sector_weights ?? {}) as Record<string, number>;
   const totalPnlPos = totalPnl >= 0;
 
+  // Fiyat değişim animasyonu
   useEffect(() => {
     if (!positions || positions.length === 0) return;
     const nextFlash: Record<string, "up" | "down"> = {};
@@ -147,6 +94,56 @@ export default function PortfolioPage() {
     }
   }, [data]);
 
+  // Filtrelenmiş Pozisyonlar
+  const filteredPositions = useMemo(() => {
+    return positions.filter((pos) => {
+      const sym = (pos.ticker || pos.symbol || "").toUpperCase();
+      const name = (pos.name || pos.company_name || "").toLowerCase();
+      const sec = (pos.sector || "").toLowerCase();
+      const q = searchTerm.trim().toLowerCase();
+      
+      const matchesSearch = !q || sym.includes(q.toUpperCase()) || name.includes(q) || sec.includes(q);
+      if (!matchesSearch) return false;
+
+      const pnlVal = Number(pos.unrealized_pnl ?? 0);
+      if (pnlFilter === "PROFIT") return pnlVal > 0;
+      if (pnlFilter === "LOSS") return pnlVal < 0;
+      return true;
+    });
+  }, [positions, searchTerm, pnlFilter]);
+
+  // Filtrelenmiş Emirler
+  const filteredOrders = useMemo(() => {
+    return orders.filter((ord) => {
+      if (orderFilter === "BUY") return ord.side === "BUY";
+      if (orderFilter === "SELL") return ord.side === "SELL";
+      return true;
+    });
+  }, [orders, orderFilter]);
+
+  // Varlık Dağılımı Hesaplama (Segment Bar)
+  const allocationSegments = useMemo(() => {
+    const segments: Array<{ label: string; pct: number; color: string }> = [];
+    const cashPct = currentCapital > 0 ? (cashBalance / currentCapital) * 100 : 0;
+    
+    // Sektörleri ekle
+    Object.entries(sectorWeights).forEach(([sec, w], idx) => {
+      const pct = Number(w) * 100;
+      if (pct > 0.5) {
+        const colorKey = sec.toUpperCase().replace(/\s+/g, "_");
+        const color = SECTOR_COLORS[colorKey] || Object.values(SECTOR_COLORS)[idx % Object.values(SECTOR_COLORS).length];
+        segments.push({ label: sec, pct, color });
+      }
+    });
+
+    // Nakit segmenti
+    if (cashPct > 0.5) {
+      segments.push({ label: "Nakit", pct: cashPct, color: SECTOR_COLORS["NAKIT"] });
+    }
+
+    return segments.sort((a, b) => b.pct - a.pct);
+  }, [sectorWeights, cashBalance, currentCapital]);
+
   const handleRunRebalanceCycle = async () => {
     setTriggering(true);
     setActionMsg(null);
@@ -154,12 +151,12 @@ export default function PortfolioPage() {
       await apiFetch("/portfolio/trigger", { method: "POST" });
       setActionMsg({ 
         type: "success", 
-        text: "Günlük seans sinyal ve portföy emir yürütme döngüsü başarıyla tetiklendi. Veriler güncelleniyor..." 
+        text: "Seans sinyal ve portföy emir yürütme döngüsü tetiklendi. Veriler güncelleniyor..." 
       });
       setTimeout(() => {
         refetch();
         refetchOrders();
-      }, 3000);
+      }, 2500);
     } catch {
       try {
         await apiFetch("/scanner/trigger?scan_type=manual", { method: "POST" });
@@ -177,444 +174,601 @@ export default function PortfolioPage() {
 
   return (
     <ErrorBoundary name="portfolio">
-    <div className="p-5 space-y-5 fade-in min-h-screen" style={{ background: "var(--color-bg-primary)" }}>
-
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex flex-wrap items-center gap-2.5">
-            <h1 className="text-xl font-bold gradient-text">Portföy Yönetimi & T+2 Takas Defteri</h1>
-            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
-              marketOpen 
-                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
-                : "bg-amber-500/10 border-amber-500/30 text-amber-400"
-            }`}>
-              {marketOpen ? "● BIST SEANSI AÇIK" : "○ BIST KAPALI (Sabah 09:55 Seans Emri Hazır)"}
-            </span>
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/10 border border-purple-500/30 text-purple-300">
-              🤖 LambdaRank v3.0 Şampiyon Model
-            </span>
-          </div>
-          <p className="text-[11px] mt-1" style={{ color: "var(--color-text-muted)" }}>
-            BIST Kurumsal Risk Kapısı · T+2 Takas Mahsup Kuralları · Sentetik Derinlik ve Kayma Koruması · {positions.length} aktif pozisyon
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleRunRebalanceCycle}
-            disabled={triggering}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-400 transition-all disabled:opacity-50"
-          >
-            <RefreshCw size={13} className={triggering ? "animate-spin" : ""} />
-            {triggering ? "Seans Yürütülüyor..." : "Seansı Şimdi Çalıştır"}
-          </button>
-
-          <div
-            className="flex items-center gap-2 px-4 py-2 rounded-xl"
-            style={{
-              background: totalPnlPos ? "rgba(0,229,160,0.08)" : "rgba(255,68,102,0.08)",
-              border: `1px solid ${totalPnlPos ? "rgba(0,229,160,0.2)" : "rgba(255,68,102,0.2)"}`,
-            }}
-          >
-            {totalPnlPos ? <TrendingUp size={14} style={{ color: "#00e5a0" }} /> : <TrendingDown size={14} style={{ color: "#ff4466" }} />}
-            <span className="text-sm font-bold font-data" style={{ color: totalPnlPos ? "#00e5a0" : "#ff4466" }}>
-              {totalPnlPos ? "+" : ""}₺{totalPnl.toLocaleString("tr-TR", { maximumFractionDigits: 2 })}
-            </span>
-            <span className="text-xs font-data" style={{ color: "var(--color-text-secondary)" }}>
-              ({totalPnlPos ? "+" : ""}%{totalReturnPct.toFixed(2)})
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {actionMsg && (
-        <div className={`p-3 rounded-lg border text-xs font-medium flex items-center gap-2 ${
-          actionMsg.type === "success" 
-            ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
-            : "bg-rose-500/10 border-rose-500/30 text-rose-400"
-        }`}>
-          {actionMsg.type === "success" ? <CheckCircle2 size={15} /> : <AlertCircle size={15} />}
-          {actionMsg.text}
-        </div>
-      )}
-
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        {loading && !data && (
-          <>
-            <SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard />
-          </>
-        )}
-        <MetricCard label="Toplam Portföy (NAV)" value={currentCapital} prefix="₺" color="#00c8ff" subtext="Toplam Net Varlık Değeri" />
-        <MetricCard label="Yatırımdaki Tutar" value={investedValue} prefix="₺" color="#9966ff" subtext={`Hisseler (${positions.length} adet)`} />
-        <MetricCard label="Alım Gücü (Nakit)" value={purchasingPower} prefix="₺" color="#ffaa00" subtext="T+2 Mahsup Dahil" />
-        <MetricCard label="Toplam Kâr / Zarar" value={totalPnl} prefix="₺" color="auto" subtext="Anlık Realized + Unrealized" />
-        <MetricCard label="Portföy Getirisi" value={totalReturnPct} suffix="%" color="auto" subtext="Model Başlangıç Getirisi" />
-      </div>
-
-      {/* T+2 Takas & Sektör Dağılım Bölümü */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* T+2 Takasbank Bakiye Modeli */}
+      {/* Ambient Glow Background Effect */}
+      <div className="relative min-h-screen pb-16 overflow-hidden" style={{ background: "var(--color-bg-primary)" }}>
         <div 
-          className="rounded-xl p-4 space-y-3"
-          style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
-        >
-          <div className="flex items-center justify-between border-b border-zinc-800 pb-2.5">
-            <div className="flex items-center gap-2">
-              <Coins size={15} className="text-amber-400" />
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-200">
-                T+2 Takas & Valör Durumu
-              </h2>
-            </div>
-            <span className="text-[10px] text-zinc-400">Takasbank Uyumlu</span>
-          </div>
+          className="pointer-events-none absolute -top-40 left-1/2 -translate-x-1/2 w-[1000px] h-[450px] opacity-25 blur-[120px] rounded-full"
+          style={{ background: totalPnlPos ? "radial-gradient(ellipse, #00e5a0 0%, #00c8ff 40%, transparent 70%)" : "radial-gradient(ellipse, #ff4466 0%, #ffaa00 40%, transparent 70%)" }}
+        />
 
-          <div className="space-y-2 text-xs font-data">
-            <div className="flex items-center justify-between p-2 rounded-lg bg-zinc-900/60 border border-zinc-800">
-              <span className="text-zinc-400">T+0 Serbest Nakit (Çekilebilir):</span>
-              <span className="font-bold text-zinc-200">₺{settledCash.toLocaleString("tr-TR", { maximumFractionDigits: 2 })}</span>
-            </div>
-            <div className="flex items-center justify-between p-2 rounded-lg bg-zinc-900/60 border border-zinc-800">
-              <span className="text-zinc-400">T+1 Takas Alacağı:</span>
-              <span className="font-bold text-zinc-300">₺{unsettledT1.toLocaleString("tr-TR", { maximumFractionDigits: 2 })}</span>
-            </div>
-            <div className="flex items-center justify-between p-2 rounded-lg bg-zinc-900/60 border border-zinc-800">
-              <span className="text-zinc-400">T+2 Takas Alacağı:</span>
-              <span className="font-bold text-zinc-300">₺{unsettledT2.toLocaleString("tr-TR", { maximumFractionDigits: 2 })}</span>
-            </div>
-            <div className="flex items-center justify-between p-2 rounded-lg bg-cyan-950/20 border border-cyan-500/20">
-              <span className="text-cyan-400 font-semibold">Toplam İşlem Gücü:</span>
-              <span className="font-bold text-cyan-300">₺{purchasingPower.toLocaleString("tr-TR", { maximumFractionDigits: 2 })}</span>
-            </div>
-          </div>
-        </div>
+        <div className="relative max-w-7xl mx-auto p-3 md:p-4 lg:p-5 space-y-3">
 
-        {/* Sektörel Dağılım & Risk Kapısı */}
-        <div 
-          className="rounded-xl p-4 space-y-3 md:col-span-2"
-          style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
-        >
-          <div className="flex items-center justify-between border-b border-zinc-800 pb-2.5">
-            <div className="flex items-center gap-2">
-              <PieChart size={15} className="text-cyan-400" />
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-200">
-                Sektörel Dağılım & Konsantrasyon Limiti
-              </h2>
-            </div>
-            <span className="text-[10px] text-zinc-400 font-medium">Maks. %30 / Sektör</span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-            {Object.keys(sectorWeights).length === 0 ? (
-              <p className="text-xs text-zinc-500 col-span-2 py-4 text-center">Henüz sektör verisi bulunmuyor</p>
-            ) : (
-              Object.entries(sectorWeights).map(([sec, weight], i) => {
-                const wPct = (Number(weight) * 100);
-                const isNearLimit = wPct >= 25.0;
-                return (
-                  <div key={i} className="p-2.5 rounded-lg bg-zinc-900/60 border border-zinc-800 space-y-1.5">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-medium text-zinc-300">{sec}</span>
-                      <span className={`font-data font-bold ${isNearLimit ? "text-amber-400" : "text-cyan-400"}`}>
-                        %{wPct.toFixed(1)}
-                      </span>
-                    </div>
-                    <div className="w-full h-1.5 rounded-full overflow-hidden bg-zinc-800">
-                      <div 
-                        className={`h-full rounded-full transition-all ${isNearLimit ? "bg-amber-400" : "bg-cyan-400"}`} 
-                        style={{ width: `${Math.min(100, (wPct / 30) * 100)}%` }} 
-                      />
-                    </div>
+          {/* 1. COMPACT LUXURY HERO HEADER */}
+          <div className="relative rounded-xl p-4 md:p-5 border border-white/[0.08] backdrop-blur-2xl shadow-xl overflow-hidden"
+               style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)" }}>
+            
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              {/* Sol: Bakiye & Kâr/Zarar */}
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold tracking-wider text-zinc-400 uppercase">
+                    Net Portföy Değeri (NAV)
+                  </span>
+                  <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.08]">
+                    <span className={`w-1.5 h-1.5 rounded-full ${marketOpen ? "bg-emerald-400 shadow-[0_0_6px_#00e5a0]" : "bg-amber-400"}`} />
+                    <span className="text-[9px] font-semibold text-zinc-300">
+                      {marketOpen ? "BIST AÇIK" : "BIST KAPALI"}
+                    </span>
                   </div>
-                );
-              })
+                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-purple-500/10 text-purple-300 border border-purple-500/20 font-medium">
+                    Hedge Fund Modu
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap items-baseline gap-3">
+                  <span className="text-2xl md:text-3xl font-extrabold font-data tracking-tight text-white drop-shadow-sm">
+                    ₺{currentCapital.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+
+                  <div className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-bold font-data border ${
+                    totalPnlPos 
+                      ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-[0_0_12px_rgba(0,229,160,0.12)]" 
+                      : "bg-rose-500/10 text-rose-400 border-rose-500/20 shadow-[0_0_12px_rgba(255,68,102,0.12)]"
+                  }`}>
+                    {totalPnlPos ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}
+                    <span>{totalPnlPos ? "+" : ""}₺{totalPnl.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    <span className="opacity-80">({totalPnlPos ? "+" : ""}%{totalReturnPct.toFixed(2)})</span>
+                  </div>
+
+                  <span className="text-[11px] text-zinc-500">
+                    Başlangıç: ₺1M
+                  </span>
+                </div>
+              </div>
+
+              {/* Sağ: İki Kompakt Metrik Kartı & Seansı Çalıştır */}
+              <div className="flex flex-wrap items-center gap-2.5">
+                {/* Alım Gücü Mini Kartı */}
+                <div className="px-3 py-2 rounded-lg border border-white/[0.06] bg-white/[0.02] backdrop-blur-md min-w-[130px]">
+                  <div className="flex items-center justify-between text-[10px] text-zinc-400 font-medium">
+                    <span>Alım Gücü (T+2)</span>
+                    <Coins size={12} className="text-amber-400" />
+                  </div>
+                  <div className="text-sm md:text-base font-bold font-data text-white">
+                    ₺{purchasingPower.toLocaleString("tr-TR", { maximumFractionDigits: 0 })}
+                  </div>
+                </div>
+
+                {/* Hisse Portföyü Mini Kartı */}
+                <div className="px-3 py-2 rounded-lg border border-white/[0.06] bg-white/[0.02] backdrop-blur-md min-w-[130px]">
+                  <div className="flex items-center justify-between text-[10px] text-zinc-400 font-medium">
+                    <span>Hisse Yatırımı</span>
+                    <Briefcase size={12} className="text-cyan-400" />
+                  </div>
+                  <div className="text-sm md:text-base font-bold font-data text-white">
+                    ₺{investedValue.toLocaleString("tr-TR", { maximumFractionDigits: 0 })}
+                  </div>
+                </div>
+
+                {/* Seansı Çalıştır Butonu */}
+                <button
+                  onClick={handleRunRebalanceCycle}
+                  disabled={triggering}
+                  className="flex items-center gap-2 px-3.5 py-2.5 rounded-lg font-bold text-xs bg-gradient-to-r from-emerald-400 to-teal-500 hover:from-emerald-300 hover:to-teal-400 text-zinc-950 shadow-md shadow-emerald-500/20 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+                  title="Yapay zeka portföy dengeleme seansını manuel tetikle"
+                >
+                  <Zap size={14} className={triggering ? "animate-spin" : ""} />
+                  <span>{triggering ? "Yürütülüyor..." : "Seansı Çalıştır"}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* 2. REVOLUT / APPLE WALLET STYLE ALLOCATION STRIP (KOMPAKT) */}
+            {allocationSegments.length > 0 && (
+              <div className="mt-3.5 pt-3 border-t border-white/[0.06] space-y-2">
+                {/* Segment Çubuğu */}
+                <div className="h-1.5 w-full rounded-full overflow-hidden flex bg-zinc-900 border border-white/[0.05] p-0.5 gap-0.5">
+                  {allocationSegments.map((seg, i) => (
+                    <div
+                      key={i}
+                      style={{ width: `${seg.pct}%`, backgroundColor: seg.color }}
+                      className="h-full rounded-full transition-all duration-500 hover:opacity-80"
+                      title={`${seg.label}: %${seg.pct.toFixed(1)}`}
+                    />
+                  ))}
+                </div>
+
+                {/* Sektör Etiketleri (Kompakt Tek Satır/Wrap) */}
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px]">
+                  <span className="text-zinc-500 font-medium">Dağılım:</span>
+                  {allocationSegments.map((seg, i) => (
+                    <div key={i} className="flex items-center gap-1 text-zinc-400">
+                      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: seg.color }} />
+                      <span className="font-medium text-zinc-300">{seg.label}</span>
+                      <span className="font-data font-semibold text-zinc-400">%{seg.pct.toFixed(1)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
-        </div>
-      </div>
 
-      {/* Positions Table */}
-      <div
-        className="rounded-xl overflow-hidden shadow-lg"
-        style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
-      >
-        <div
-          className="flex items-center justify-between px-5 py-3.5"
-          style={{ borderBottom: "1px solid var(--color-border-subtle)", background: "rgba(255,255,255,0.01)" }}
-        >
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-cyan-500/10 border border-cyan-500/20">
-              <Briefcase size={14} className="text-cyan-400" />
+          {actionMsg && (
+            <div className={`p-2.5 px-3 rounded-lg border text-xs font-medium flex items-center justify-between transition-all ${
+              actionMsg.type === "success" 
+                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
+                : "bg-rose-500/10 border-rose-500/30 text-rose-300"
+            }`}>
+              <div className="flex items-center gap-2">
+                {actionMsg.type === "success" ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
+                <span>{actionMsg.text}</span>
+              </div>
+              <button onClick={() => setActionMsg(null)} className="text-zinc-400 hover:text-white text-[11px] cursor-pointer">
+                ✕
+              </button>
             </div>
-            <div>
-              <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-100">
-                Açık Pozisyonlar & Canlı Değerleme
-              </h2>
-              <p className="text-[10px] text-zinc-400">Gerçek zamanlı piyasa fiyatı, kâr/zarar ve portföy ağırlıkları</p>
-            </div>
-          </div>
-          <span className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-zinc-800 text-zinc-300 border border-zinc-700">
-            {positions.length} Hisse Aktif
-          </span>
-        </div>
+          )}
 
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr
-                className="text-[10px] uppercase tracking-wider font-semibold"
-                style={{
-                  color: "var(--color-text-muted)",
-                  borderBottom: "1px solid var(--color-border-subtle)",
-                  background: "rgba(0,0,0,0.2)"
-                }}
+          {/* 3. ANA GEZİNTİ ÇUBUĞU (SEKMELER + ARAMA + GÖRÜNÜM SEÇİCİ) */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-zinc-900/60 p-1.5 rounded-xl border border-white/[0.06] backdrop-blur-md">
+            {/* Sol: Ana Sekmeler */}
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setMainTab("positions")}
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  mainTab === "positions"
+                    ? "bg-emerald-500 text-zinc-950 font-bold shadow-sm"
+                    : "text-zinc-400 hover:text-white hover:bg-white/[0.04]"
+                }`}
               >
-                <th className="text-left py-3 px-5">Sembol</th>
-                <th className="text-left py-3 px-3">Şirket Adı</th>
-                <th className="text-left py-3 px-3">Sektör</th>
-                <th className="text-right py-3 px-3">Adet (Lot)</th>
-                <th className="text-right py-3 px-3">Giriş Maliyeti</th>
-                <th className="text-right py-3 px-3">Güncel Fiyat</th>
-                <th className="text-right py-3 px-3">Piyasa Değeri</th>
-                <th className="text-right py-3 px-3">Kâr / Zarar (₺)</th>
-                <th className="text-right py-3 px-3">K/Z %</th>
-                <th className="text-right py-3 px-5">Portföy Payı</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading && positions.length === 0 ? (
-                <tr><td colSpan={10} className="text-center py-16"><SkeletonTable rows={5} cols={10} /></td></tr>
-              ) : positions.length === 0 ? (
-                <tr>
-                  <td colSpan={10} className="text-center py-16">
-                    <Wallet size={32} className="mx-auto mb-3 text-zinc-600" />
-                    <p className="text-sm font-semibold text-zinc-400">Henüz açık pozisyon bulunmuyor</p>
-                    <p className="text-xs text-zinc-500 mt-1">Sabah 09:55 seansında veya Seansı Şimdi Çalıştır ile otomatik alım yapılır.</p>
-                  </td>
-                </tr>
+                <Briefcase size={14} />
+                <span>Açık Pozisyonlar</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${mainTab === "positions" ? "bg-zinc-950/20 text-zinc-950" : "bg-zinc-800 text-zinc-300"}`}>
+                  {positions.length}
+                </span>
+              </button>
+
+              <button
+                onClick={() => setMainTab("orders")}
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  mainTab === "orders"
+                    ? "bg-emerald-500 text-zinc-950 font-bold shadow-sm"
+                    : "text-zinc-400 hover:text-white hover:bg-white/[0.04]"
+                }`}
+              >
+                <Receipt size={14} />
+                <span>Emir & İşlem Defteri</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${mainTab === "orders" ? "bg-zinc-950/20 text-zinc-950" : "bg-zinc-800 text-zinc-300"}`}>
+                  {orders.length}
+                </span>
+              </button>
+
+              <button
+                onClick={() => setMainTab("t2")}
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  mainTab === "t2"
+                    ? "bg-emerald-500 text-zinc-950 font-bold shadow-sm"
+                    : "text-zinc-400 hover:text-white hover:bg-white/[0.04]"
+                }`}
+              >
+                <Coins size={14} />
+                <span>T+2 Takasbank</span>
+              </button>
+            </div>
+
+            {/* Sağ: Arama ve Görünüm Kontrolleri (Pozisyon Sekmesinde Aktif) */}
+            {mainTab === "positions" && (
+              <div className="flex items-center gap-2">
+                {/* Hızlı Arama */}
+                <div className="relative">
+                  <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+                  <input
+                    type="text"
+                    placeholder="Hisse ara (örn: THYAO)..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-44 md:w-56 pl-8 pr-3 py-1.5 rounded-lg text-xs bg-zinc-950/80 border border-white/[0.08] text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-emerald-500/50"
+                  />
+                </div>
+
+                {/* K/Z Filtresi */}
+                <div className="flex bg-zinc-950/80 p-0.5 rounded-lg border border-white/[0.08] text-[11px]">
+                  <button
+                    onClick={() => setPnlFilter("ALL")}
+                    className={`px-2 py-1 rounded font-medium transition-all cursor-pointer ${pnlFilter === "ALL" ? "bg-zinc-800 text-white font-semibold" : "text-zinc-400 hover:text-zinc-200"}`}
+                  >
+                    Tümü
+                  </button>
+                  <button
+                    onClick={() => setPnlFilter("PROFIT")}
+                    className={`px-2 py-1 rounded font-medium transition-all cursor-pointer ${pnlFilter === "PROFIT" ? "bg-emerald-500/20 text-emerald-300 font-semibold" : "text-zinc-400 hover:text-zinc-200"}`}
+                  >
+                    Kârdakiler
+                  </button>
+                  <button
+                    onClick={() => setPnlFilter("LOSS")}
+                    className={`px-2 py-1 rounded font-medium transition-all cursor-pointer ${pnlFilter === "LOSS" ? "bg-rose-500/20 text-rose-300 font-semibold" : "text-zinc-400 hover:text-zinc-200"}`}
+                  >
+                    Zarardakiler
+                  </button>
+                </div>
+
+                {/* Tablo / Grid Görünüm Değiştirici */}
+                <div className="flex bg-zinc-950/80 p-0.5 rounded-lg border border-white/[0.08]">
+                  <button
+                    onClick={() => setViewMode("table")}
+                    className={`p-1.5 rounded transition-all cursor-pointer ${viewMode === "table" ? "bg-zinc-800 text-emerald-400" : "text-zinc-500 hover:text-zinc-300"}`}
+                    title="Tablo Görünümü"
+                  >
+                    <ListFilter size={14} />
+                  </button>
+                  <button
+                    onClick={() => setViewMode("grid")}
+                    className={`p-1.5 rounded transition-all cursor-pointer ${viewMode === "grid" ? "bg-zinc-800 text-emerald-400" : "text-zinc-500 hover:text-zinc-300"}`}
+                    title="Kart / Grid Görünümü"
+                  >
+                    <LayoutGrid size={14} />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Emir Defteri Filtresi */}
+            {mainTab === "orders" && (
+              <div className="flex items-center gap-1 bg-zinc-950/80 p-0.5 rounded-lg border border-white/[0.08] text-[11px]">
+                {(["ALL", "BUY", "SELL"] as const).map((f) => (
+                  <button
+                    key={f}
+                    onClick={() => setOrderFilter(f)}
+                    className={`px-2.5 py-1 rounded font-medium transition-all cursor-pointer ${
+                      orderFilter === f ? "bg-zinc-800 text-white font-semibold" : "text-zinc-400 hover:text-zinc-200"
+                    }`}
+                  >
+                    {f === "ALL" ? "Tüm Emirler" : f === "BUY" ? "Alışlar" : "Satışlar"}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* 4. POZİSYONLAR: PRO TABLO VEYA MODERN KART GÖRÜNÜMÜ */}
+          {mainTab === "positions" && (
+            <>
+              {filteredPositions.length === 0 ? (
+                <div className="rounded-2xl p-12 text-center border border-white/[0.06] bg-zinc-900/20 backdrop-blur-md">
+                  <Wallet size={36} className="mx-auto mb-3 text-zinc-600" />
+                  <p className="text-sm font-semibold text-zinc-300">Aramanıza uygun pozisyon bulunamadı</p>
+                  <p className="text-xs text-zinc-500 mt-1">Filtreleri temizleyebilir veya yeni seans çalıştırabilirsiniz.</p>
+                </div>
+              ) : viewMode === "table" ? (
+                /* 4A. PRO TABLO GÖRÜNÜMÜ */
+                <div className="rounded-2xl border border-white/[0.08] overflow-hidden bg-zinc-900/30 backdrop-blur-xl shadow-xl">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                      <thead>
+                        <tr className="border-b border-white/[0.06] text-[11px] font-bold text-zinc-400 uppercase tracking-wider bg-white/[0.01]">
+                          <th className="py-3.5 px-5">Varlık / Hisse</th>
+                          <th className="py-3.5 px-4 text-right">Adet (Lot)</th>
+                          <th className="py-3.5 px-4 text-right">Anlık Fiyat & Maliyet</th>
+                          <th className="py-3.5 px-4 text-right">Toplam Değer & Pay</th>
+                          <th className="py-3.5 px-5 text-right">Kâr / Zarar Durumu</th>
+                          <th className="py-3.5 px-4 text-center">İşlem</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/[0.04] text-xs">
+                        {filteredPositions.map((pos, idx) => {
+                          const sym = pos.ticker || pos.symbol || "";
+                          const pnlVal = Number(pos.unrealized_pnl ?? 0);
+                          const pnlPct = Number(pos.unrealized_pnl_pct ?? 0);
+                          const isPos = pnlVal >= 0;
+                          const curPrice = Number(pos.current_price ?? pos.avg_cost ?? 0);
+                          const avgCost = Number(pos.avg_cost ?? 0);
+                          const weight = Number(pos.weight_pct ?? 0);
+                          const flash = sym ? flashMap[sym] : undefined;
+
+                          return (
+                            <tr 
+                              key={idx}
+                              onClick={() => router.push(`/asset?symbol=${sym}`)}
+                              className="hover:bg-white/[0.03] transition-all cursor-pointer group"
+                            >
+                              {/* Varlık / Hisse */}
+                              <td className="py-3.5 px-5">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold font-data text-xs bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 group-hover:scale-105 group-hover:bg-emerald-500/20 transition-all">
+                                    {sym.slice(0, 3)}
+                                  </div>
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-bold font-data text-white text-sm group-hover:text-emerald-400 transition-colors">
+                                        {sym}
+                                      </span>
+                                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/[0.05] text-zinc-400 border border-white/[0.06]">
+                                        {pos.sector || "BIST"}
+                                      </span>
+                                    </div>
+                                    <p className="text-[11px] text-zinc-400 truncate max-w-[170px] mt-0.5">
+                                      {pos.name || pos.company_name || sym}
+                                    </p>
+                                  </div>
+                                </div>
+                              </td>
+
+                              {/* Adet (Lot) */}
+                              <td className="py-3.5 px-4 text-right font-data font-bold text-zinc-200">
+                                {Number(pos.quantity ?? 0).toLocaleString("tr-TR")} Lot
+                              </td>
+
+                              {/* Anlık Fiyat & Maliyet */}
+                              <td className="py-3.5 px-4 text-right">
+                                <div className={`font-data font-bold text-sm ${flash === "up" ? "text-emerald-400" : flash === "down" ? "text-rose-400" : "text-white"}`}>
+                                  ₺{curPrice.toFixed(2)}
+                                </div>
+                                <div className="font-data text-[11px] text-zinc-500">
+                                  Maliyet: ₺{avgCost.toFixed(2)}
+                                </div>
+                              </td>
+
+                              {/* Toplam Değer & Pay */}
+                              <td className="py-3.5 px-4 text-right">
+                                <div className="font-data font-bold text-zinc-100">
+                                  ₺{Number(pos.market_value ?? 0).toLocaleString("tr-TR", { maximumFractionDigits: 0 })}
+                                </div>
+                                <div className="flex items-center justify-end gap-1 text-[11px] text-zinc-500 font-data">
+                                  <span>Pay:</span>
+                                  <span className="text-zinc-300 font-semibold">%{weight.toFixed(1)}</span>
+                                </div>
+                              </td>
+
+                              {/* Kâr / Zarar */}
+                              <td className="py-3.5 px-5 text-right">
+                                <div className="flex flex-col items-end gap-0.5">
+                                  <span className={`font-extrabold font-data text-sm ${isPos ? "text-emerald-400" : "text-rose-400"}`}>
+                                    {isPos ? "+" : ""}₺{pnlVal.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </span>
+                                  <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
+                                    isPos 
+                                      ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" 
+                                      : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                                  }`}>
+                                    {isPos ? "+" : ""}%{pnlPct.toFixed(2)}
+                                  </span>
+                                </div>
+                              </td>
+
+                              {/* İşlem */}
+                              <td className="py-3.5 px-4 text-center">
+                                <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-white/[0.04] text-zinc-400 group-hover:bg-emerald-500 group-hover:text-zinc-950 transition-all">
+                                  <ArrowRight size={13} />
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               ) : (
-                positions.map((pos, i: number) => {
-                  const sym = pos.ticker || pos.symbol || "";
-                  const pnlVal = Number(pos.unrealized_pnl ?? 0);
-                  const pnlPct = Number(pos.unrealized_pnl_pct ?? 0);
-                  const pnlPos = pnlVal >= 0;
-                  const flashDir = sym ? flashMap[sym] : undefined;
-                  const flashClass = flashDir === "up" ? "flash-up" : (flashDir === "down" ? "flash-down" : "");
-                  return (
-                    <tr
-                      key={i}
-                      onClick={() => router.push(`/asset?ticker=${sym}`)}
-                      className={`row-hover cursor-pointer text-[12px] transition-colors hover:bg-zinc-800/40 border-b border-zinc-800/50 ${flashClass}`}
-                    >
-                      <td className="py-3 px-5">
-                        <span className="font-bold font-data text-cyan-400 hover:underline">{sym}</span>
-                      </td>
-                      <td className="py-3 px-3">
-                        <span className="truncate max-w-[150px] block text-[11px] text-zinc-300 font-medium">
-                          {pos.name || pos.company_name || sym}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-zinc-800 border border-zinc-700 text-zinc-300">
-                          {pos.sector || "DİĞER"}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 text-right font-data font-bold text-zinc-200">
-                        {pos.quantity?.toLocaleString("tr-TR")}
-                      </td>
-                      <td className="py-3 px-3 text-right font-data text-zinc-400">
-                        ₺{Number(pos.avg_cost ?? 0).toFixed(2)}
-                      </td>
-                      <td className={`py-3 px-3 text-right font-data font-bold text-zinc-100 transition-colors ${flashClass}`}>
-                        ₺{Number(pos.current_price ?? pos.avg_cost ?? 0).toFixed(2)}
-                      </td>
-                      <td className="py-3 px-3 text-right font-data font-semibold text-zinc-200">
-                        ₺{Number(pos.market_value ?? 0).toLocaleString("tr-TR", { maximumFractionDigits: 2 })}
-                      </td>
-                      <td className="py-3 px-3 text-right">
-                        <div className="flex items-center justify-end gap-1 font-data font-bold">
-                          {pnlPos ? <ArrowUpRight size={12} className="text-emerald-400" /> : <ArrowDownRight size={12} className="text-rose-400" />}
-                          <span className={pnlPos ? "text-emerald-400" : "text-rose-400"}>
-                            {pnlPos ? "+" : ""}₺{pnlVal.toLocaleString("tr-TR", { maximumFractionDigits: 2 })}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="py-3 px-3 text-right font-data font-bold">
-                        <span className={`px-2 py-0.5 rounded text-[11px] ${
-                          pnlPos 
-                            ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" 
-                            : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
-                        }`}>
-                          {pnlPos ? "+" : ""}%{pnlPct.toFixed(2)}
-                        </span>
-                      </td>
-                      <td className="py-3 px-5 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <div className="w-16 h-1.5 rounded-full overflow-hidden bg-zinc-800">
-                            <div className="h-full rounded-full bg-cyan-400" style={{ width: `${Math.min(100, Number(pos.weight_pct ?? 0) * 5)}%` }} />
+                /* 4B. REVOLUT / APPLE WALLET STYLE GRID CARDS */
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredPositions.map((pos, idx) => {
+                    const sym = pos.ticker || pos.symbol || "";
+                    const pnlVal = Number(pos.unrealized_pnl ?? 0);
+                    const pnlPct = Number(pos.unrealized_pnl_pct ?? 0);
+                    const isPos = pnlVal >= 0;
+                    const curPrice = Number(pos.current_price ?? pos.avg_cost ?? 0);
+                    const avgCost = Number(pos.avg_cost ?? 0);
+                    const weight = Number(pos.weight_pct ?? 0);
+
+                    return (
+                      <div
+                        key={idx}
+                        onClick={() => router.push(`/asset?symbol=${sym}`)}
+                        className="rounded-2xl p-4 border border-white/[0.06] bg-zinc-900/40 hover:bg-zinc-900/70 hover:border-emerald-500/30 transition-all cursor-pointer space-y-3.5 group backdrop-blur-md hover:-translate-y-1 shadow-lg"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold font-data text-xs bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 group-hover:scale-105 transition-all">
+                              {sym.slice(0, 3)}
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-bold text-white text-sm group-hover:text-emerald-400 transition-colors font-data">
+                                  {sym}
+                                </span>
+                                <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/[0.05] text-zinc-400">
+                                  {pos.sector || "BIST"}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-zinc-400 truncate max-w-[140px]">
+                                {pos.name || pos.company_name || sym}
+                              </p>
+                            </div>
                           </div>
-                          <span className="font-data text-[11px] text-zinc-300 font-semibold w-10 text-right">
-                            %{Number(pos.weight_pct ?? 0).toFixed(1)}
+
+                          <span className={`px-2 py-0.5 rounded-lg text-xs font-bold font-data border ${
+                            isPos 
+                              ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" 
+                              : "bg-rose-500/10 text-rose-400 border-rose-500/20"
+                          }`}>
+                            {isPos ? "+" : ""}%{pnlPct.toFixed(2)}
                           </span>
                         </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
 
-      {/* Gerçekleşen Son Emirler ve İşlem Kayıtları */}
-      <div
-        className="rounded-xl overflow-hidden shadow-lg"
-        style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
-      >
-        <div
-          className="flex items-center justify-between px-5 py-3.5 flex-wrap gap-3"
-          style={{ borderBottom: "1px solid var(--color-border-subtle)", background: "rgba(255,255,255,0.01)" }}
-        >
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-purple-500/10 border border-purple-500/20">
-              <Receipt size={14} className="text-purple-400" />
-            </div>
-            <div>
-              <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-100">
-                Emir Defteri & Realize Kâr/Zarar Geçmişi
-              </h2>
-              <p className="text-[10px] text-zinc-400">Alış/satış yürütmeleri, kâr/zarar tutarları ve BIST mikro-yapı denetim izi</p>
-            </div>
-          </div>
+                        {/* Metrikler */}
+                        <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/[0.04] text-xs">
+                          <div>
+                            <span className="text-[10px] text-zinc-500 block uppercase">Fiyat & Maliyet</span>
+                            <span className="font-bold font-data text-white">₺{curPrice.toFixed(2)}</span>
+                            <span className="text-[10px] text-zinc-500 block">Mal: ₺{avgCost.toFixed(2)}</span>
+                          </div>
 
-          <div className="flex items-center gap-2">
-            <div className="flex items-center bg-zinc-900/80 p-1 rounded-lg border border-zinc-800">
-              <button
-                onClick={() => setOrderTab("ALL")}
-                className={`px-3 py-1 rounded-md text-[11px] font-semibold transition-all ${
-                  orderTab === "ALL"
-                    ? "bg-purple-600 text-white shadow-sm"
-                    : "text-zinc-400 hover:text-zinc-200"
-                }`}
-              >
-                Tümü ({orders.length})
-              </button>
-              <button
-                onClick={() => setOrderTab("BUY")}
-                className={`px-3 py-1 rounded-md text-[11px] font-semibold transition-all ${
-                  orderTab === "BUY"
-                    ? "bg-emerald-600 text-white shadow-sm"
-                    : "text-zinc-400 hover:text-zinc-200"
-                }`}
-              >
-                Alışlar ({orders.filter(o => o.side === "BUY").length})
-              </button>
-              <button
-                onClick={() => setOrderTab("SELL")}
-                className={`px-3 py-1 rounded-md text-[11px] font-semibold transition-all ${
-                  orderTab === "SELL"
-                    ? "bg-rose-600 text-white shadow-sm"
-                    : "text-zinc-400 hover:text-zinc-200"
-                }`}
-              >
-                Satışlar & Kâr/Zarar ({orders.filter(o => o.side === "SELL").length})
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr
-                className="text-[10px] uppercase tracking-wider font-semibold"
-                style={{
-                  color: "var(--color-text-muted)",
-                  borderBottom: "1px solid var(--color-border-subtle)",
-                  background: "rgba(0,0,0,0.2)"
-                }}
-              >
-                <th className="text-left py-3 px-5">Tarih</th>
-                <th className="text-left py-3 px-3">Emir No</th>
-                <th className="text-left py-3 px-3">Hisse</th>
-                <th className="text-center py-3 px-3">İşlem Yönü</th>
-                <th className="text-right py-3 px-3">Miktar (Lot)</th>
-                <th className="text-right py-3 px-3">Alış / Sinyal Fiyatı</th>
-                <th className="text-right py-3 px-3">Gerçekleşme / Çıkış</th>
-                <th className="text-right py-3 px-4">Elde Edilen Kâr / Zarar</th>
-                <th className="text-right py-3 px-3">Komisyon</th>
-                <th className="text-right py-3 px-5">Durum</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredOrders.length === 0 ? (
-                <tr>
-                  <td colSpan={10} className="text-center py-10 text-xs text-zinc-500">
-                    Seçili kategoride işlem kaydı bulunmuyor.
-                  </td>
-                </tr>
-              ) : (
-                filteredOrders.map((ord, i: number) => {
-                  const isBuy = ord.side === "BUY";
-                  const pnl = ord.realized_pnl !== undefined ? Number(ord.realized_pnl) : null;
-                  const pnlPct = ord.realized_pnl_pct !== undefined ? Number(ord.realized_pnl_pct) : null;
-                  const isPos = (pnl ?? 0) >= 0;
-
-                  return (
-                    <tr key={i} className="text-[12px] border-b border-zinc-800/40 hover:bg-zinc-800/20">
-                      <td className="py-2.5 px-5 font-data text-zinc-400">{ord.date || "2026-08-29"}</td>
-                      <td className="py-2.5 px-3 font-data text-zinc-500 text-[11px] truncate max-w-[120px]">{ord.order_id || `ORD_${i+1}`}</td>
-                      <td className="py-2.5 px-3 font-bold font-data text-cyan-400 cursor-pointer hover:underline" onClick={() => router.push(`/asset?ticker=${ord.ticker}`)}>
-                        {ord.ticker}
-                      </td>
-                      <td className="py-2.5 px-3 text-center">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                          isBuy ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
-                        }`}>
-                          {isBuy ? "ALIŞ" : "SATIŞ"}
-                        </span>
-                      </td>
-                      <td className="py-2.5 px-3 text-right font-data font-semibold text-zinc-200">{ord.quantity?.toLocaleString("tr-TR")}</td>
-                      <td className="py-2.5 px-3 text-right font-data text-zinc-400">
-                        ₺{Number(ord.entry_price ?? ord.signal_price ?? 0).toFixed(2)}
-                      </td>
-                      <td className="py-2.5 px-3 text-right font-data font-bold text-zinc-100">
-                        ₺{Number(ord.execution_price ?? ord.exit_price ?? 0).toFixed(2)}
-                      </td>
-                      <td className="py-2.5 px-4 text-right font-data">
-                        {pnl !== null ? (
-                          <div className="flex flex-col items-end">
-                            <span className={`font-bold text-[12px] ${isPos ? "text-emerald-400" : "text-rose-400"}`}>
-                              {isPos ? "+" : ""}₺{pnl.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          <div className="text-right">
+                            <span className="text-[10px] text-zinc-500 block uppercase">Toplam Değer</span>
+                            <span className="font-bold font-data text-white">
+                              ₺{Number(pos.market_value ?? 0).toLocaleString("tr-TR", { maximumFractionDigits: 0 })}
                             </span>
-                            {pnlPct !== null && (
-                              <span className={`text-[10px] font-semibold ${isPos ? "text-emerald-400/80" : "text-rose-400/80"}`}>
-                                ({isPos ? "+" : ""}%{pnlPct.toFixed(2)})
-                              </span>
-                            )}
+                            <span className="text-[10px] text-zinc-500 block font-data">{pos.quantity} Lot · %{weight.toFixed(1)}</span>
                           </div>
-                        ) : (
-                          <span className="text-[10px] text-zinc-500 font-sans">Açık Pozisyon</span>
-                        )}
-                      </td>
-                      <td className="py-2.5 px-3 text-right font-data text-zinc-400">₺{Number(ord.commission ?? 0).toFixed(2)}</td>
-                      <td className="py-2.5 px-5 text-right">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                          {ord.status === "FILLED" ? "GERÇEKLEŞTİ" : (ord.status || "KAPANDI")}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })
+                        </div>
+
+                        {/* Net Kâr Alt Barı */}
+                        <div className="flex items-center justify-between pt-2 border-t border-white/[0.04] text-xs">
+                          <span className="text-[11px] text-zinc-400">Net Kâr/Zarar:</span>
+                          <span className={`font-bold font-data ${isPos ? "text-emerald-400" : "text-rose-400"}`}>
+                            {isPos ? "+" : ""}₺{pnlVal.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               )}
-            </tbody>
-          </table>
+            </>
+          )}
+
+          {/* 5. EMİR & İŞLEM GEÇMİŞİ SEKMESİ */}
+          {mainTab === "orders" && (
+            <div className="rounded-2xl border border-white/[0.08] overflow-hidden bg-zinc-900/30 backdrop-blur-xl shadow-xl">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="border-b border-white/[0.06] text-[11px] font-bold text-zinc-400 uppercase tracking-wider bg-white/[0.01]">
+                      <th className="py-3.5 px-5">Tarih</th>
+                      <th className="py-3.5 px-4">Hisse & Yön</th>
+                      <th className="py-3.5 px-4 text-right">Miktar (Lot)</th>
+                      <th className="py-3.5 px-4 text-right">İşlem Fiyatı</th>
+                      <th className="py-3.5 px-4 text-right">Elde Edilen Kâr / Zarar</th>
+                      <th className="py-3.5 px-5 text-right">Durum</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/[0.04] text-xs">
+                    {filteredOrders.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-12 text-center text-zinc-500">
+                          Seçili kategoride emir kaydı bulunmuyor.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredOrders.map((ord, idx) => {
+                        const isBuy = ord.side === "BUY";
+                        const pnl = ord.realized_pnl !== undefined ? Number(ord.realized_pnl) : null;
+                        const isPos = (pnl ?? 0) >= 0;
+
+                        return (
+                          <tr key={idx} className="hover:bg-white/[0.02] transition-colors">
+                            <td className="py-3 px-5 font-data text-zinc-400">
+                              {ord.date || "2026-09-02"}
+                            </td>
+                            <td className="py-3 px-4">
+                              <div className="flex items-center gap-2">
+                                <span 
+                                  onClick={() => router.push(`/asset?symbol=${ord.ticker}`)}
+                                  className="font-bold font-data text-emerald-400 hover:underline cursor-pointer"
+                                >
+                                  {ord.ticker}
+                                </span>
+                                <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                                  isBuy 
+                                    ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" 
+                                    : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                                }`}>
+                                  {isBuy ? "ALIŞ" : "SATIŞ"}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="py-3 px-4 text-right font-data font-bold text-zinc-200">
+                              {ord.quantity?.toLocaleString("tr-TR")} Lot
+                            </td>
+                            <td className="py-3 px-4 text-right font-data text-white font-semibold">
+                              ₺{Number(ord.execution_price ?? ord.exit_price ?? ord.signal_price ?? 0).toFixed(2)}
+                            </td>
+                            <td className="py-3 px-4 text-right font-data">
+                              {pnl !== null ? (
+                                <span className={`font-bold ${isPos ? "text-emerald-400" : "text-rose-400"}`}>
+                                  {isPos ? "+" : ""}₺{pnl.toFixed(2)}
+                                </span>
+                              ) : (
+                                <span className="text-[10px] text-zinc-500">Pozisyonda</span>
+                              )}
+                            </td>
+                            <td className="py-3 px-5 text-right">
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                {ord.status === "FILLED" ? "GERÇEKLEŞTİ" : (ord.status || "KAPANDI")}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* 6. T+2 TAKASBANK DETAYLARI SEKMESİ */}
+          {mainTab === "t2" && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Valör Dağılımı */}
+              <div className="rounded-2xl p-6 border border-white/[0.08] bg-zinc-900/40 backdrop-blur-xl space-y-4">
+                <div className="flex items-center gap-2 border-b border-white/[0.06] pb-3">
+                  <Coins size={18} className="text-amber-400" />
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-white">
+                    Takasbank T+2 Valör Dağılımı
+                  </h3>
+                </div>
+
+                <div className="space-y-3 text-xs font-data">
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+                    <span className="text-zinc-400">T+0 Serbest Nakit (Çekilebilir):</span>
+                    <span className="font-bold text-white text-sm">₺{settledCash.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+                    <span className="text-zinc-400">T+1 Takas Alacağı (Yarın):</span>
+                    <span className="font-bold text-zinc-300 text-sm">₺{unsettledT1.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+                    <span className="text-zinc-400">T+2 Takas Alacağı (Sonraki Gün):</span>
+                    <span className="font-bold text-zinc-300 text-sm">₺{unsettledT2.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                    <span className="text-emerald-400 font-bold">Toplam Alım Gücü:</span>
+                    <span className="font-extrabold text-emerald-300 text-base">₺{purchasingPower.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Kurumsal Risk Sınırları */}
+              <div className="rounded-2xl p-6 border border-white/[0.08] bg-zinc-900/40 backdrop-blur-xl space-y-4">
+                <div className="flex items-center gap-2 border-b border-white/[0.06] pb-3">
+                  <ShieldCheck size={18} className="text-emerald-400" />
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-white">
+                    Kurumsal BIST Risk Kapısı
+                  </h3>
+                </div>
+
+                <div className="space-y-3 text-xs text-zinc-300">
+                  <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] space-y-1">
+                    <div className="font-semibold text-white">Tek Sektör Konsantrasyon Limiti: %30</div>
+                    <p className="text-[11px] text-zinc-400">
+                      Hiçbir sektör toplam portföyün %30'unu aşamaz. Otomatik rebalance motoru sınırı aşan sektörleri kısıtlar.
+                    </p>
+                  </div>
+                  <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] space-y-1">
+                    <div className="font-semibold text-white">Sentetik Likidite & Kayma (Slippage) Koruması</div>
+                    <p className="text-[11px] text-zinc-400">
+                      Alım ve satımlarda kademe derinliği simüle edilir, volatil piyasalarda emir hacmi bölünerek piyasa etkisi minimize edilir.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
         </div>
       </div>
-
-    </div>
     </ErrorBoundary>
   );
 }

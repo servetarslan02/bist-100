@@ -111,6 +111,13 @@ class WorldState:
             "timestamp": self.timestamp.isoformat(),
         }
 
+    def __repr__(self) -> str:
+        return (
+            f"<WorldState risk_appetite={self.global_risk_appetite:.2f} "
+            f"usd_str={self.usd_strength:.2f} turkey_risk={self.turkey_macro_risk:.2f} "
+            f"vix={self.vix_level:.1f}>"
+        )
+
     def apply_decay(self, hours_elapsed: float) -> Any:
         """Zaman geçtikçe etki azalır — factor bazlı decay."""
         factors = [
@@ -321,3 +328,9 @@ class WorldStateManager:
 
 # Singleton
 world_state_manager = WorldStateManager()
+
+__all__ = [
+    "WorldState",
+    "WorldStateManager",
+    "world_state_manager",
+]

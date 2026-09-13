@@ -53,9 +53,22 @@ from .feature_tests import FeatureTestSuite, feature_test_suite
 from .incremental_state import IncrementalStateManager, incremental_state
 from .lineage import FeatureLineageTracker, feature_lineage
 from .macro import MacroFeatureEngine, macro_feature_engine
+from .microstructure_features import (
+    MicrostructureFeatureEngine,
+    MicrostructureFeatures,
+    microstructure_engine,
+)
 from .pipeline import FeaturePipeline, PipelineConfig, feature_pipeline
 from .quality_monitor import FeatureQualityMonitor, feature_quality_monitor
 from .selection import FeatureSelector, feature_selector
+from .sentiment_features import (
+    FlowSentimentCalculator,
+    NewsSentimentCalculator,
+    SentimentFeatureEngine,
+    SentimentFeatureVector,
+    TechnicalSentimentCalculator,
+    sentiment_engine,
+)
 from .seven_motors import (
     MeanReversionMotor,
     MicrostructureMotor,
@@ -109,11 +122,15 @@ __all__ = [
     "feature_store",
     "feature_test_suite",
     "feature_version_manager",
-    "get_all_feature_names",
-    "get_feature_count",
-    "get_feature_names_by_category",
-    "get_high_importance_features",
-    "incremental_state",
-    "macro_feature_engine",
-    "print_feature_summary",
+    # Microstructure Features
+    "MicrostructureFeatureEngine",
+    "MicrostructureFeatures",
+    "microstructure_engine",
+    # Sentiment Features
+    "SentimentFeatureEngine",
+    "SentimentFeatureVector",
+    "FlowSentimentCalculator",
+    "NewsSentimentCalculator",
+    "TechnicalSentimentCalculator",
+    "sentiment_engine",
 ]

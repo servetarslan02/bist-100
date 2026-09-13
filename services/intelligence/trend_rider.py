@@ -154,3 +154,8 @@ class TrendRiderEngine:
 
 # Singleton
 trend_rider = TrendRiderEngine()
+
+__all__ = [
+    "TrendRiderEngine",
+    "trend_rider",
+]

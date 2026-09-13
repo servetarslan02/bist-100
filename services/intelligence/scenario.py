@@ -334,5 +334,20 @@ class ScenarioEngine:
         )
 
 
+    def __repr__(self) -> str:
+        return f"<ScenarioEngine predefined={len(PREDEFINED_SCENARIOS)}>"
+
+
 # Singleton
 scenario_engine = ScenarioEngine()
+
+__all__ = [
+    "AssetImpact",
+    "BreakingPoint",
+    "PREDEFINED_SCENARIOS",
+    "ScenarioEngine",
+    "ScenarioInput",
+    "ScenarioResult",
+    "StressTestResult",
+    "scenario_engine",
+]

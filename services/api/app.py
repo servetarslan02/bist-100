@@ -21,13 +21,13 @@ NOT: Bu dosya CANONICAL üretim giriş noktasıdır.
 from __future__ import annotations
 
 import asyncio
-import logging
 import os
 import time
 import uuid as _uuid
 from datetime import UTC, datetime
 from typing import Any
 
+import structlog
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -43,7 +43,7 @@ from ..core.otel import otel_trace, setup_telemetry
 from .rate_limiter import rate_limiter
 from .v1 import v1_router
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.api_app")
 
 
@@ -68,7 +68,7 @@ async def _startup_services(app: FastAPI = None) -> asyncio.Task | None:
         logger.warning("onbellek_isitma_basarisiz: hata=%s", e)
 
     try:
-        from ...portfolio.main import portfolio_service
+        from ..portfolio.main import portfolio_service
 
         await portfolio_service.start()
         logger.info("PortfolioService API yaşam döngüsünde başlatıldı")
@@ -845,6 +845,13 @@ def create_app() -> FastAPI:
         if not released:
             raise HTTPException(status_code=409, detail="Kilit size ait değil")
         return {"success": True}
+
+    # API v2 Enterprise Router & GraphQL Entegrasyonu
+    try:
+        from .v2.router import router as api_v2_router
+        app.include_router(api_v2_router, prefix="/api")
+    except Exception as exc:
+        logger.warning("api_v2_router_yuklenemedi: hata=%s", str(exc))
 
     return app
 

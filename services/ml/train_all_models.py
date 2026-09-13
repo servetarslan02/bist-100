@@ -358,12 +358,14 @@ def train_all_models(
 
         # Birinci Geçiş: O gün için Point-in-Time filtreleme ve gerçek 5-günlük ileri getiri
         ticker_day_data: dict[str, dict[str, Any]] = {}
+        dt_target = str(dt_str)[:10]
         for ticker, df in stock_cache.items():
-            sub = df.filter(pl.col("Date") <= dt_str)
+            date_col_str = pl.col("Date").cast(pl.Utf8).str.slice(0, 10)
+            sub = df.filter(date_col_str <= dt_target)
             if len(sub) < 25:
                 continue
 
-            fut = df.filter(pl.col("Date") > dt_str)
+            fut = df.filter(date_col_str > dt_target)
             if len(fut) < 5:
                 continue
 

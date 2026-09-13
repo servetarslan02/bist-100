@@ -10,6 +10,9 @@ x-common:
     options:
       max-size: 100k
       max-file: '1'
+x-app-build: &id004
+  context: .
+  dockerfile: infrastructure/Dockerfile.api
 services:
   traefik:
     image: traefik:v3.7
@@ -360,9 +363,7 @@ services:
     env_file: *id002
     networks: *id003
     logging: *id001
-    build:
-      context: .
-      dockerfile: infrastructure/Dockerfile.api
+    build: *id004
     image: alpha-bist-base:latest
     container_name: alpha-api
     mem_limit: 1536m
@@ -376,6 +377,8 @@ services:
     - ./ai:/app/ai:ro
     - ./backtest:/app/backtest:ro
     - ./config:/app/config:ro
+    - ./models:/app/models:ro
+    - ./proto:/app/proto:ro
     - ./data:/app/data
     - ./.env:/app/.env:ro
     - ./infrastructure/mtls/certs:/app/certs:ro
@@ -406,7 +409,7 @@ services:
     - MTLS_CLIENT_KEY=/app/certs/client.key
     labels:
     - traefik.enable=true
-    - traefik.http.routers.api.rule=PathPrefix(`/api`) || PathPrefix(`/health`) || PathPrefix(`/docs`) || PathPrefix(`/openapi.json`)
+    - traefik.http.routers.api.rule=PathPrefix(`/api`) || PathPrefix(`/health`) || PathPrefix(`/docs`) || PathPrefix(`/openapi.json`) || PathPrefix(`/ws`) || PathPrefix(`/metrics`)
     - traefik.http.routers.api.entrypoints=web
     - traefik.http.services.api.loadbalancer.server.port=8000
     - traefik.http.routers.api.middlewares=rate-limit@file,compress@file
@@ -435,6 +438,7 @@ services:
     env_file: *id002
     networks: *id003
     logging: *id001
+    build: *id004
     image: alpha-bist-base:latest
     container_name: alpha-ingestion
     mem_limit: 512m
@@ -442,6 +446,8 @@ services:
     command: python -m services.ingestion.main
     volumes:
     - ./services:/app/services:ro
+    - ./models:/app/models:ro
+    - ./proto:/app/proto:ro
     - ./data:/app/data
     - ./.env:/app/.env:ro
     - ./infrastructure/mtls/certs:/app/certs:ro
@@ -477,6 +483,7 @@ services:
     env_file: *id002
     networks: *id003
     logging: *id001
+    build: *id004
     image: alpha-bist-base:latest
     container_name: alpha-feature-engine
     mem_limit: 1g
@@ -485,6 +492,8 @@ services:
     volumes:
     - ./services:/app/services:ro
     - ./ml:/app/ml:ro
+    - ./models:/app/models:ro
+    - ./proto:/app/proto:ro
     - ./data:/app/data
     - ./.env:/app/.env:ro
     - ./infrastructure/mtls/certs:/app/certs:ro
@@ -516,6 +525,7 @@ services:
       redis:
         condition: service_healthy
   market-state:
+    build: *id004
     restart: unless-stopped
     env_file: *id002
     networks: *id003
@@ -530,6 +540,8 @@ services:
     - ./data:/app/data
     - ./.env:/app/.env:ro
     - ./infrastructure/mtls/certs:/app/certs:ro
+    - ./models:/app/models:ro
+    - ./proto:/app/proto:ro
     tmpfs:
     - /tmp:size=8M,mode=1777
     environment:
@@ -557,6 +569,7 @@ services:
       redis:
         condition: service_healthy
   intelligence:
+    build: *id004
     restart: unless-stopped
     env_file: *id002
     networks: *id003
@@ -573,6 +586,8 @@ services:
     - ./data:/app/data
     - ./.env:/app/.env:ro
     - ./infrastructure/mtls/certs:/app/certs:ro
+    - ./models:/app/models:ro
+    - ./proto:/app/proto:ro
     tmpfs:
     - /tmp:size=32M,mode=1777
     environment:
@@ -601,6 +616,7 @@ services:
       redis:
         condition: service_healthy
   simulation:
+    build: *id004
     restart: unless-stopped
     env_file: *id002
     networks: *id003
@@ -616,6 +632,8 @@ services:
     - ./data:/app/data
     - ./.env:/app/.env:ro
     - ./infrastructure/mtls/certs:/app/certs:ro
+    - ./models:/app/models:ro
+    - ./proto:/app/proto:ro
     tmpfs:
     - /tmp:size=16M,mode=1777
     environment:
@@ -644,6 +662,7 @@ services:
       redis:
         condition: service_healthy
   risk:
+    build: *id004
     restart: unless-stopped
     env_file: *id002
     networks: *id003
@@ -658,6 +677,8 @@ services:
     - ./data:/app/data
     - ./.env:/app/.env:ro
     - ./infrastructure/mtls/certs:/app/certs:ro
+    - ./models:/app/models:ro
+    - ./proto:/app/proto:ro
     tmpfs:
     - /tmp:size=8M,mode=1777
     environment:
@@ -683,6 +704,7 @@ services:
       redis:
         condition: service_healthy
   portfolio:
+    build: *id004
     restart: unless-stopped
     env_file: *id002
     networks: *id003
@@ -697,6 +719,8 @@ services:
     - ./data:/app/data
     - ./.env:/app/.env:ro
     - ./infrastructure/mtls/certs:/app/certs:ro
+    - ./models:/app/models:ro
+    - ./proto:/app/proto:ro
     tmpfs:
     - /tmp:size=8M,mode=1777
     environment:
@@ -722,6 +746,7 @@ services:
       redis:
         condition: service_healthy
   learning:
+    build: *id004
     restart: unless-stopped
     stop_grace_period: 15s
     env_file: *id002
@@ -738,6 +763,8 @@ services:
     - ./data:/app/data
     - ./.env:/app/.env:ro
     - ./infrastructure/mtls/certs:/app/certs:ro
+    - ./models:/app/models
+    - ./proto:/app/proto:ro
     tmpfs:
     - /tmp:size=16M,mode=1777
     deploy:
@@ -775,6 +802,7 @@ services:
       redis:
         condition: service_healthy
   celery-worker:
+    build: *id004
     restart: unless-stopped
     env_file: *id002
     networks: *id003
@@ -799,6 +827,8 @@ services:
     - ./data:/app/data
     - ./.env:/app/.env:ro
     - ./infrastructure/mtls/certs:/app/certs:ro
+    - ./models:/app/models:ro
+    - ./proto:/app/proto:ro
     tmpfs:
     - /tmp:size=16M,mode=1777
     environment:
@@ -939,6 +969,7 @@ services:
     - --web.enable-lifecycle
     volumes:
     - ./infrastructure/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    - ./infrastructure/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
     - prometheus_data:/prometheus
     healthcheck:
       test:
@@ -1032,6 +1063,7 @@ services:
   autoheal:
     image: willfarrell/autoheal
     restart: always
+    container_name: alpha-autoheal
     networks: *id003
     logging: *id001
     mem_limit: 32m

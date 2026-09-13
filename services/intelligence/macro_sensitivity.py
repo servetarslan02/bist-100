@@ -283,3 +283,9 @@ class MacroSensitivityEngine:
 
 # Singleton
 macro_sensitivity_engine = MacroSensitivityEngine()
+
+__all__ = [
+    "MacroSensitivityEngine",
+    "SECTOR_MACRO_SENSITIVITY",
+    "macro_sensitivity_engine",
+]

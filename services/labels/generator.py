@@ -137,7 +137,7 @@ class LabelGenerator:
                 labels[f"y_{period}d_vs_benchmark"] = bench_fwd
                 labels[f"y_{period}d_outperform"] = np.where(bench_fwd > 0, 1, 0).astype(float)
                 labels[f"y_{period}d_outperform"] = np.where(
-                    np.isnan(bench_fwd), np.nan, labels[f"y_{period}d_outperform"]
+                    np.isnan(bench_fwd), np.nan, labels[f"y_{period}d_outperform"],
                 )
 
         # Max drawdown (forward 20 gün)
@@ -174,7 +174,7 @@ class LabelGenerator:
             valid_mask[-purge_days:] = False
 
         # Valid mask (en az bir label hesaplanabilir mi?)
-        for label_name, label_values in labels.items():
+        for _label_name, label_values in labels.items():
             valid_mask = valid_mask & ~np.isnan(label_values)
 
         # İstatistikler
@@ -277,7 +277,7 @@ class LabelGenerator:
                     f"y_{period}d_vs_sector",
                     f"y_{period}d_vs_benchmark",
                     f"y_{period}d_outperform",
-                ]
+                ],
             )
         names.extend(["y_max_dd_20d", "y_volatility_20d"])
         return names

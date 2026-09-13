@@ -72,9 +72,50 @@ class TradePlan:
     horizon: str = ""  # 1-5D | 1-4W | 1-6M
     entry_window: str = ""  # "Bugün", "Bu hafta", vb.
 
+    def __repr__(self) -> str:
+        return (
+            f"<TradePlan ticker={self.ticker!r} action={self.action} dir={self.direction} "
+            f"entry=₺{self.entry_price:.2f} t1=₺{self.target_price_1:.2f} sl=₺{self.stop_loss:.2f} "
+            f"rr={self.risk_reward_ratio:.2f}>"
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serileştirilebilir sözlük çıktısı döner."""
+        return {
+            "ticker": self.ticker,
+            "timestamp": self.timestamp.isoformat(),
+            "action": self.action,
+            "conviction": self.conviction,
+            "direction": self.direction,
+            "entry_price": self.entry_price,
+            "entry_type": self.entry_type,
+            "target_price_1": self.target_price_1,
+            "target_price_2": self.target_price_2,
+            "target_price_3": self.target_price_3,
+            "stop_loss": self.stop_loss,
+            "stop_type": self.stop_type,
+            "expected_return_pct": self.expected_return_pct,
+            "expected_loss_pct": self.expected_loss_pct,
+            "risk_reward_ratio": self.risk_reward_ratio,
+            "scenario_bull": self.scenario_bull,
+            "scenario_base": self.scenario_base,
+            "scenario_bear": self.scenario_bear,
+            "suggested_position_pct": self.suggested_position_pct,
+            "max_loss_pct": self.max_loss_pct,
+            "reasons": self.reasons,
+            "risks": self.risks,
+            "spec_score": self.spec_score,
+            "spec_category": self.spec_category,
+            "horizon": self.horizon,
+            "entry_window": self.entry_window,
+        }
+
 
 class TradePlanner:
     """İşlem planı oluşturucu."""
+
+    def __repr__(self) -> str:
+        return "<TradePlanner>"
 
     def create_plan(
         self,
@@ -526,3 +567,10 @@ def format_trade_plan(plan: TradePlan) -> str:
 
 # Singleton
 trade_planner = TradePlanner()
+
+__all__ = [
+    "TradePlan",
+    "TradePlanner",
+    "format_trade_plan",
+    "trade_planner",
+]

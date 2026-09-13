@@ -12,13 +12,83 @@ import re
 import time
 import urllib.parse
 from datetime import UTC, datetime, timedelta, timezone
+import xml.etree.ElementTree as ET
 from typing import Any
 
 import aiohttp
-import feedparser
+
+try:
+    import feedparser
+except ImportError:
+    feedparser = None  # type: ignore[assignment]
+
 import structlog
 
 logger = structlog.get_logger()
+
+
+def _parse_rss_entries(content: str) -> list[dict[str, Any]]:
+    """RSS veya Atom XML içeriğini parse eder (feedparser veya ElementTree fallback)."""
+    if feedparser is not None:
+        try:
+            feed = feedparser.parse(content)
+            entries: list[dict[str, Any]] = []
+            for e in getattr(feed, "entries", []):
+                t = e.get("title", "") if isinstance(e, dict) else getattr(e, "title", "")
+                s = e.get("summary", "") if isinstance(e, dict) else (getattr(e, "summary", "") or getattr(e, "description", ""))
+                l = e.get("link", "") if isinstance(e, dict) else getattr(e, "link", "")
+                p = e.get("published", "") if isinstance(e, dict) else (getattr(e, "published", "") or getattr(e, "pubDate", ""))
+                parsed_time = getattr(e, "published_parsed", None)
+                entries.append({
+                    "title": t or "",
+                    "summary": s or "",
+                    "link": l or "",
+                    "published": p or "",
+                    "published_parsed": parsed_time,
+                })
+            if entries:
+                return entries
+        except Exception:
+            pass
+
+    # Saf Python ElementTree fallback
+    entries = []
+    try:
+        root = ET.fromstring(content)
+        items = root.findall(".//item")
+        if not items:
+            items = root.findall(".//{http://www.w3.org/2005/Atom}entry") or root.findall(".//entry")
+
+        for it in items:
+            def _find_text(names: list[str]) -> str:
+                for n in names:
+                    el = it.find(n)
+                    if el is not None and el.text:
+                        return el.text.strip()
+                    el_atom = it.find(f"{{http://www.w3.org/2005/Atom}}{n}")
+                    if el_atom is not None and el_atom.text:
+                        return el_atom.text.strip()
+                return ""
+
+            title = _find_text(["title"])
+            summary = _find_text(["description", "summary", "content"])
+            link = _find_text(["link"])
+            if not link:
+                link_el = it.find("link") or it.find("{http://www.w3.org/2005/Atom}link")
+                if link_el is not None:
+                    link = link_el.get("href", "") or ""
+            pub = _find_text(["pubDate", "published", "updated", "date"])
+
+            entries.append({
+                "title": title,
+                "summary": summary,
+                "link": link,
+                "published": pub,
+                "published_parsed": None,
+            })
+    except Exception as exc:
+        logger.debug("rss_xml_fallback_parse_hatasi", error=str(exc))
+    return entries
 
 # Varsayılan sabitler
 DEFAULT_NEWS_MAX_ITEMS: int = 50
@@ -447,8 +517,8 @@ class NewsProvider:
                 async with session.get(feed_url, timeout=aiohttp.ClientTimeout(total=DEFAULT_RSS_TIMEOUT_TOTAL, connect=DEFAULT_RSS_TIMEOUT_CONNECT)) as resp:
                     if resp.status == 200:
                         content = await resp.text()
-                        feed = feedparser.parse(content)
-                        for entry in feed.entries[:DEFAULT_FEED_ENTRIES_LIMIT]:
+                        entries = _parse_rss_entries(content)
+                        for entry in entries[:DEFAULT_FEED_ENTRIES_LIMIT]:
                             t = entry.get("title", "")
                             s = entry.get("summary", "")
 
@@ -519,8 +589,8 @@ class NewsProvider:
                 async with session.get(url, timeout=aiohttp.ClientTimeout(total=DEFAULT_KAP_TIMEOUT)) as resp:
                     if resp.status == 200:
                         content = await resp.text()
-                        feed = feedparser.parse(content)
-                        for entry in feed.entries[:max_items]:
+                        entries = _parse_rss_entries(content)
+                        for entry in entries[:max_items]:
                             t = entry.get("title", "")
                             s = entry.get("summary", "")
 
@@ -576,8 +646,8 @@ class NewsProvider:
                 async with session.get(url, timeout=aiohttp.ClientTimeout(total=DEFAULT_KAP_TIMEOUT)) as resp:
                     if resp.status == 200:
                         content = await resp.text()
-                        feed = feedparser.parse(content)
-                        for entry in feed.entries[:max_items]:
+                        entries = _parse_rss_entries(content)
+                        for entry in entries[:max_items]:
                             t = entry.get("title", "")
                             s = entry.get("summary", "")
 
@@ -639,8 +709,8 @@ class NewsProvider:
                 async with session.get(url, timeout=aiohttp.ClientTimeout(total=DEFAULT_TICKER_TIMEOUT)) as resp:
                     if resp.status == 200:
                         content = await resp.text()
-                        feed = feedparser.parse(content)
-                        for entry in feed.entries[:max_items]:
+                        entries = _parse_rss_entries(content)
+                        for entry in entries[:max_items]:
                             t = entry.get("title", "")
                             s = entry.get("summary", "")
                             all_news.append(

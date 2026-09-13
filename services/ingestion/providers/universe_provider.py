@@ -272,7 +272,29 @@ class LiveUniverseScraper:
         Returns:
             Sektör string'i.
         """
-        # 1. TradingView sektör eşlemesi
+        # 1. Öncelikli Holding Tespiti (Holdingler TV'de karmaşık sektörlerde yer alır)
+        name_u = (name or "").upper()
+        ticker_u = (ticker or "").upper()
+        if "HOLDING" in name_u or "YATIRIM ORTAKLIGI" in name_u:
+            return "HOLDING"
+
+        ind_u = (tv_industry or "").upper()
+
+        # 2. Otomotiv & Yan Sanayi (FROTO, TOASO, DOAS, TTRAK, OTKAR, BRISA vb.)
+        if any(w in ind_u for w in ["MOTOR VEHICLES", "AUTOMOTIVE", "TRUCKS", "AGRICULTURAL MACHINERY"]) or \
+           any(w in name_u for w in ["OTOMOTIV", "OTOMOBIL", "TRAKTOR", "LASTIK SANAYI"]):
+            return "OTOMOTIV"
+
+        # 3. Havacılık & Ulaştırma (THYAO, PGSUS, TAVHL, CLEBI, Lojistik vb.)
+        if tv_sector == "Transportation" or any(w in ind_u for w in ["AIRLINES", "AIR FREIGHT", "TRANSPORTATION", "MARINE", "TRUCKING"]) or \
+           any(w in name_u for w in ["HAVAYOLLARI", "HAVACILIK", "HAVA TAŞIMA", "HAVA TASIMA", "HAVA SERVISI", "HAVA LIMAN"]):
+            return "HAVACILIK"
+
+        # 4. GYO & Gayrimenkul
+        if any(w in ind_u for w in ["REAL ESTATE", "REIT"]) or "GYO" in ticker_u or "GAYRIMENKUL" in name_u:
+            return "GAYRIMENKUL"
+
+        # 5. TradingView birincil sektör & endüstri eşlemesi (GICS Taksonomisi)
         if tv_sector:
             sec_map = {
                 "Commercial Services": "HIZMET",
@@ -285,82 +307,58 @@ class LiveUniverseScraper:
                 "Energy Minerals": "ENERJI",
                 "Finance": (
                     "BANKACILIK"
-                    if any(w in ticker for w in [
-                        "BNK", "ISCTR", "GARAN", "AKBNK",
-                        "YKBNK", "HALKB", "VAKBN", "TSKB", "ALBRK",
-                    ])
-                    else "FINANS"
+                    if ("BANK" in ind_u or "BANK" in name_u)
+                    else (
+                        "SIGORTA"
+                        if ("INSUR" in ind_u or "SIGORTA" in name_u)
+                        else "FINANS"
+                    )
                 ),
                 "Health Services": "SAGLIK",
                 "Health Technology": "SAGLIK",
                 "Industrial Services": "SANAYI",
-                "Non-Energy Minerals": "MADENCILIK",
-                "Process Industries": "KIMYA",
+                "Non-Energy Minerals": "CIMENTO" if any(w in ind_u for w in ["CONSTRUCTION", "BUILDING", "PRECIOUS METALS"]) else "MADENCILIK",
+                "Process Industries": "CIMENTO" if any(w in ind_u for w in ["CEMENT", "BUILDING PRODUCTS"]) else "KIMYA",
                 "Producer Manufacturing": "SANAYI",
+                "Real Estate": "GAYRIMENKUL",
                 "Retail Trade": "PERAKENDE",
                 "Technology Services": "TEKNOLOJI",
-                "Transportation": (
-                    "HAVACILIK"
-                    if any(w in ticker for w in ["THYAO", "PGSUS", "TAVHL", "CLEBI"])
-                    else "ULASTIRMA"
-                ),
+                "Transportation": "HAVACILIK",
                 "Utilities": "ENERJI",
+                "Miscellaneous": "HOLDING",
             }
             if tv_sector in sec_map:
                 return sec_map[tv_sector]
 
-        # 2. Anahtar kelime eşlemesi
-        name_u = (name + " " + ticker).upper()
-        _BANK_KEYS = ["BANK", "BANKASI", "GARAN", "AKBNK", "ISCTR", "YKBNK", "HALKB", "VAKBN", "TSKB", "ALBRK", "QNB"]
-        if any(w in name_u for w in _BANK_KEYS):
+        # 6. Yedek kaynaklar için unvan anahtar kelime eşlemesi
+        if "BANK" in name_u or "BANKASI" in name_u or "KATILIM" in name_u:
             return "BANKACILIK"
-        if any(w in name_u for w in ["GYO", "GAYRIMENKUL", "KONUT"]):
+        if "GYO" in name_u or "GAYRIMENKUL" in name_u or "KONUT" in name_u:
             return "GAYRIMENKUL"
-        if any(w in name_u for w in ["HAVACILIK", "HAVAYOLLARI", "THYAO", "PGSUS", "TAVHL", "CLEBI"]):
+        if "HAVACILIK" in name_u or "HAVAYOLLARI" in name_u or "AIRLINES" in name_u:
             return "HAVACILIK"
-        if any(w in name_u for w in ["SAVUNMA", "ASELS", "SDTTR"]):
-            return "SAVUNMA"
-        _TECH_KEYS = [
-            "YAZILIM", "TEKNOLOJI", "BILISIM",
-            "KFEIN", "LOGO", "MIATK", "VBTYZ", "ARDYZ", "FONET", "REEDR", "BINHO",
-        ]
-        if any(w in name_u for w in _TECH_KEYS):
-            return "TEKNOLOJI"
-        _ENERGY_KEYS = [
-            "ENERJI", "ELEKTRIK", "SOLAR", "PETROL",
-            "TUPRS", "ASTOR", "ENJSA", "AKSEN", "EUPWR", "KONTR", "CWENE", "YEOTK",
-        ]
-        if any(w in name_u for w in _ENERGY_KEYS):
-            return "ENERJI"
-        _SANAY_KEYS = [
-            "DEMIR", "CELIK", "SANAYI",
-            "EREGL", "KRDMD", "SISE", "ARCLK", "VESTL", "CIMSA", "AKCNS", "BOBET", "KCAER",
-        ]
-        if any(w in name_u for w in _SANAY_KEYS):
-            return "SANAYI"
-        _HOLD_KEYS = [
-            "HOLDING", "YATIRIM",
-            "KCHOL", "SAHOL", "ALARK", "ENKAI", "AGHOL", "DOHOL", "BERA", "TKFEN",
-        ]
-        if any(w in name_u for w in _HOLD_KEYS):
-            return "HOLDING"
-        _FOOD_KEYS = [
-            "GIDA", "MARKET", "PERAKENDE",
-            "BIMAS", "MGROS", "CCOLA", "ULKER", "SOKM", "AEFES", "TATGD",
-        ]
-        if any(w in name_u for w in _FOOD_KEYS):
-            return "PERAKENDE"
-        if any(w in name_u for w in ["OTOMOTIV", "OTO", "FROTO", "TOASO", "TTRAK", "DOAS", "OTKAR", "KARSAN"]):
-            return "OTOMOTIV"
-        if any(w in name_u for w in ["SIGORTA", "EMEKLI", "ANSGR", "ANHYT", "TURSG", "AGESA"]):
-            return "SIGORTA"
-        if any(w in name_u for w in ["TELEKOM", "ILETISIM", "TCELL", "TTKOM"]):
+        if "TELEKOM" in name_u or "ILETISIM" in name_u or "TELECOMMUNICATION" in name_u:
             return "TELEKOM"
-        if any(w in name_u for w in ["SAGLIK", "ILAC", "HASTANE", "GENIL", "ECILC", "MPARK"]):
+        if "SAVUNMA" in name_u:
+            return "SAVUNMA"
+        if "YAZILIM" in name_u or "TEKNOLOJI" in name_u or "BILISIM" in name_u or "SOFTWARE" in name_u:
+            return "TEKNOLOJI"
+        if "ENERJI" in name_u or "ELEKTRIK" in name_u or "SOLAR" in name_u or "PETROL" in name_u or "RAFINERI" in name_u:
+            return "ENERJI"
+        if "DEMIR" in name_u or "CELIK" in name_u or "SANAYI" in name_u or "METAL" in name_u:
+            return "SANAYI"
+        if "GIDA" in name_u or "MARKET" in name_u or "PERAKENDE" in name_u or "ICECEK" in name_u or "UNLU" in name_u:
+            return "PERAKENDE"
+        if "SIGORTA" in name_u or "EMEKLILIK" in name_u or "HAYAT" in name_u:
+            return "SIGORTA"
+        if "SAGLIK" in name_u or "ILAC" in name_u or "HASTANE" in name_u:
             return "SAGLIK"
-        if any(w in name_u for w in ["MADEN", "MADENCILIK", "ALTIN", "KOZAL", "KOZAA", "IPEKE"]):
+        if "MADEN" in name_u or "MADENCILIK" in name_u or "ALTIN" in name_u or "CIMENTO" in name_u:
             return "MADENCILIK"
-        if any(w in name_u for w in ["KIMYA", "PETKIM", "PETKM", "AKSA", "SASA", "HEKTS", "GUBRF"]):
+        if "KIMYA" in name_u or "GUBRE" in name_u or "PLASTIK" in name_u or "BOYA" in name_u:
+            return "KIMYA"
+        return "DIGER"
+        if "KIMYA" in name_u or "GUBRE" in name_u or "PLASTIK" in name_u or "BOYA" in name_u:
             return "KIMYA"
         return "DIGER"
 

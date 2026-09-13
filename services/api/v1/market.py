@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from collections import defaultdict
 from datetime import UTC, datetime
 from typing import Any
@@ -43,77 +44,40 @@ BILINEN_SIRKETLER: dict[str, dict[str, Any]] = {
     "ENJSA": {"name": "Enerjisa Enerji", "sector": "Elektrik & Enerji"},
 }
 
-# Sektör eşleme sözlüğü
-SEKTOR_ESLEME: dict[str, str] = {
-    "AKBNK": "Bankacılık & Finans",
-    "GARAN": "Bankacılık & Finans",
-    "ISCTR": "Bankacılık & Finans",
-    "YKBNK": "Bankacılık & Finans",
-    "VAKBN": "Bankacılık & Finans",
-    "HALKB": "Bankacılık & Finans",
-    "TSKB": "Bankacılık & Finans",
-    "ALBRK": "Bankacılık & Finans",
-    "SKBNK": "Bankacılık & Finans",
-    "KCHOL": "Holding & Yatırım",
-    "SAHOL": "Holding & Yatırım",
-    "DOHOL": "Holding & Yatırım",
-    "AGHOL": "Holding & Yatırım",
-    "SISE": "Holding & Yatırım",
-    "ALARK": "Holding & Yatırım",
-    "ENKAI": "Holding & Yatırım",
-    "TKFEN": "Holding & Yatırım",
-    "GLYHO": "Holding & Yatırım",
-    "THYAO": "Havacılık & Ulaştırma",
-    "PGSUS": "Havacılık & Ulaştırma",
-    "TAVHL": "Havacılık & Ulaştırma",
-    "CLEBI": "Havacılık & Ulaştırma",
-    "GSDHO": "Havacılık & Ulaştırma",
-    "TMSN": "Havacılık & Ulaştırma",
-    "TUPRS": "Enerji & Petrol Rafineri",
-    "ASTOR": "Enerji & Petrol Rafineri",
-    "ENJSA": "Enerji & Petrol Rafineri",
-    "AKFYE": "Enerji & Petrol Rafineri",
-    "GWIND": "Enerji & Petrol Rafineri",
-    "BIOEN": "Enerji & Petrol Rafineri",
-    "CWENE": "Enerji & Petrol Rafineri",
-    "EUPWR": "Enerji & Petrol Rafineri",
-    "SMRTG": "Enerji & Petrol Rafineri",
-    "EREGL": "Sanayi & Demir-Çelik",
-    "KRDMD": "Sanayi & Demir-Çelik",
-    "SASA": "Sanayi & Demir-Çelik",
-    "HEKTS": "Sanayi & Demir-Çelik",
-    "KORDS": "Sanayi & Demir-Çelik",
-    "BRSAN": "Sanayi & Demir-Çelik",
-    "ASELS": "Savunma & Teknoloji",
-    "MIATK": "Savunma & Teknoloji",
-    "REEDR": "Savunma & Teknoloji",
-    "VBTYZ": "Savunma & Teknoloji",
-    "SDTTR": "Savunma & Teknoloji",
-    "KFEIN": "Savunma & Teknoloji",
-    "FROTO": "Otomotiv & Yan Sanayi",
-    "TOASO": "Otomotiv & Yan Sanayi",
-    "DOAS": "Otomotiv & Yan Sanayi",
-    "TTRAK": "Otomotiv & Yan Sanayi",
-    "OTKAR": "Otomotiv & Yan Sanayi",
-    "BRISA": "Otomotiv & Yan Sanayi",
-    "BIMAS": "Perakende, Gıda & İçecek",
-    "MGROS": "Perakende, Gıda & İçecek",
-    "CCOLA": "Perakende, Gıda & İçecek",
-    "AEFES": "Perakende, Gıda & İçecek",
-    "SOKM": "Perakende, Gıda & İçecek",
-    "ULKER": "Perakende, Gıda & İçecek",
-    "EKGYO": "GYO & Gayrimenkul",
-    "SNGYO": "GYO & Gayrimenkul",
-    "TRGYO": "GYO & Gayrimenkul",
-    "ISGYO": "GYO & Gayrimenkul",
-    "KLGYO": "GYO & Gayrimenkul",
-    "OZKGY": "GYO & Gayrimenkul",
-    "TCELL": "Telekomünikasyon & İletişim",
-    "TTKOM": "Telekomünikasyon & İletişim",
-    "OYAKC": "Çimento & Madencilik",
-    "CIMSA": "Çimento & Madencilik",
-    "KOZAL": "Çimento & Madencilik",
-}
+def _sektor_etiketi_belirle(raw_sec: str) -> str:
+    """BIST evreninden gelen dinamik sektör kodunu arayüz kategori adına eşler.
+
+    Args:
+        raw_sec: Dinamik kaynaklardan gelen ham sektör adı.
+
+    Returns:
+        str: Isı haritası standart sektör kategori adı.
+    """
+    s = (raw_sec or "").upper()
+    if any(k in s for k in ["BANKA", "FINANS", "SIGORTA", "FAKTOR"]):
+        return "Bankacılık & Finans"
+    if "HOLD" in s:
+        return "Holding & Yatırım"
+    if any(k in s for k in ["HAVA", "ULAS", "LOJISTIK"]):
+        return "Havacılık & Ulaştırma"
+    if any(k in s for k in ["ENERJ", "PETROL", "GAZ", "ELEKTRIK"]):
+        return "Enerji & Petrol Rafineri"
+    if any(k in s for k in ["SAVUN", "TEKNO", "YAZIL", "BILISIM"]):
+        return "Savunma & Teknoloji"
+    if "OTO" in s:
+        return "Otomotiv & Yan Sanayi"
+    if any(k in s for k in ["GIDA", "PERAKENDE", "ICECEK", "MAGAZA", "TARIM", "TICARET"]):
+        return "Perakende, Gıda & İçecek"
+    if any(k in s for k in ["GYO", "GAYRIMENKUL", "INSAAT", "KONUT"]):
+        return "GYO & Gayrimenkul"
+    if any(k in s for k in ["TELEKOM", "ILETISIM"]):
+        return "Telekomünikasyon & İletişim"
+    if any(k in s for k in ["CIMENTO", "MADEN", "TAS", "TOPRAK"]):
+        return "Çimento & Madencilik"
+    if any(k in s for k in ["SANAYI", "DEMIR", "CELIK", "CAM", "KIMYA", "TEKSTIL", "METAL"]):
+        return "Sanayi & Demir-Çelik"
+    return "Diğer Sektörler"
+
 
 
 def _hesapla_rsi(closes: list[float], period: int = 14) -> float:
@@ -209,6 +173,80 @@ def _hesapla_oneri(rsi_14: float, latest_price: float, sma_20: float, support: f
 # =====================================================
 
 
+async def _get_full_bist_breadth() -> dict[str, Any] | None:
+    """TradingView Scanner API üzerinden Borsa İstanbul'daki tüm hisseleri (600+ hisse) tarayarak
+    piyasa genişliği (advancing, declining, total, rsi_list) hesaplar.
+    Sonuçlar 120 saniye boyunca Redis'te önbelleğe alınır.
+    """
+    from ...core.redis_helper import get_cached, set_cached
+
+    cache_key = "bist:full:breadth"
+    cached = get_cached(cache_key)
+    if cached and isinstance(cached, dict) and cached.get("total", 0) > 0:
+        return cached
+
+    url = "https://scanner.tradingview.com/turkey/scan"
+    payload = {
+        "filter": [{"left": "type", "operation": "equal", "right": "stock"}],
+        "options": {"lang": "tr"},
+        "symbols": {"query": {"types": []}, "tickers": []},
+        "columns": ["name", "change", "close", "RSI"],
+        "sort": {"sortBy": "name", "sortOrder": "asc"},
+        "range": [0, 1000],
+    }
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Accept": "application/json",
+    }
+    try:
+        import httpx
+
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            resp = await client.post(url, json=payload, headers=headers)
+            if resp.status_code == 200:
+                data = resp.json().get("data", [])
+                advancing = 0
+                declining = 0
+                total = 0
+                rsi_list: list[float] = []
+
+                for row in data:
+                    cols = row.get("d", [])
+                    if len(cols) < 4:
+                        continue
+                    chg = cols[1]
+                    rsi = cols[3]
+
+                    if chg is not None:
+                        try:
+                            chg_val = float(chg)
+                            if chg_val > 0.001:
+                                advancing += 1
+                            elif chg_val < -0.001:
+                                declining += 1
+                            total += 1
+                        except (ValueError, TypeError):
+                            pass
+
+                    if rsi is not None:
+                        with contextlib.suppress(ValueError, TypeError):
+                            rsi_list.append(float(rsi))
+
+                if total > 0:
+                    result = {
+                        "advancing": advancing,
+                        "declining": declining,
+                        "total": total,
+                        "rsi_list": rsi_list,
+                    }
+                    set_cached(cache_key, result, ttl=120)
+                    return result
+    except Exception as exc:
+        logger.warning("BIST tam piyasa genisligi tarama hatasi", hata=str(exc))
+
+    return None
+
+
 @router.get("/state")
 async def market_state(
     user=Depends(get_current_user),
@@ -233,23 +271,39 @@ async def market_state(
         if regime == "UNKNOWN" or not regime:
             regime = "BILINMEYEN"
 
-        radar_items = get_cached("radar:data")
-
         advancing = 0
         declining = 0
         total = 0
         rsi_list: list[float] = []
 
-        if radar_items and isinstance(radar_items, list) and len(radar_items) > 0:
-            for item in radar_items:
-                chg = item.get("change", 0.0)
-                if chg > 0:
-                    advancing += 1
-                elif chg < 0:
-                    declining += 1
-                total += 1
-                if item.get("rsi"):
-                    rsi_list.append(item["rsi"])
+        # 1. Öncelik: Tüm BIST evrenini (600+ hisse) kapsayan tam piyasa genişliği
+        full_breadth = await _get_full_bist_breadth()
+        if full_breadth:
+            advancing = full_breadth["advancing"]
+            declining = full_breadth["declining"]
+            total = full_breadth["total"]
+            rsi_list = full_breadth.get("rsi_list", [])
+        else:
+            # 2. Öncelik Fallback: Radar verisi (Top 50)
+            radar_items = get_cached("radar:data")
+            if radar_items and isinstance(radar_items, list) and len(radar_items) > 0:
+                for item in radar_items:
+                    raw_chg = item.get("change_pct") if item.get("change_pct") is not None else item.get("change", 0.0)
+                    try:
+                        chg_val = float(raw_chg)
+                    except (ValueError, TypeError):
+                        chg_val = 0.0
+
+                    if chg_val > 0.001:
+                        advancing += 1
+                    elif chg_val < -0.001:
+                        declining += 1
+                    total += 1
+
+                    raw_rsi = item.get("rsi")
+                    if raw_rsi is not None:
+                        with contextlib.suppress(ValueError, TypeError):
+                            rsi_list.append(float(raw_rsi))
 
         if total == 0:
             raise HTTPException(
@@ -433,7 +487,10 @@ async def live_intel_analysis(
         from ...data.data_source import data_source
 
         raw_chart = data_source.get_stock_data(yf_ticker, period=period, interval=interval)
-        raw_daily = data_source.get_stock_data(yf_ticker, period="6mo", interval="1d")
+        if period == "6mo" and interval == "1d":
+            raw_daily = raw_chart
+        else:
+            raw_daily = data_source.get_stock_data(yf_ticker, period="6mo", interval="1d")
 
         def _clean_polars_df(d: Any) -> pl.DataFrame | None:
             """Veri kaynağını standardize edilmiş Polars DataFrame'e dönüştürür."""
@@ -454,25 +511,44 @@ async def live_intel_analysis(
         df = _clean_polars_df(raw_daily)
 
         if df is None or df.is_empty() or len(df) < 2:
-            df = df_chart
+            try:
+                # Önbellek baypas edilerek doğrudan canlı Yahoo Finance kaynağından çekmeyi dene
+                fallback_chart = data_source.get_stock_data(
+                    yf_ticker, period=period, interval=interval, source_priority=["yahoo", "bist"]
+                )
+                if fallback_chart is not None and not fallback_chart.is_empty():
+                    df_chart = _clean_polars_df(fallback_chart)
+                if period == "6mo" and interval == "1d":
+                    df = df_chart
+                else:
+                    fallback_daily = data_source.get_stock_data(
+                        yf_ticker, period="6mo", interval="1d", source_priority=["yahoo", "bist"]
+                    )
+                    if fallback_daily is not None and not fallback_daily.is_empty():
+                        df = _clean_polars_df(fallback_daily)
+            except Exception as e:
+                logger.debug("canli_kaynak_fallback_hatasi", hisse=ticker, hata=str(e))
 
         if df is None or df.is_empty() or len(df) < 2:
+            df = df_chart
+
+        if df is None or df.is_empty() or len(df) < 1:
             raise HTTPException(
-                status_code=503,
-                detail=f"{ticker} için fiyat verisi alınamadı.",
+                status_code=404,
+                detail=f"{ticker} sembolü için piyasa fiyat verisi bulunamadı.",
             )
 
         df = df.drop_nulls(subset=["Close", "Open", "High", "Low"])
-        if len(df) < 2:
+        if df.is_empty():
             raise HTTPException(
-                status_code=503,
-                detail=f"{ticker} için yeterli veri yok.",
+                status_code=404,
+                detail=f"{ticker} için geçerli fiyat verisi yok.",
             )
 
         closes_list = [float(c) for c in df["Close"].to_list()]
         latest_price = round(closes_list[-1], 2)
-        prev_price = round(closes_list[-2], 2)
-        change_pct = round(float(((latest_price - prev_price) / prev_price) * 100), 2) if prev_price else 0.0
+        prev_price = round(closes_list[-2], 2) if len(closes_list) >= 2 else latest_price
+        change_pct = round(float(((latest_price - prev_price) / prev_price) * 100), 2) if (prev_price and prev_price > 0) else 0.0
 
         # Redis canlı tick senkronizasyonu
         try:
@@ -491,10 +567,26 @@ async def live_intel_analysis(
         sma_20 = _hesapla_sma(closes_list, 20)
         sma_50 = _hesapla_sma(closes_list, 50)
 
-        lows_20 = [float(x) for x in df["Low"].tail(20).to_list()]
-        highs_20 = [float(x) for x in df["High"].tail(20).to_list()]
-        support = round(min(lows_20), 2) if lows_20 else latest_price
-        resistance = round(max(highs_20), 2) if highs_20 else latest_price
+        # Destek & Direnç: Klasik Floor Pivot S1 & R1 hesaplaması (günlük tradable seviyeler)
+        last_high = float(df["High"][-1]) if len(df) >= 1 else latest_price
+        last_low = float(df["Low"][-1]) if len(df) >= 1 else latest_price
+        last_close = float(df["Close"][-1]) if len(df) >= 1 else latest_price
+        pivot = (last_high + last_low + last_close) / 3.0
+        pivot_r1 = round(2.0 * pivot - last_low, 2)
+        pivot_s1 = round(2.0 * pivot - last_high, 2)
+
+        # Son 10 günlük swing low / swing high desteği ile harmanla
+        lows_10 = [float(x) for x in df["Low"].tail(10).to_list()]
+        highs_10 = [float(x) for x in df["High"].tail(10).to_list()]
+        swing_support = round(min(lows_10), 2) if lows_10 else latest_price
+        swing_resistance = round(max(highs_10), 2) if highs_10 else latest_price
+
+        support = pivot_s1 if pivot_s1 < latest_price else swing_support
+        resistance = pivot_r1 if pivot_r1 > latest_price else swing_resistance
+        if support >= latest_price:
+            support = round(latest_price * 0.96, 2)
+        if resistance <= latest_price:
+            resistance = round(latest_price * 1.04, 2)
 
         highs_14 = df["High"].tail(14)
         lows_14 = df["Low"].tail(14)
@@ -502,6 +594,30 @@ async def live_intel_analysis(
 
         macd_val, sig_val, macd_signal = _hesapla_macd(closes_list)
         recommendation, rec_text, rec_score = _hesapla_oneri(rsi_14, latest_price, sma_20, support)
+
+        # Temel Analiz ve Finansal Rasyolar (F/K, PD/DD, Piyasa Değeri)
+        pe_ratio: float | None = None
+        pb_ratio: float | None = None
+        market_cap_str: str = "—"
+        try:
+            from ...ingestion.providers.fundamental_provider import FundamentalProvider
+
+            fund_prov = FundamentalProvider()
+            fund_data = await fund_prov.fetch_fundamentals(sym)
+            if fund_data:
+                pe_ratio = round(float(fund_data["pe_ratio"]), 2) if fund_data.get("pe_ratio") is not None else None
+                pb_ratio = round(float(fund_data["pb_ratio"]), 2) if fund_data.get("pb_ratio") is not None else None
+                mcap = fund_data.get("market_cap")
+                if mcap and float(mcap) > 0:
+                    val = float(mcap)
+                    if val >= 1_000_000_000:
+                        market_cap_str = f"₺{val / 1_000_000_000:.1f} Mr"
+                    elif val >= 1_000_000:
+                        market_cap_str = f"₺{val / 1_000_000:.1f} Mn"
+                    else:
+                        market_cap_str = f"₺{val:,.0f}"
+        except Exception as f_err:
+            logger.warning("fundamental_fetch_uyari: sym=%s, hata=%s", sym, f_err)
 
         # Mum grafikleri
         target_df = df_chart if df_chart is not None and not df_chart.is_empty() else df
@@ -536,6 +652,9 @@ async def live_intel_analysis(
             "price": latest_price,
             "prev_price": prev_price,
             "change_pct": change_pct,
+            "market_cap": market_cap_str,
+            "pe_ratio": pe_ratio,
+            "pb_ratio": pb_ratio,
             "rsi_14": rsi_14,
             "sma_20": sma_20,
             "sma_50": sma_50,
@@ -694,22 +813,68 @@ async def market_radar(
     """
     from ...core.redis_helper import get_cached
 
+    # 1. Öncelik: Tam BIST piyasa radarı (600+ hisse)
     try:
-        cached = get_cached("radar:data")
-        if cached and len(cached) > 0:
-            cached_at_raw = get_cached("radar:updated_at")
+        all_cached = get_cached("radar:market:all")
+        if all_cached and isinstance(all_cached, list) and len(all_cached) > 50:
+            cached_at_raw = get_cached("radar:market:updated_at")
             return {
-                "data": cached,
-                "count": len(cached),
+                "data": all_cached[:limit],
+                "count": len(all_cached),
                 "errors": 0,
                 "status": "ok",
                 "cached_at": cached_at_raw,
                 "from_cache": True,
             }
     except Exception as exc:
-        logger.warning("radar_cache_okuma_hatasi: hata=%s", exc)
+        logger.warning("radar_market_all_okuma_hatasi: hata=%s", exc)
 
-    return await _fetch_radar_fresh(limit)
+    # 2. Canlı tarama dene (TradingView 649 hisse)
+    fresh_res = await _fetch_radar_fresh(limit)
+    if fresh_res.get("data") and len(fresh_res["data"]) > 0:
+        return fresh_res
+
+    # 3. Fallback: ML radar listesi (Top 50) normalize edilerek
+    try:
+        cached = get_cached("radar:data")
+        if cached and isinstance(cached, list) and len(cached) > 0:
+            normalized: list[dict[str, Any]] = []
+            for item in cached:
+                sym = item.get("symbol") or item.get("ticker", "BIST")
+                price = float(item.get("price", 0.0))
+                chg = float(item.get("change") if item.get("change") is not None else item.get("change_pct", 0.0))
+                vol_ratio = float(item.get("volume_ratio", 1.0))
+                vol = int(item.get("volume") if item.get("volume") is not None else round(vol_ratio * 1_000_000))
+                high = float(item.get("high") if item.get("high") is not None else item.get("target_price", price * 1.02))
+                low = float(item.get("low") if item.get("low") is not None else item.get("stop_loss", price * 0.98))
+                rsi = float(item.get("rsi", 50.0)) if item.get("rsi") is not None else 50.0
+                score = int(round(float(item.get("score", 50.0))))
+                is_b100 = bool(item.get("isBist100") or item.get("is_bist100", False))
+                normalized.append({
+                    "symbol": sym,
+                    "name": item.get("name", sym),
+                    "price": price,
+                    "change": chg,
+                    "volume": vol,
+                    "high": high,
+                    "low": low,
+                    "rsi": rsi,
+                    "score": score,
+                    "isBist100": is_b100,
+                })
+
+            return {
+                "data": normalized[:limit],
+                "count": len(normalized),
+                "errors": 0,
+                "status": "ok",
+                "cached_at": None,
+                "from_cache": True,
+            }
+    except Exception as exc:
+        logger.warning("radar_fallback_okuma_hatasi: hata=%s", exc)
+
+    return fresh_res
 
 
 async def _fetch_radar_fresh(limit: int = 1000) -> dict[str, Any]:
@@ -911,8 +1076,11 @@ async def _fetch_radar_fresh(limit: int = 1000) -> dict[str, Any]:
     try:
         from ...core.redis_helper import set_cached
 
+        now_iso = datetime.now(UTC).isoformat()
+        set_cached("radar:market:all", results, ttl=180)
+        set_cached("radar:market:updated_at", now_iso, ttl=180)
         set_cached("radar:data", results, ttl=180)
-        set_cached("radar:updated_at", datetime.now(UTC).isoformat(), ttl=180)
+        set_cached("radar:updated_at", now_iso, ttl=180)
     except Exception as exc:
         logger.warning("radar_cache_yazma_hatasi: hata=%s", exc)
 
@@ -971,7 +1139,16 @@ async def market_heatmap(
     from ...core.redis_helper import get_cached
     from ...ingestion.bist_universe import bist_universe
 
-    stock_items = get_cached("radar:data")
+    # 1. Öncelik: Tam BIST piyasa radarı (600+ hisse)
+    stock_items = get_cached("radar:market:all")
+    if not stock_items or not isinstance(stock_items, list) or len(stock_items) < 50:
+        stock_items = get_cached("radar:data")
+
+    # 2. Önbellek boşsa anlık taze tarama yap
+    if not stock_items or not isinstance(stock_items, list) or len(stock_items) == 0:
+        fresh = await _fetch_radar_fresh(1000)
+        stock_items = fresh.get("data", [])
+
     if not stock_items:
         return {
             "status": "unavailable",
@@ -997,51 +1174,32 @@ async def market_heatmap(
     sec_map_raw = getattr(bist_universe, "SECTOR_MAP", {})
     sector_groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
 
-    for item in stock_items:
-        sym = item.get("symbol", "")
-        if sym in SEKTOR_ESLEME:
-            sec_name = SEKTOR_ESLEME[sym]
-        else:
-            raw_sec = sec_map_raw.get(sym, "SANAYI").upper()
-            if "BANKA" in raw_sec or "FINANS" in raw_sec or "SIGORTA" in raw_sec or "FAKTORING" in raw_sec:
-                sec_name = "Bankacılık & Finans"
-            elif "HOLD" in raw_sec:
-                sec_name = "Holding & Yatırım"
-            elif "HAVA" in raw_sec or "ULAS" in raw_sec or "LOJISTIK" in raw_sec:
-                sec_name = "Havacılık & Ulaştırma"
-            elif "ENERJ" in raw_sec or "PETROL" in raw_sec or "GAZ" in raw_sec:
-                sec_name = "Enerji & Petrol Rafineri"
-            elif "SAVUN" in raw_sec or "TEKNO" in raw_sec or "YAZIL" in raw_sec or "BILISIM" in raw_sec:
-                sec_name = "Savunma & Teknoloji"
-            elif "OTO" in raw_sec:
-                sec_name = "Otomotiv & Yan Sanayi"
-            elif (
-                "GIDA" in raw_sec
-                or "PERAKENDE" in raw_sec
-                or "ICECEK" in raw_sec
-                or "MAGAZA" in raw_sec
-                or "TARIM" in raw_sec
-            ):
-                sec_name = "Perakende, Gıda & İçecek"
-            elif "GYO" in raw_sec or "GAYRIMENKUL" in raw_sec or "INSAAT" in raw_sec:
-                sec_name = "GYO & Gayrimenkul"
-            elif "TELEKOM" in raw_sec or "ILETISIM" in raw_sec:
-                sec_name = "Telekomünikasyon & İletişim"
-            elif "CIMENTO" in raw_sec or "MADEN" in raw_sec or "TAS" in raw_sec or "TOPRAK" in raw_sec:
-                sec_name = "Çimento & Madencilik"
-            elif (
-                "SANAYI" in raw_sec
-                or "DEMIR" in raw_sec
-                or "CELIK" in raw_sec
-                or "CAM" in raw_sec
-                or "KIMYA" in raw_sec
-                or "TEKSTIL" in raw_sec
-            ):
-                sec_name = "Sanayi & Demir-Çelik"
-            else:
-                sec_name = "Diğer Sektörler"
+    total_market_volume_val = 0
 
-        sector_groups[sec_name].append(item)
+    for item in stock_items:
+        sym = item.get("symbol") or item.get("ticker", "")
+        if not sym:
+            continue
+
+        raw_sec = sec_map_raw.get(sym, item.get("sector", "DIGER"))
+        sec_name = _sektor_etiketi_belirle(raw_sec)
+
+        # Alan normalizasyonu
+        price = float(item.get("price", 0.0))
+        chg = float(item.get("change") if item.get("change") is not None else item.get("change_pct", 0.0))
+        vol = int(item.get("volume") if item.get("volume") is not None else round(float(item.get("volume_ratio", 1.0)) * 1_000_000))
+        score = int(round(float(item.get("score", 50.0))))
+
+        total_market_volume_val += vol
+
+        sector_groups[sec_name].append({
+            "symbol": sym,
+            "name": item.get("name", sym),
+            "price": price,
+            "change": chg,
+            "volume": vol,
+            "score": score,
+        })
 
     sectors: list[dict[str, Any]] = []
     for sec_name, weight in SEKTOR_AGIRLIK.items():
@@ -1059,11 +1217,11 @@ async def market_heatmap(
             stock_list.append(
                 {
                     "symbol": it.get("symbol"),
-                    "name": it.get("symbol"),
-                    "price": round(float(it.get("price", 100.0)), 2),
+                    "name": it.get("name", it.get("symbol")),
+                    "price": round(float(it.get("price", 0.0)), 2),
                     "change_pct": round(float(it.get("change", 0.0)), 2),
                     "volume": vol_str,
-                    "score": it.get("score", 75),
+                    "score": it.get("score", 50),
                 }
             )
 
@@ -1082,6 +1240,23 @@ async def market_heatmap(
             }
         )
 
-    res: dict[str, Any] = {"status": "ok", "sectors": sectors}
+    total_market_vol_str = (
+        f"{(total_market_volume_val / 1000000000):.1f} Milyar ₺"
+        if total_market_volume_val >= 1000000000
+        else f"{(total_market_volume_val / 1000000):.0f} Milyon ₺"
+    )
+
+    top_sec = max(sectors, key=lambda s: s.get("change_pct", -999)) if sectors else None
+
+    res: dict[str, Any] = {
+        "status": "ok",
+        "sectors": sectors,
+        "total_volume": total_market_vol_str,
+        "total_stocks": len(stock_items),
+        "top_sector": top_sec.get("name") if top_sec else "Genel Piyasa",
+        "top_sector_chg": top_sec.get("change_pct", 0.0) if top_sec else 0.0,
+        "advancing_sectors": sum(1 for s in sectors if s.get("change_pct", 0) > 0),
+        "declining_sectors": sum(1 for s in sectors if s.get("change_pct", 0) < 0),
+    }
     _heatmap_cache.set(res)
     return res

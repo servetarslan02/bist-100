@@ -76,7 +76,7 @@ async def paper_trading_scheduler() -> Any:
 
     await asyncio.sleep(5)
     try:
-        from ...pipeline.startup_catchup import master_catchup
+        from ..pipeline.startup_catchup import master_catchup
 
         logger.info(
             "paper_trading_scheduler: Başlangıç Master Catch-up (Tüm eksik seanslar ve eğitimler) başlatılıyor..."
@@ -111,7 +111,7 @@ async def paper_trading_scheduler() -> Any:
 
         if datetime.now(TR_TZ).weekday() < 5:
             try:
-                from ...pipeline.run_unified_daily import run_eod_signal_cycle, run_morning_execution_cycle
+                from ..pipeline.run_unified_daily import run_eod_signal_cycle, run_morning_execution_cycle
 
                 if phase == "MORNING":
                     logger.info("paper_trading_scheduler: Sabah açılışı yürütme döngüsü başlıyor...")

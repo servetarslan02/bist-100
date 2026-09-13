@@ -165,7 +165,7 @@ class LearningService:
                     timestamp,
                     feature_name,
                     feature_value
-                FROM features
+                FROM alpha_bist.features
                 WHERE timestamp >= now() - INTERVAL 1 YEAR
                 ORDER BY instrument_id, timestamp, feature_name
             """)

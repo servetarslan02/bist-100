@@ -184,11 +184,20 @@ class LSTMTrainingResult:
         )
 
 
-import torch
-import torch.nn as nn
+try:
+    import torch
+    import torch.nn as nn
+
+    HAS_TORCH = True
+    _BaseModule = nn.Module
+except ImportError:
+    torch = None  # type: ignore[assignment]
+    nn = None  # type: ignore[assignment]
+    HAS_TORCH = False
+    _BaseModule = object  # type: ignore[assignment,misc]
 
 
-class AttentionLayer(nn.Module):
+class AttentionLayer(_BaseModule):
     """LSTM zaman adımları çıktılarına ağırlık atayan dikkat (Self-Attention) mekanizması."""
 
     def __init__(self, hidden_size: int) -> None:
@@ -197,11 +206,13 @@ class AttentionLayer(nn.Module):
         Args:
             hidden_size: Giriş gizli durum vektör boyutu.
         """
+        if not HAS_TORCH:
+            raise ImportError("PyTorch (torch) kütüphanesi yüklü değil.")
         super().__init__()
         self.attention = nn.Linear(hidden_size, 1)
         self.softmax = nn.Softmax(dim=1)
 
-    def forward(self, lstm_output: torch.Tensor) -> torch.Tensor:
+    def forward(self, lstm_output: Any) -> Any:
         """Dikkat ağırlıklarını hesaplar ve ağırlıklı bağlam vektörünü döndürür.
 
         Args:
@@ -210,6 +221,8 @@ class AttentionLayer(nn.Module):
         Returns:
             Ağırlıklandırılmış bağlam tensorü `(batch, hidden)`.
         """
+        if not HAS_TORCH:
+            raise ImportError("PyTorch (torch) kütüphanesi yüklü değil.")
         weights = self.attention(lstm_output)
         weights = self.softmax(weights)
         context = torch.sum(weights * lstm_output, dim=1)

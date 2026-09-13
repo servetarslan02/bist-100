@@ -19,47 +19,243 @@ async def run_backtest(
     ticker: str = Query(...),
     period: str = Query("1y"),
     strategy: str = Query("momentum"),
+    initial_capital: float = Query(100_000.0),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
 ) -> dict[str, Any]:
-    """Backtest çalıştırır ve sonucu döndürür.
+    """Backtest çalıştırır ve gerçek sermaye eğrisi ile metrikleri döndürür.
 
     Args:
         ticker: Hisse sembolü (ör. THYAO).
-        period: Backtest süresi (ör. 1y, 2y, 5y).
-        strategy: Strateji adı (ör. momentum, mean_reversion).
+        period: Backtest süresi (ör. 6mo, 1y, 2y, 5y).
+        strategy: Strateji adı (momentum, mean_reversion, breakout).
+        initial_capital: Başlangıç sermayesi.
         user: Kimliği doğrulanmış kullanıcı.
 
     Returns:
-        dict: Backtest durumu ve sonuç bilgisi.
-
-    Raises:
-        HTTPException: Backtest çalıştırılamazsa 500 hatası döner.
+        dict: Backtest durumu, performans metrikleri, equity curve ve işlem defteri.
     """
+    clean_ticker = ticker.strip().upper().replace(".IS", "")
     try:
-        from ...backtest.execution_engine import BacktestEngine
+        from ...data.data_source import YahooFinanceSource
+        import numpy as np
 
-        engine = BacktestEngine()
-        result = await engine.run(ticker=ticker, period=period, strategy=strategy)
+        ys = YahooFinanceSource()
+        df = ys.fetch(ticker=clean_ticker, period=period, interval="1d")
+
+        if df is None or len(df) < 15:
+            # Yedek: yfinance doğrudan
+            import yfinance as yf
+            import polars as pl
+            raw = yf.Ticker(f"{clean_ticker}.IS").history(period=period, interval="1d")
+            if raw is not None and not raw.empty:
+                df = pl.from_pandas(raw.reset_index())
+                if "Date" in df.columns:
+                    df = df.with_columns(pl.col("Date").cast(pl.Datetime).alias("Date"))
+
+        if df is None or len(df) < 10:
+            raise HTTPException(
+                status_code=404,
+                detail=f"{clean_ticker} için yeterli tarihsel fiyat verisi temin edilemedi.",
+            )
+
+        # Veri hazırlığı
+        dates = [str(d)[:10] for d in df["Date"].to_list()]
+        closes = [float(c) for c in df["Close"].to_list()]
+        volumes = [float(v) for v in df["Volume"].to_list()] if "Volume" in df.columns else [100000.0] * len(closes)
+        highs = [float(h) for h in df["High"].to_list()] if "High" in df.columns else closes
+        lows = [float(l) for l in df["Low"].to_list()] if "Low" in df.columns else closes
+
+        # Stratejiye göre sinyal üretimi
+        n = len(closes)
+        strat_key = strategy.lower().strip()
+
+        # Basit Hareketli Ortalamalar (SMA)
+        sma20 = [None] * n
+        sma50 = [None] * n
+        for i in range(n):
+            if i >= 19:
+                sma20[i] = sum(closes[i - 19 : i + 1]) / 20.0
+            if i >= 49:
+                sma50[i] = sum(closes[i - 49 : i + 1]) / 50.0
+
+        # RSI Hesaplama
+        rsi14 = [50.0] * n
+        gains, losses = [], []
+        for i in range(1, n):
+            delta = closes[i] - closes[i - 1]
+            gains.append(max(0.0, delta))
+            losses.append(max(0.0, -delta))
+            if i >= 14:
+                avg_gain = sum(gains[-14:]) / 14.0
+                avg_loss = sum(losses[-14:]) / 14.0
+                rs = avg_gain / max(avg_loss, 1e-6)
+                rsi14[i] = 100.0 - (100.0 / (1.0 + rs))
+
+        # Simülasyon döngüsü
+        cash = initial_capital
+        position_qty = 0
+        entry_price = 0.0
+        entry_date = ""
+        trades = []
+        equity_curve = []
+        peak_equity = initial_capital
+        drawdowns = []
+
+        comm_rate = 0.001  # Binde 1 komisyon
+        slippage_rate = 0.0008  # Binde 0.8 kayma
+
+        for i in range(n):
+            cur_price = closes[i]
+            cur_date = dates[i]
+
+            # Alış/Satış Koşulları
+            buy_signal = False
+            sell_signal = False
+
+            if strat_key == "mean_reversion":
+                buy_signal = (rsi14[i] < 35) and (position_qty == 0)
+                sell_signal = (rsi14[i] > 65 or (entry_price > 0 and cur_price < entry_price * 0.94)) and (position_qty > 0)
+            elif strat_key == "breakout":
+                highest_20 = max(highs[max(0, i - 20) : i]) if i > 20 else cur_price
+                lowest_10 = min(lows[max(0, i - 10) : i]) if i > 10 else cur_price
+                buy_signal = (cur_price > highest_20) and (position_qty == 0)
+                sell_signal = (cur_price < lowest_10 or (entry_price > 0 and cur_price < entry_price * 0.93)) and (position_qty > 0)
+            else:  # Momentum (Varsayılan)
+                s20 = sma20[i]
+                s50 = sma50[i]
+                buy_signal = (s20 is not None and s50 is not None and s20 > s50 and rsi14[i] > 48) and (position_qty == 0)
+                sell_signal = ((s20 is not None and s50 is not None and s20 < s50) or (entry_price > 0 and cur_price < entry_price * 0.93)) and (position_qty > 0)
+
+            # İşlem Uygulama
+            if buy_signal and cash > cur_price * 10:
+                fill_price = cur_price * (1.0 + slippage_rate)
+                invest_amt = cash * 0.95
+                position_qty = int(invest_amt // fill_price)
+                fee = position_qty * fill_price * comm_rate
+                cash -= (position_qty * fill_price + fee)
+                entry_price = fill_price
+                entry_date = cur_date
+
+            elif sell_signal and position_qty > 0:
+                exit_price = cur_price * (1.0 - slippage_rate)
+                gross = position_qty * exit_price
+                fee = gross * comm_rate
+                net_revenue = gross - fee
+                pnl = net_revenue - (position_qty * entry_price)
+                pnl_pct = ((exit_price / entry_price) - 1.0) * 100.0
+
+                trades.append({
+                    "trade_id": len(trades) + 1,
+                    "ticker": clean_ticker,
+                    "side": "LONG",
+                    "entry_date": entry_date,
+                    "exit_date": cur_date,
+                    "entry_price": round(entry_price, 2),
+                    "exit_price": round(exit_price, 2),
+                    "quantity": position_qty,
+                    "pnl": round(pnl, 2),
+                    "pnl_pct": round(pnl_pct, 2),
+                })
+                cash += net_revenue
+                position_qty = 0
+                entry_price = 0.0
+
+            # Günlük portföy net değeri (NAV)
+            cur_equity = cash + (position_qty * cur_price)
+            equity_curve.append({
+                "date": cur_date,
+                "equity": round(cur_equity, 2),
+                "benchmark": round(initial_capital * (closes[i] / max(closes[0], 1e-6)), 2),
+            })
+            if cur_equity > peak_equity:
+                peak_equity = cur_equity
+            dd = ((peak_equity - cur_equity) / peak_equity * 100.0) if peak_equity > 0 else 0.0
+            drawdowns.append(round(dd, 2))
+
+        # Açık pozisyon varsa son fiyattan kapat
+        if position_qty > 0:
+            last_price = closes[-1]
+            gross = position_qty * last_price
+            fee = gross * comm_rate
+            net_revenue = gross - fee
+            pnl = net_revenue - (position_qty * entry_price)
+            pnl_pct = ((last_price / entry_price) - 1.0) * 100.0
+            trades.append({
+                "trade_id": len(trades) + 1,
+                "ticker": clean_ticker,
+                "side": "OPEN_CLOSE",
+                "entry_date": entry_date,
+                "exit_date": dates[-1],
+                "entry_price": round(entry_price, 2),
+                "exit_price": round(last_price, 2),
+                "quantity": position_qty,
+                "pnl": round(pnl, 2),
+                "pnl_pct": round(pnl_pct, 2),
+            })
+            cash += net_revenue
+
+        final_capital = cash
+        total_return_pct = ((final_capital / initial_capital) - 1.0) * 100.0
+
+        # Benchmark getirisi (Buy & Hold)
+        bh_return_pct = ((closes[-1] / max(closes[0], 1e-6)) - 1.0) * 100.0
+
+        # Metrikler
+        winning_trades = [t for t in trades if t["pnl"] > 0]
+        losing_trades = [t for t in trades if t["pnl"] <= 0]
+        win_rate = (len(winning_trades) / len(trades) * 100.0) if trades else 0.0
+        gross_profit = sum(t["pnl"] for t in winning_trades)
+        gross_loss = abs(sum(t["pnl"] for t in losing_trades))
+        profit_factor = (gross_profit / max(gross_loss, 1.0)) if gross_loss > 0 else (9.99 if gross_profit > 0 else 1.0)
+
+        # Günlük getirilerden Sharpe Oranı
+        returns = []
+        for i in range(1, len(equity_curve)):
+            prev = equity_curve[i - 1]["equity"]
+            curr = equity_curve[i]["equity"]
+            returns.append((curr - prev) / max(prev, 1e-6))
+        
+        if returns and np.std(returns) > 0:
+            sharpe_ratio = round(float(np.mean(returns) / np.std(returns) * np.sqrt(252)), 2)
+        else:
+            sharpe_ratio = 0.0
+
+        max_dd = max(drawdowns) if drawdowns else 0.0
+
+        # Yıllıklandırılmış CAGR
+        years = max(len(dates) / 252.0, 0.1)
+        cagr = ((final_capital / initial_capital) ** (1.0 / years) - 1.0) * 100.0 if final_capital > 0 else -100.0
+
         return {
             "status": "completed",
-            "ticker": ticker,
+            "ticker": clean_ticker,
             "period": period,
-            "strategy": strategy,
-            "result": result,
+            "strategy": strat_key,
+            "initial_capital": round(initial_capital, 2),
+            "final_capital": round(final_capital, 2),
+            "total_return_pct": round(total_return_pct, 2),
+            "benchmark_return_pct": round(bh_return_pct, 2),
+            "cagr_pct": round(cagr, 2),
+            "sharpe_ratio": sharpe_ratio,
+            "max_drawdown_pct": round(max_dd, 2),
+            "win_rate": round(win_rate, 1),
+            "profit_factor": round(profit_factor, 2),
+            "total_trades": len(trades),
+            "winning_trades_count": len(winning_trades),
+            "losing_trades_count": len(losing_trades),
+            "equity_curve": equity_curve,
+            "trades": trades,
         }
-    except ImportError as exc:
-        logger.warning("backtest_engine_yuklenemedi: execution_engine modülü mevcut değil")
-        raise HTTPException(
-            status_code=503,
-            detail="Backtest motoru şu anda kullanılamıyor.",
-        ) from exc
+    except HTTPException:
+        raise
     except Exception as exc:
-        logger.error("backtest_calistirma_hatasi: ticker=%s, hata=%s", ticker, exc)
+        logger.error("backtest_calistirma_hatasi: ticker=%s, hata=%s", clean_ticker, exc)
         raise HTTPException(
             status_code=500,
             detail=f"Backtest çalıştırılamadı: {exc}",
         ) from exc
+
 
 
 @router.get("/results/{backtest_id}")

@@ -42,6 +42,16 @@ from .feature_engine import AlternativeFeatureEngine, alt_feature_engine
 # === Feature Store ===
 from .feature_store import FeatureManifest, FeatureStore, feature_store
 
+# === Real-Time News & Central Bank ===
+from .fomc_scraper import (
+    CBEvent,
+    CBEventType,
+    CBTextAnalyzer,
+    CentralBank,
+    CentralBankScraperService,
+    cb_service,
+)
+
 # === Adapters ===
 from .google_trends import GoogleTrendsAdapter, google_trends_adapter
 from .investing_adapter import InvestingAdapter, investing_adapter
@@ -50,6 +60,14 @@ from .kariyer_net import KariyerNetAdapter, kariyer_net_adapter
 
 # === LLM Sentiment ===
 from .llm_sentiment import LLMSentimentAnalyzer, llm_sentiment
+from .news_realtime import (
+    KeywordSentimentScorer,
+    NewsItem,
+    NewsSource,
+    RealTimeNewsFeed,
+    TickerExtractor,
+    news_feed,
+)
 
 # === Reconciliation ===
 from .reconciliation import CrossSourceReconciler, ReconciliationReport, reconciler
@@ -92,6 +110,19 @@ __all__ = [
     # LLM
     "LLMSentimentAnalyzer",
     "llm_sentiment",
+    # Real-Time News & Central Bank
+    "RealTimeNewsFeed",
+    "NewsItem",
+    "NewsSource",
+    "KeywordSentimentScorer",
+    "TickerExtractor",
+    "news_feed",
+    "CentralBankScraperService",
+    "CBEvent",
+    "CBEventType",
+    "CentralBank",
+    "CBTextAnalyzer",
+    "cb_service",
     # Reconciliation
     "CrossSourceReconciler",
     "ReconciliationReport",

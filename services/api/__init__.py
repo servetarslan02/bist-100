@@ -10,7 +10,9 @@ from __future__ import annotations
 from .app import app, create_app
 from .auth import APIKeyManager, JWTHandler, RBACChecker, Role, api_key_manager, jwt_handler, rbac_checker
 from .dependencies import check_rate_limit, get_current_user, get_service_orchestrator
+from .graphql_schema import BISTGraphQLService, bist_graphql
 from .rate_limiter import InMemoryRateLimiter, rate_limiter
+from .v2 import api_v2_router
 
 __all__ = [
     "app",
@@ -27,4 +29,7 @@ __all__ = [
     "get_current_user",
     "check_rate_limit",
     "get_service_orchestrator",
+    "BISTGraphQLService",
+    "bist_graphql",
+    "api_v2_router",
 ]

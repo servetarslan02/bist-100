@@ -30,6 +30,17 @@ from .enhancements import (
     tax_model,
     tca,
 )
+from .factor_portfolio import (
+    DEFAULT_FACTOR_WEIGHTS,
+    FACTOR_NAMES,
+    FactorPortfolioOptimizer,
+    FactorScoreCalculator,
+    FactorScores,
+    PortfolioMethod,
+    PortfolioWeights,
+    factor_optimizer,
+    factor_score_calculator,
+)
 from .portfolio_enhancements import (
     PortfolioConstraints,
     PortfolioEnhancements,
@@ -53,6 +64,13 @@ from .portfolio_optimizer import (
     PortfolioOptimizerConstraints,
     portfolio_optimizer,
 )
+from .tax_loss_harvesting import (
+    HarvestCandidate,
+    HarvestPlan,
+    TaxLossHarvestEngine,
+    tax_harvest_engine,
+)
+from .tax_loss_harvesting import Position as HarvestPosition
 
 __all__ = [
     # Portfolio Manager
@@ -94,4 +112,20 @@ __all__ = [
     "AllocationPlan",
     "ExitDecision",
     "ExitAction",
+    # Factor Portfolio
+    "FactorPortfolioOptimizer",
+    "factor_optimizer",
+    "FactorScoreCalculator",
+    "factor_score_calculator",
+    "FactorScores",
+    "PortfolioMethod",
+    "PortfolioWeights",
+    "FACTOR_NAMES",
+    "DEFAULT_FACTOR_WEIGHTS",
+    # Tax Loss Harvesting
+    "TaxLossHarvestEngine",
+    "tax_harvest_engine",
+    "HarvestCandidate",
+    "HarvestPlan",
+    "HarvestPosition",
 ]

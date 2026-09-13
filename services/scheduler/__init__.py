@@ -8,9 +8,23 @@ from __future__ import annotations
 # - daily_workflow: Günlük workflow otomasyonu (8 faz)
 # - learning_scheduler: Learning cycle scheduling (drift, retrain, backtest)
 # - scheduler_api: Scheduler API endpoints (status, jobs, monitor, trigger)
-# - daily_report: Günlük rapor üretici
+# - dependency_graph: Pipeline DAG bağımlılık yönetimi (Kahn + kritik yol)
 from .daily_report import generate_daily_report
 from .daily_workflow import DailyWorkflow, WorkflowPhase, WorkflowStatus, daily_workflow
+from .dependency_graph import (
+    CriticalPathResult,
+    CycleDetectedError,
+    DependencyGraph,
+    DependencyNode,
+    build_alpha_bist_dag,
+)
+from .distributed_scheduler import (
+    DistributedSchedulerCoordinator,
+    LeaderStatus,
+    LockLease,
+    LockState,
+    distributed_coordinator,
+)
 from .job_monitor import JobAlert, JobMonitor, JobRecord, JobStatus, job_monitor
 from .learning_scheduler import LearningJobConfig, LearningScheduler, learning_scheduler
 from .scheduler_api import SchedulerAPI, scheduler_api
@@ -53,4 +67,16 @@ __all__ = [
     "scheduler_api",
     # Daily Report
     "generate_daily_report",
+    # Dependency Graph (DAG)
+    "CriticalPathResult",
+    "CycleDetectedError",
+    "DependencyGraph",
+    "DependencyNode",
+    "build_alpha_bist_dag",
+    # Distributed Scheduler
+    "DistributedSchedulerCoordinator",
+    "LeaderStatus",
+    "LockLease",
+    "LockState",
+    "distributed_coordinator",
 ]

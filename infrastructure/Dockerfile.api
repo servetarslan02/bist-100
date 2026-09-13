@@ -1,5 +1,5 @@
 # Multi-stage build for Python API
-FROM python:3.12-slim as builder
+FROM python:3.12-slim AS builder
 
 WORKDIR /build
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -31,6 +31,11 @@ COPY ml /app/ml
 COPY ai /app/ai
 COPY config /app/config
 COPY data /app/data
+COPY models /app/models
+COPY proto /app/proto
+COPY database /app/database
+COPY alembic /app/alembic
+COPY alembic.ini /app/
 COPY main.py /app/
 COPY .env* /app/
 

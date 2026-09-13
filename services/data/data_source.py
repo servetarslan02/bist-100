@@ -45,9 +45,9 @@ DEFAULT_WAL_SIZE: Final[str] = "2MB"
 DEFAULT_SOURCE_PRIORITY: Final[list[str]] = [
     "warehouse",
     "local",
-    "tradingview",
     "yahoo",
     "bist",
+    "tradingview",
 ]
 
 
@@ -494,7 +494,7 @@ class WarehouseSource:
 
         sym = ticker.upper().replace(".IS", "").strip()
         try:
-            with duckdb.connect(str(self.db_path)) as conn:
+            with duckdb.connect(str(self.db_path), read_only=True) as conn:
                 configure_duckdb_wal(conn)
                 tbl = "benchmark_xu100" if sym in ["XU100", "^XU100", "BIST100"] else "stock_candles"
 
@@ -613,28 +613,30 @@ class DataSourceManager:
             pl.DataFrame: OHLCV Polars DataFrame.
         """
         priority = source_priority or DEFAULT_SOURCE_PRIORITY
+        min_required_rows = 5 if period not in ["1d", "1h", "5m", "15m"] else 1
 
         if self.use_cache:
             with self._lock:
                 cached = self._load_from_cache(ticker, interval)
             if cached is not None and not cached.is_empty():
-                cache_min_date = str(cached["Date"].min())[:10]
-                cache_max_date = str(cached["Date"].max())[:10]
+                if len(cached) >= min_required_rows:
+                    cache_min_date = str(cached["Date"].min())[:10]
+                    cache_max_date = str(cached["Date"].max())[:10]
 
-                cache_is_valid = True
-                if start_date and start_date < cache_min_date:
-                    cache_is_valid = False
-                if end_date and end_date > cache_max_date:
-                    cache_is_valid = False
+                    cache_is_valid = True
+                    if start_date and start_date < cache_min_date:
+                        cache_is_valid = False
+                    if end_date and end_date > cache_max_date:
+                        cache_is_valid = False
 
-                if cache_is_valid:
-                    if start_date:
-                        cached = cached.filter(pl.col("Date") >= start_date)
-                    if end_date:
-                        cached = cached.filter(pl.col("Date") <= end_date)
-                    if not cached.is_empty():
-                        logger.info("veri_onbellekten_yuklendi", hisse=ticker, satir=len(cached))
-                        return cached
+                    if cache_is_valid:
+                        if start_date:
+                            cached = cached.filter(pl.col("Date") >= start_date)
+                        if end_date:
+                            cached = cached.filter(pl.col("Date") <= end_date)
+                        if not cached.is_empty() and len(cached) >= min_required_rows:
+                            logger.info("veri_onbellekten_yuklendi", hisse=ticker, satir=len(cached))
+                            return cached
 
         for source_name in priority:
             source = self._sources.get(source_name)
@@ -765,10 +767,20 @@ class DataSourceManager:
             return None
 
     def _save_to_cache(self, ticker: str, df: pl.DataFrame, interval: str) -> None:
-        """Veriyi Parquet önbelleğine kaydeder."""
+        """Veriyi Parquet önbelleğine kaydeder (tarihsel derinliği koruyarak)."""
         clean_sym = ticker.replace(".IS", "").upper().strip()
         parquet_file = self.cache_dir / f"{clean_sym}_{interval}.parquet"
         try:
+            if len(df) <= 2 and parquet_file.exists():
+                try:
+                    existing_df = pl.read_parquet(parquet_file)
+                    if existing_df is not None and len(existing_df) > len(df):
+                        combined = pl.concat([existing_df, df]).unique(subset=["Date"], keep="last").sort("Date")
+                        combined.write_parquet(parquet_file)
+                        logger.info("onbellek_birlestirildi", hisse=ticker, satir=len(combined))
+                        return
+                except Exception:
+                    pass
             df.write_parquet(parquet_file)
             logger.info("onbellek_kaydedildi", hisse=ticker, satir=len(df))
         except Exception as e:
