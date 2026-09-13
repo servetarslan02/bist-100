@@ -375,8 +375,8 @@ class AuthenticationService:
                 user = self._users.get(sub_id)
                 if user:
                     return user
-            except (JWTError, Exception):
-                pass
+            except (JWTError, Exception) as token_err:
+                logger.debug("JWT token doğrulama başarısız", hata=str(token_err))
 
             return None
 
@@ -385,8 +385,8 @@ class AuthenticationService:
         if _USE_PASSLIB:
             try:
                 return _pwd_context.hash(password)
-            except Exception:
-                pass
+            except Exception as passlib_err:
+                logger.debug("Passlib hashleme hatası, yerel PBKDF2'ye geçiliyor", hata=str(passlib_err))
         salt = secrets.token_hex(16)
         hash_val = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 100000)
         return f"{salt}:{hash_val.hex()}"
@@ -397,8 +397,8 @@ class AuthenticationService:
             if _USE_PASSLIB and ":" not in stored_hash:
                 try:
                     return _pwd_context.verify(password, stored_hash)
-                except Exception:
-                    pass
+                except Exception as verify_err:
+                    logger.debug("Passlib şifre doğrulama hatası, pbkdf2 fallback", hata=str(verify_err))
 
             salt, hash_hex = stored_hash.split(":")
             hash_val = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 100000)

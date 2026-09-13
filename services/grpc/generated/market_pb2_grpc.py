@@ -78,7 +78,7 @@ class MarketServiceServicer:
 
 
 def add_MarketServiceServicer_to_server(servicer, server) -> Any:
-    """Otomatik eklendi."""
+    """MarketService RPC sunucu işleyicilerini gRPC sunucusuna bağlar."""
     rpc_method_handlers = {
         "StreamTicks": grpc.unary_stream_rpc_method_handler(
             servicer.StreamTicks,
@@ -121,7 +121,7 @@ class MarketService:
         timeout=30,
         metadata=None,
     ) -> Any:
-        """Otomatik eklendi."""
+        """Gerçek zamanlı piyasa tick veri akışını sağlayan RPC çağrısı."""
         return grpc.experimental.unary_stream(
             request,
             target,
@@ -152,7 +152,7 @@ class MarketService:
         timeout=30,
         metadata=None,
     ) -> Any:
-        """Otomatik eklendi."""
+        """Gerçek zamanlı piyasa OHLCV bar veri akışını sağlayan RPC çağrısı."""
         return grpc.experimental.unary_stream(
             request,
             target,
@@ -183,7 +183,7 @@ class MarketService:
         timeout=30,
         metadata=None,
     ) -> Any:
-        """Otomatik eklendi."""
+        """gRPC servis metodunu çalıştırır."""
         return grpc.experimental.unary_unary(
             request,
             target,
@@ -242,7 +242,7 @@ class SignalServiceServicer:
 
 
 def add_SignalServiceServicer_to_server(servicer, server) -> Any:
-    """Otomatik eklendi."""
+    """SignalService RPC sunucu işleyicilerini gRPC sunucusuna bağlar."""
     rpc_method_handlers = {
         "StreamSignals": grpc.unary_stream_rpc_method_handler(
             servicer.StreamSignals,
@@ -277,7 +277,7 @@ class SignalService:
         timeout=30,
         metadata=None,
     ) -> Any:
-        """Otomatik eklendi."""
+        """Canlı model sinyal veri akışını sağlayan RPC çağrısı."""
         return grpc.experimental.unary_stream(
             request,
             target,
@@ -308,7 +308,7 @@ class SignalService:
         timeout=30,
         metadata=None,
     ) -> Any:
-        """Otomatik eklendi."""
+        """gRPC servis metodunu çalıştırır."""
         return grpc.experimental.unary_unary(
             request,
             target,
@@ -367,7 +367,7 @@ class PortfolioServiceServicer:
 
 
 def add_PortfolioServiceServicer_to_server(servicer, server) -> Any:
-    """Otomatik eklendi."""
+    """PortfolioService RPC sunucu işleyicilerini gRPC sunucusuna bağlar."""
     rpc_method_handlers = {
         "StreamPortfolio": grpc.unary_stream_rpc_method_handler(
             servicer.StreamPortfolio,
@@ -402,7 +402,7 @@ class PortfolioService:
         timeout=30,
         metadata=None,
     ) -> Any:
-        """Otomatik eklendi."""
+        """gRPC servis metodunu çalıştırır."""
         return grpc.experimental.unary_stream(
             request,
             target,
@@ -433,7 +433,7 @@ class PortfolioService:
         timeout=30,
         metadata=None,
     ) -> Any:
-        """Otomatik eklendi."""
+        """gRPC servis metodunu çalıştırır."""
         return grpc.experimental.unary_unary(
             request,
             target,
@@ -492,7 +492,7 @@ class RiskServiceServicer:
 
 
 def add_RiskServiceServicer_to_server(servicer, server) -> Any:
-    """Otomatik eklendi."""
+    """RiskService RPC sunucu işleyicilerini gRPC sunucusuna bağlar."""
     rpc_method_handlers = {
         "StreamRisk": grpc.unary_stream_rpc_method_handler(
             servicer.StreamRisk,
@@ -527,7 +527,7 @@ class RiskService:
         timeout=30,
         metadata=None,
     ) -> Any:
-        """Otomatik eklendi."""
+        """gRPC servis metodunu çalıştırır."""
         return grpc.experimental.unary_stream(
             request,
             target,
@@ -558,7 +558,7 @@ class RiskService:
         timeout=30,
         metadata=None,
     ) -> Any:
-        """Otomatik eklendi."""
+        """gRPC servis metodunu çalıştırır."""
         return grpc.experimental.unary_unary(
             request,
             target,

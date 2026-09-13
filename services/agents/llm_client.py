@@ -622,8 +622,8 @@ def parse_llm_json(content: str) -> dict[str, Any] | None:
                 res = orjson.loads(sanitized)
                 if isinstance(res, dict):
                     return res
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("LLM markdown code block parsing failed", error=str(e))
 
     # 3. İlk geçerli { ... } nesnesini brace-counting ile bul
     extracted_json = _find_json_object(cleaned)
@@ -638,8 +638,8 @@ def parse_llm_json(content: str) -> dict[str, Any] | None:
                 res = orjson.loads(sanitized)
                 if isinstance(res, dict):
                     return res
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("LLM extracted JSON parsing failed", error=str(e))
 
     # 4. Metin bazlı kural tabanlı çıkarım (son çare)
     return _extract_from_text(cleaned)
@@ -718,7 +718,7 @@ def _extract_from_text(content: str) -> dict[str, Any]:
             if conf > 1.0:
                 conf = conf / 100.0
             result["confidence"] = max(0.0, min(1.0, conf))
-        except (ValueError, TypeError):
-            pass
+        except (ValueError, TypeError) as conv_err:
+            logger.debug("Güven skoru sayıya dönüştürülemedi", hata=str(conv_err))
 
     return result

@@ -512,8 +512,8 @@ class StreamingAnomalyDetector:
             try:
                 row = self._duckdb_con.execute("SELECT COUNT(*) FROM streaming_anomalies_audit").fetchone()
                 total_audit = int(row[0]) if row else 0
-            except Exception:
-                pass
+            except Exception as err:
+                logger.debug("Anomali denetim tablosu sorgulanamadı", hata=str(err))
 
             return {
                 "tracked_tickers": len(self._price_history),

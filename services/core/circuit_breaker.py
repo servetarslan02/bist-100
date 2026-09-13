@@ -55,22 +55,33 @@ try:
     )
 except Exception:
     class _NoOpSpan:
+        """OpenTelemetry bulunamadığında kullanılan hafif no-op span nesnesi."""
+
         def set_attribute(self, *args: Any, **kwargs: Any) -> None:
-            pass
+            """Öznitelik atama işlemini güvenle tamamlar."""
+            return None
 
         def record_exception(self, *args: Any, **kwargs: Any) -> None:
-            pass
+            """İstisna kaydetme işlemini güvenle tamamlar."""
+            return None
 
     class _NoOpTracer:
+        """OpenTelemetry bulunamadığında kullanılan hafif no-op tracer nesnesi."""
+
         def start_as_current_span(self, name: str, *args: Any, **kwargs: Any) -> Any:
+            """Boş no-op span bağlamı döndürür."""
             return nullcontext(_NoOpSpan())
 
     class _NoOpMetric:
+        """OpenTelemetry bulunamadığında kullanılan hafif no-op metrik nesnesi."""
+
         def set(self, val: Any, *args: Any, **kwargs: Any) -> None:
-            pass
+            """Metrik değerini güvenle günceller."""
+            return None
 
         def add(self, val: Any, *args: Any, **kwargs: Any) -> None:
-            pass
+            """Sayaç değerini güvenle artırır."""
+            return None
 
     tracer = _NoOpTracer()  # type: ignore[assignment]
     CB_STATE_GAUGE = _NoOpMetric()  # type: ignore[assignment]

@@ -208,9 +208,11 @@ class _MockCeleryApp:
                     """Görevi doğrudan çağırır."""
                     return self.func(self, *a, **kw)
 
-                def update_state(self, state=None, meta=None) -> Any:
+                def update_state(self, state: str | None = None, meta: dict[str, Any] | None = None) -> None:
                     """Görev ilerleme durumunu günceller."""
-                    pass
+                    self._state = state
+                    self._meta = meta or {}
+                    return None
 
             return TaskWrapper(fn)
 

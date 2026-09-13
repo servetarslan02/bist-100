@@ -426,8 +426,8 @@ class ExpectCircuitBreakerLimits(Expectation):
                             severity="CRITICAL",
                             affected_rows=1,
                         )
-            except (ValueError, TypeError, ZeroDivisionError):
-                pass
+            except (ValueError, TypeError, ZeroDivisionError) as num_err:
+                logger.debug("Tavan/taban hesaplama ayrıştırma hatası, veri geçersiz", hata=str(num_err))
 
         return ExpectationResult(self.get_name(), True, "OK", "INFO", 0)
 

@@ -192,8 +192,8 @@ class AsyncHTTPClient:
         try:
             val = float(header_val)
             return float(min(max(0.0, val), self._max_retry_delay_s))
-        except ValueError:
-            pass
+        except ValueError as err:
+            logger.debug("Retry-After sayısal değil, HTTP-date deneniyor", header=header_val, hata=str(err))
 
         try:
             target_dt = email.utils.parsedate_to_datetime(header_val)

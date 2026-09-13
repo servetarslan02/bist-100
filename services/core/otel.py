@@ -114,7 +114,8 @@ def setup_telemetry(
                             return SpanExportResult.SUCCESS
 
                         def shutdown(self) -> None:
-                            pass
+                            """Dışa aktarıcıyı güvenle kapatır."""
+                            return None
 
                         def force_flush(self, timeout_millis: int = 30000) -> bool:
                             return True
@@ -131,7 +132,7 @@ def setup_telemetry(
 
                     def shutdown(self) -> None:
                         """Dışa aktarıcıyı kapatır."""
-                        pass
+                        return None
 
                     def force_flush(self, timeout_millis: int = 30000) -> bool:
                         """Tamponu temizler."""
@@ -223,26 +224,34 @@ def get_tracer(name: str = __name__) -> Any:
             except ImportError:
 
                 class _FallbackSpan:
+                    """OpenTelemetry olmadığında kullanılan hafif fallback span."""
+
                     def __enter__(self) -> _FallbackSpan:
                         return self
 
                     def __exit__(self, *args: Any) -> None:
-                        pass
+                        """Bağlam çıkışını güvenle tamamlar."""
+                        return None
 
                     def set_attribute(self, *args: Any, **kwargs: Any) -> None:
-                        pass
+                        """Öznitelik atamasını güvenle tamamlar."""
+                        return None
 
                     def set_attributes(self, *args: Any, **kwargs: Any) -> None:
-                        pass
+                        """Toplu öznitelik atamasını güvenle tamamlar."""
+                        return None
 
                     def record_exception(self, *args: Any, **kwargs: Any) -> None:
-                        pass
+                        """İstisna kaydını güvenle tamamlar."""
+                        return None
 
                     def set_status(self, *args: Any, **kwargs: Any) -> None:
-                        pass
+                        """Durum güncellemesini güvenle tamamlar."""
+                        return None
 
                     def add_event(self, *args: Any, **kwargs: Any) -> None:
-                        pass
+                        """Olay kaydını güvenle tamamlar."""
+                        return None
 
                     def is_recording(self) -> bool:
                         return False
@@ -290,8 +299,8 @@ def otel_trace(span_name: str) -> Any:
                                 from opentelemetry.trace import Status, StatusCode
 
                                 span.set_status(Status(StatusCode.ERROR, str(exc)))
-                            except Exception:
-                                pass
+                            except Exception as span_err:
+                                logger.debug("Async span durumu ayarlanamadı", hata=str(span_err))
                         raise
 
             return async_wrapper
@@ -312,8 +321,8 @@ def otel_trace(span_name: str) -> Any:
                                 from opentelemetry.trace import Status, StatusCode
 
                                 span.set_status(Status(StatusCode.ERROR, str(exc)))
-                            except Exception:
-                                pass
+                            except Exception as span_err:
+                                logger.debug("Sync span durumu ayarlanamadı", hata=str(span_err))
                         raise
 
             return sync_wrapper

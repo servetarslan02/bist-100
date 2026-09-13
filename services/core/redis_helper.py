@@ -243,8 +243,8 @@ def get_cached(key: str) -> Any | None:
             if exp > now_mono:
                 try:
                     return orjson.loads(val)
-                except Exception:
-                    pass
+                except Exception as err:
+                    logger.debug("L1 önbellek serileştirme çözme hatası", anahtar=key, hata=str(err))
             _mem_cache.pop(key, None)
 
     # DuckDB L2 Kontrolü
@@ -331,8 +331,8 @@ def mget_cached(keys: list[str]) -> dict[str, Any]:
                     try:
                         results[k] = orjson.loads(val)
                         missing_keys.remove(k)
-                    except Exception:
-                        pass
+                    except Exception as parse_err:
+                        logger.debug("Redis mget json çözümleme hatası", key=k, hata=str(parse_err))
         except Exception as exc:
             logger.warning("Redis mget pipeline hatası", hata=str(exc))
             with _lock:
@@ -349,8 +349,8 @@ def mget_cached(keys: list[str]) -> dict[str, Any]:
                         try:
                             results[k] = orjson.loads(val)
                             missing_keys.remove(k)
-                        except Exception:
-                            pass
+                        except Exception as parse_err:
+                            logger.debug("L1 önbellek json çözümleme hatası", key=k, hata=str(parse_err))
                     else:
                         _mem_cache.pop(k, None)
 
@@ -528,8 +528,8 @@ def get_cache_stats() -> dict[str, Any]:
     try:
         df = read_l2_cache_from_duckdb(include_expired=False)
         l2_count = df.height
-    except Exception:
-        pass
+    except Exception as l2_err:
+        logger.debug("L2 DuckDB önbellek istatistik okuma hatası", hata=str(l2_err))
 
     return {
         "redis_available": r_active,

@@ -103,8 +103,8 @@ def _to_clean_numpy(values: np.ndarray | pl.Series | pl.DataFrame | Sequence[flo
                             cleaned.append(fv)
                     except (ValueError, TypeError):
                         continue
-            except Exception:
-                pass
+            except Exception as err:
+                logger.debug("Dizi yineleme sırasında beklenmeyen veri formatı hatası", hata=str(err))
         return np.array(cleaned, dtype=np.float64)
 
     if arr.ndim > 1:

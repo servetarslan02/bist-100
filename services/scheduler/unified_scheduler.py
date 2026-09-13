@@ -937,8 +937,8 @@ class UnifiedScheduler:
         try:
             from services.core.offline_queue import offline_queue
             offline_queue.stop_background_flusher()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Offline flusher durdurulurken hata", hata=str(e))
 
         logger.info("=== UNIFIED SCHEDULER STOPPED ===")
 
@@ -1383,8 +1383,8 @@ class UnifiedScheduler:
             try:
                 conn.execute("SET wal_autocheckpoint = '2MB'")
                 conn.execute("SET checkpoint_threshold = '4MB'")
-            except Exception:
-                pass
+            except Exception as wal_err:
+                logger.debug("DuckDB WAL yapılandırma ayarı uygulanamadı", hata=str(wal_err))
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS scheduler_state (
                     key TEXT PRIMARY KEY,

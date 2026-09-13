@@ -780,16 +780,16 @@ def _flush_on_signal(signum: int, frame: Any) -> None:
     try:
         logger.info("Signal received, flushing state store buffer", signum=signum)
         state_store.flush()
-    except Exception:
-        pass
+    except Exception as err:
+        logger.warning("Sinyal flush işlemi sırasında hata", signum=signum, hata=str(err))
 
 
 atexit.register(_flush_on_exit)
 try:
     signal.signal(signal.SIGTERM, _flush_on_signal)
     signal.signal(signal.SIGINT, _flush_on_signal)
-except (ValueError, OSError):
-    pass
+except (ValueError, OSError) as sig_err:
+    logger.debug("Sinyal işleyici kaydedilemedi (ana thread dışında veya işletim sistemi sınırlaması)", hata=str(sig_err))
 
 __all__ = [
     "CentralStateStore",

@@ -181,7 +181,7 @@ class HealthReporter:
         exc_tb: TracebackType | None,
     ) -> None:
         """Context manager çıkışı."""
-        pass
+        return None
 
     def _get_uptime(self) -> dict[str, Any]:
         """Süreç çalışma süresi (uptime) bilgilerini hesaplar.
