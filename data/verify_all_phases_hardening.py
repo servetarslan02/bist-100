@@ -14,6 +14,7 @@ Doğrulanan Fazlar:
 import asyncio
 import gzip
 import time
+from typing import Any
 
 import numpy as np
 import orjson
@@ -34,19 +35,26 @@ from services.scanner.bist_ml_scanner import bist_ml_scanner
 logger = structlog.get_logger(__name__)
 
 
-async def run_full_suite():
+async def run_full_suite() -> None:
+    """Tüm fazların altyapı hardening ve dayanıklılık doğrulamalarını uçtan uca yürütür."""
     print("=" * 80)
     print("ALPHA BIST — TÜM FAZLARIN KAPSAMLI HARDENING DOĞRULAMASI")
     print("=" * 80)
 
     # 1. FAZ 1: BaseAlphaService Testi
     print("\n[FAZ 1] BaseAlphaService & Idempotency & CircuitBreaker...")
+
     class TestService(BaseAlphaService):
-        def validate_input(self, payload: dict) -> dict:
+        """Hardening doğrulama test servisi."""
+
+        def validate_input(self, payload: dict[str, Any]) -> dict[str, Any]:
+            """Girdi verisini doğrular."""
             if "key" not in payload:
                 raise ValueError("Key missing")
             return payload
-        async def process_payload(self, validated_input: dict) -> dict:
+
+        async def process_payload(self, validated_input: dict[str, Any]) -> dict[str, Any]:
+            """Doğrulanmış iş yükünü işler."""
             return {"result": "ok", "val": validated_input["key"]}
 
     srv = TestService("test_phase1_srv", timeout_seconds=1.0)

@@ -1,13 +1,16 @@
 """BIST Sistem Saglik Kontrolu"""
 import sys
+from collections.abc import Callable
+from typing import Any
 
-results = {}
+results: dict[str, tuple[str, str]] = {}
 
 
-def chk(name, fn):
+def chk(name: str, fn: Callable[[], Any]) -> None:
+    """Belirtilen alt sistem kontrol fonksiyonunu çalıştırıp sağlık durumunu kaydeder."""
     try:
         msg = fn()
-        results[name] = ("OK", msg or "OK")
+        results[name] = ("OK", str(msg) if msg else "OK")
     except Exception as e:
         results[name] = ("FAIL", str(e)[:120])
 

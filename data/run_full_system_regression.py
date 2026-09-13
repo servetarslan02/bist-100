@@ -31,7 +31,12 @@ from services.scanner.bist_ml_scanner import bist_ml_scanner
 logger = structlog.get_logger(__name__)
 
 
-def measure_system_resources():
+def measure_system_resources() -> dict[str, float]:
+    """Mevcut işlemin RAM ve sistem genel CPU kullanım metriklerini ölçer.
+
+    Returns:
+        dict[str, float]: RAM kullanımı (MB) ve CPU kullanım yüzdesi.
+    """
     process = psutil.Process(os.getpid())
     mem_info = process.memory_info()
     return {
@@ -40,7 +45,8 @@ def measure_system_resources():
     }
 
 
-async def run_e2e_regression_suite():
+async def run_e2e_regression_suite() -> None:
+    """Tüm BIST veri, öznitelik ve model tahmin zincirini 10 iterasyonluk yük altında test eder."""
     print("=" * 80)
     print("ALPHA BIST — FAZ 11: FULL SYSTEM REGRESSION & LOAD TEST")
     print("=" * 80)

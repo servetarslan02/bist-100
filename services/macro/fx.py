@@ -151,8 +151,8 @@ def compute_fx_features(fx_data: dict[str, Any]) -> dict[str, float]:
                 ann_fx_change = ((1.0 + features["fx_usdtry_momentum_20d"] / 100.0) ** (252 / 20) - 1.0) * 100.0
                 reer_gap = ann_fx_change - float(inflation_yoy)
                 features["fx_real_depreciation_gap"] = round(reer_gap, 2)
-            except (ValueError, OverflowError):
-                pass
+            except (ValueError, OverflowError) as e:
+                logger.debug("Reel kur farkı hesaplanamadı", error=str(e))
 
     except Exception as e:
         logger.error("Döviz analitik feature hesaplaması başarısız oldu", error=str(e))
