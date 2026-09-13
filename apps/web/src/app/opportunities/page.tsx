@@ -41,6 +41,7 @@ interface OpportunitySignal {
 const CAT_FILTERS = [
   { id: "ALL", label: "Tüm Fırsatlar", icon: Layers },
   { id: "HIGH_CONVICTION", label: "Yüksek Güven", icon: Flame, color: "#ff4466" },
+  { id: "KAP_CATALYST", label: "KAP Katalizörü", icon: Star, color: "#c084fc" },
   { id: "VOLUME_BREAKOUT", label: "Hacim Kırılımı", icon: Zap, color: "#ffaa00" },
   { id: "PULLBACK_BOUNCE", label: "Dip / Swing", icon: Target, color: "#00e5a0" },
   { id: "MOMENTUM_LEADER", label: "Trend Lideri", icon: TrendingUp, color: "#00c8ff" },
@@ -97,6 +98,9 @@ export default function OpportunitiesPage() {
 
         if (activeFilter === "HIGH_CONVICTION") {
           if (!isHigh) return false;
+        } else if (activeFilter === "KAP_CATALYST") {
+          const hasKap = Boolean((s as any).kap_catalyst && (s as any).kap_catalyst !== "NONE") || tags.includes("KAP_CATALYST");
+          if (!hasKap) return false;
         } else if (activeFilter === "VOLUME_BREAKOUT") {
           const isVol = stype === "VOLUME_BREAKOUT" || cat === "VOLUME_BREAKOUT" || tags.includes("VOLUME_BREAKOUT") || sig.includes("HACİM") || sig.includes("KIRILIM") || Number(s.volume_ratio ?? 0) >= 1.2;
           if (!isVol) return false;
@@ -115,7 +119,8 @@ export default function OpportunitiesPage() {
         const sym = (s.symbol || s.ticker || "").toLowerCase();
         const nm = (s.name || s.company_name || "").toLowerCase();
         const rsn = (s.spec_reason || "").toLowerCase();
-        return sym.includes(q) || nm.includes(q) || rsn.includes(q);
+        const kap = String((s as any).kap_catalyst || "").toLowerCase();
+        return sym.includes(q) || nm.includes(q) || rsn.includes(q) || kap.includes(q);
       }
       return true;
     });
@@ -136,6 +141,7 @@ export default function OpportunitiesPage() {
     const counts: Record<string, number> = {
       ALL: signals.length,
       HIGH_CONVICTION: 0,
+      KAP_CATALYST: 0,
       VOLUME_BREAKOUT: 0,
       PULLBACK_BOUNCE: 0,
       MOMENTUM_LEADER: 0,
@@ -148,6 +154,9 @@ export default function OpportunitiesPage() {
 
       if (Boolean((s as any).is_high_conviction) || Number(s.score ?? 0) >= 80 || cat === "HIGH_CONVICTION" || tags.includes("HIGH_CONVICTION")) {
         counts.HIGH_CONVICTION++;
+      }
+      if (Boolean((s as any).kap_catalyst && (s as any).kap_catalyst !== "NONE") || tags.includes("KAP_CATALYST")) {
+        counts.KAP_CATALYST++;
       }
       if (stype === "VOLUME_BREAKOUT" || cat === "VOLUME_BREAKOUT" || tags.includes("VOLUME_BREAKOUT") || sig.includes("HACİM") || sig.includes("KIRILIM") || Number(s.volume_ratio ?? 0) >= 1.2) {
         counts.VOLUME_BREAKOUT++;
@@ -338,7 +347,7 @@ export default function OpportunitiesPage() {
               >
                 {/* Top Badge & Score */}
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-semibold font-data text-zinc-100 group-hover:text-cyan-400 transition-colors">
                       {sig.symbol}
                     </span>
@@ -351,6 +360,11 @@ export default function OpportunitiesPage() {
                     >
                       {String(sig.signal_type || sig.signal || "AL").replace(/_/g, " ")}
                     </span>
+                    {sig.kap_catalyst && sig.kap_catalyst !== "NONE" && (
+                      <span className="text-[9px] px-2 py-0.5 rounded-full font-semibold tracking-wider bg-purple-500/15 text-purple-300 border border-purple-500/30 flex items-center gap-1">
+                        <span>📢 {sig.kap_catalyst}</span>
+                      </span>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-1.5">
@@ -367,10 +381,18 @@ export default function OpportunitiesPage() {
                   </div>
                 </div>
 
-                {/* Reason Catalyst */}
-                <p className="text-[11px] text-zinc-400 line-clamp-2 leading-relaxed bg-zinc-950/40 p-2 rounded-lg border border-zinc-800/40 font-normal">
-                  {sig.spec_reason || "Phase 18 Otonom Makine Öğrenmesi Yüksek Güvenilirlikli Sinyali"}
-                </p>
+                {/* Reason Catalyst & KAP */}
+                <div className="space-y-1.5">
+                  {sig.kap_title && (
+                    <div className="text-[10px] text-purple-300/90 font-medium bg-purple-950/30 px-2 py-1 rounded border border-purple-800/30 flex items-center gap-1">
+                      <span className="font-bold text-purple-400 shrink-0">KAP:</span>
+                      <span className="truncate">{sig.kap_title}</span>
+                    </div>
+                  )}
+                  <p className="text-[11px] text-zinc-400 line-clamp-2 leading-relaxed bg-zinc-950/40 p-2 rounded-lg border border-zinc-800/40 font-normal">
+                    {sig.spec_reason || "Phase 18 Otonom Makine Öğrenmesi Yüksek Güvenilirlikli Sinyali"}
+                  </p>
+                </div>
 
                 {/* Price & Targets Grid (Sol: Stop Loss, Orta: Giriş, Sağ: Hedef) */}
                 <div className="grid grid-cols-3 gap-2 text-center pt-1.5 border-t border-zinc-800/60">
@@ -488,11 +510,18 @@ export default function OpportunitiesPage() {
                         {isHigh && <Flame size={12} className="text-red-400 inline" />}
                       </td>
                       <td className="p-3">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                          isHigh ? "bg-red-500/10 text-red-400 border border-red-500/20" : "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20"
-                        }`}>
-                          {String(sig.signal_type || sig.signal || "AL").replace(/_/g, " ")}
-                        </span>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            isHigh ? "bg-red-500/10 text-red-400 border border-red-500/20" : "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20"
+                          }`}>
+                            {String(sig.signal_type || sig.signal || "AL").replace(/_/g, " ")}
+                          </span>
+                          {sig.kap_catalyst && sig.kap_catalyst !== "NONE" && (
+                            <span className="px-2 py-0.5 rounded-full text-[9px] font-semibold bg-purple-500/15 text-purple-300 border border-purple-500/30">
+                              📢 {sig.kap_catalyst}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="p-3 text-right font-data text-zinc-200">₺{price.toFixed(2)}</td>
                       <td className={`p-3 text-right font-data font-semibold ${chg >= 0 ? "text-emerald-400" : "text-red-400"}`}>

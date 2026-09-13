@@ -19,9 +19,11 @@ UYARI: Bu parametre seti Final Holdout verisi kullanılarak SEÇİLMEMİŞTİR.
 """
 
 from datetime import timedelta
+from pathlib import Path
 from typing import Any
 
 import numpy as np
+import orjson
 import polars as pl
 import structlog
 
@@ -95,8 +97,41 @@ def sync_learned_params(db_path: str = "data/strategy_diagnosis.duckdb") -> dict
     return FROZEN_PARAMS
 
 
-# Başlangıçta öğrenilmiş en güncel parametreleri yükle
+def load_discovered_hyperparameters(config_path: str = "config/champion_hyperparameters.json") -> dict[str, Any]:
+    """Alpha-Optima Bayesian arama motoru tarafından keşfedilen en güncel parametreleri yükler."""
+    cfg_file = Path(config_path)
+    if cfg_file.exists():
+        try:
+            data = orjson.loads(cfg_file.read_bytes())
+            hypers = data.get("hyperparameters", {})
+            if hypers:
+                if "bull_trailing_atr" in hypers:
+                    FROZEN_PARAMS["trailing_atr_mult"] = float(hypers["bull_trailing_atr"])
+                if "bull_breakeven_trigger" in hypers:
+                    FROZEN_PARAMS["breakeven_trigger_pct"] = float(hypers["bull_breakeven_trigger"])
+                if "bull_breakeven_lock" in hypers:
+                    FROZEN_PARAMS["breakeven_lock_pct"] = float(hypers["bull_breakeven_lock"])
+                if "bull_hard_stop" in hypers:
+                    FROZEN_PARAMS["hard_stop_pct"] = float(hypers["bull_hard_stop"])
+                if "bull_max_pos" in hypers and isinstance(FROZEN_PARAMS.get("max_pos"), dict):
+                    FROZEN_PARAMS["max_pos"]["BULL_TREND"] = int(hypers["bull_max_pos"])
+                    FROZEN_PARAMS["max_pos"]["LOW_VOLATILITY"] = int(hypers["bull_max_pos"])
+                if "bear_max_pos" in hypers and isinstance(FROZEN_PARAMS.get("max_pos"), dict):
+                    FROZEN_PARAMS["max_pos"]["BEAR_MARKET"] = int(hypers["bear_max_pos"])
+                    FROZEN_PARAMS["max_pos"]["HIGH_VOLATILITY"] = int(hypers["bear_max_pos"])
+                if "sideway_max_pos" in hypers and isinstance(FROZEN_PARAMS.get("max_pos"), dict):
+                    FROZEN_PARAMS["max_pos"]["SIDEWAYS_RANGE"] = int(hypers["sideway_max_pos"])
+                if "bull_min_cash" in hypers:
+                    FROZEN_PARAMS["min_cash_buffer_pct"] = float(hypers["bull_min_cash"]) / 100.0
+                logger.info("Alpha-Optima tarafindan kesfedilen sampiyon hiperparametreler yuklendi", fitness=data.get("fitness_score"))
+        except Exception as exc:
+            logger.warning("Sampiyon hiperparametreler yuklenemedi", hata=str(exc))
+    return FROZEN_PARAMS
+
+
+# Başlangıçta öğrenilmiş ve keşfedilmiş en güncel parametreleri yükle
 sync_learned_params()
+load_discovered_hyperparameters()
 
 MODELS = [
     "LightGBM_LambdaRank",

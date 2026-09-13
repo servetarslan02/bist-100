@@ -1,0 +1,27 @@
+{
+  "discovered_at": "2026-09-14",
+  "fitness_score": 6.483186817738088,
+  "train_return_pct": 860.7342424266759,
+  "train_max_dd_pct": 27.91042981708714,
+  "holdout_return_pct": 258.0599858921345,
+  "holdout_max_dd_pct": 31.196233035809982,
+  "hyperparameters": {
+    "bull_trailing_atr": 2.6,
+    "bull_breakeven_trigger": 7.0,
+    "bull_breakeven_lock": 2.5,
+    "bull_hard_stop": -6.0,
+    "bull_max_pos": 11,
+    "bull_min_cash": 10.0,
+    "bear_trailing_atr": 2.0,
+    "bear_breakeven_trigger": 6.0,
+    "bear_hard_stop": -5.5,
+    "bear_max_pos": 4,
+    "bear_min_cash": 80.0,
+    "sideway_trailing_atr": 2.4000000000000004,
+    "sideway_hard_stop": -6.0,
+    "sideway_max_pos": 5,
+    "model_prob_weight": 0.5,
+    "momentum_weight": 0.45,
+    "trend_weight": 0.15000000000000002
+  }
+}

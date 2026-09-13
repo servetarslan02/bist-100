@@ -106,6 +106,11 @@ class LearningScheduler:
                 interval_hours=720,  # Aylık
                 description="Calibration güncelleme — aylık",
             ),
+            "autonomous_optima_tuning": LearningJobConfig(
+                job_type="autonomous_optima_tuning",
+                interval_hours=168,  # Haftalık (Pazar gecesi)
+                description="Alpha-Optima v2 Bayesyen hiperparametre optimizasyonu ve şampiyon güncelleme",
+            ),
         }
 
     def register_handler(self, job_type: str, handler: Callable[..., Awaitable[Any]]) -> Any:

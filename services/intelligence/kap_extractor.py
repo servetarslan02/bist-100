@@ -97,11 +97,14 @@ KEYWORD_MAP = {
     "lawsuit": "LEGAL",
     "regülasyon": "REGULATORY",
     "sermaye artırımı": "CAPITAL_INCREASE",
+    "üretim durdurma": "PLANT_SHUTDOWN",
+    "üretim durdurulması": "PLANT_SHUTDOWN",
+    "faaliyetin durdurulması": "PLANT_SHUTDOWN",
+    "durdurma": "PLANT_SHUTDOWN",
+    "kapanma": "PLANT_SHUTDOWN",
     "kapasite artışı": "EXPANSION",
     "fabrika": "EXPANSION",
     "üretim": "EXPANSION",
-    "durdurma": "PLANT_SHUTDOWN",
-    "kapanma": "PLANT_SHUTDOWN",
 }
 
 

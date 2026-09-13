@@ -337,3 +337,46 @@ async def gemini_report(
             status_code=502,
             detail=f"Gemini raporu üretilemedi: {exc}",
         ) from exc
+
+
+@router.get("/kap-feed")
+async def get_kap_intelligence_feed(
+    limit: int = Query(50, ge=1, le=100, description="Maksimum KAP bildirim sayısı"),
+    user=Depends(get_current_user),
+    _=Depends(check_rate_limit),
+) -> dict[str, Any]:
+    """Son işlenen KAP bildirimlerini, NLP etki puanlarını ve katalizörleri döndürür."""
+    try:
+        from ...intelligence.kap_intelligence_service import kap_intelligence_service
+
+        events = kap_intelligence_service.get_recent_events(limit=limit)
+        return {
+            "status": "success",
+            "total": len(events),
+            "events": events,
+        }
+    except Exception as exc:
+        logger.error("kap_feed_api_hatasi: %s", exc)
+        raise HTTPException(status_code=500, detail=f"KAP akışı alınamadı: {exc}") from exc
+
+
+@router.get("/kap/{ticker}")
+async def get_ticker_kap_intelligence(
+    ticker: str,
+    user=Depends(get_current_user),
+    _=Depends(check_rate_limit),
+) -> dict[str, Any]:
+    """Belirli bir hissenin güncel KAP duygu ve katalizör metriklerini döndürür."""
+    try:
+        from ...intelligence.kap_intelligence_service import kap_intelligence_service
+
+        metrics = kap_intelligence_service.get_ticker_kap_metrics(ticker)
+        return {
+            "status": "success",
+            "ticker": ticker.upper(),
+            "metrics": metrics,
+        }
+    except Exception as exc:
+        logger.error("ticker_kap_api_hatasi: ticker=%s, hata=%s", ticker, exc)
+        raise HTTPException(status_code=500, detail=f"Hisse KAP bilgisi alınamadı: {exc}") from exc
+

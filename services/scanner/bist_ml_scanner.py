@@ -16,6 +16,7 @@ import structlog
 
 logger = structlog.get_logger()
 from services.data.historical_warehouse import HistoricalDataWarehouse
+from services.intelligence.kap_intelligence_service import kap_intelligence_service
 
 __all__ = [
     "BistMLScanner",
@@ -218,6 +219,9 @@ class BistMLScanner:
                     debt_eq = float(item.get("total_debt_to_equity_fq") or 0.0)
                     bs_quality = float(np.clip(50.0 + (roe_val * 0.5) + (profit_m * 0.5) - (debt_eq * 0.1), 0.0, 100.0))
 
+                    # Canlı KAP Duygu ve Katalizör Entegrasyonu
+                    kap_metrics = kap_intelligence_service.get_ticker_kap_metrics(sym)
+
                     # 70-Boyutlu Özellik Haritası (Sıfır Sahte Veri, Tamamen Dinamik)
                     f_map = {
                         "rs_vs_bist_1d": float(ret_1d),
@@ -261,14 +265,14 @@ class BistMLScanner:
                         "profit_margin_pct": float(profit_m),
                         "roe": float(roe_val),
                         "roa": float(roa_val),
-                        "kap_sentiment_avg": float(np.clip((buyer_press / 100.0), 0.0, 1.0)),
-                        "kap_sentiment_latest": float(np.clip((buyer_press / 100.0), 0.0, 1.0)),
+                        "kap_sentiment_avg": float(kap_metrics["kap_sentiment_avg"]),
+                        "kap_sentiment_latest": float(kap_metrics["kap_sentiment_latest"]),
                         "news_sentiment_weighted": float(np.clip(0.5 + (ret_5d / 40.0), 0.0, 1.0)),
                         "sentiment_momentum": float(np.clip(ret_1d / 20.0, -1.0, 1.0)),
-                        "kap_avg_importance": 1.0 if vol_surge >= 1.5 else 0.0,
-                        "catalyst_count": 1.0 if (vol_surge >= 1.5 and is_breakout == 1.0) else 0.0,
-                        "catalyst_importance": 3.0 if vol_surge >= 2.0 else 1.0,
-                        "catalyst_days_nearest": float(np.clip(14.0 - (vol_surge * 2.0), 1.0, 30.0)),
+                        "kap_avg_importance": float(kap_metrics["kap_avg_importance"]),
+                        "catalyst_count": 1.0 if (kap_metrics["has_positive_catalyst"] or (vol_surge >= 1.5 and is_breakout == 1.0)) else 0.0,
+                        "catalyst_importance": 4.0 if kap_metrics["has_positive_catalyst"] else (3.0 if vol_surge >= 2.0 else 1.0),
+                        "catalyst_days_nearest": 1.0 if kap_metrics["has_positive_catalyst"] else float(np.clip(14.0 - (vol_surge * 2.0), 1.0, 30.0)),
                         "falling_is_temporary": 1.0 if ret_5d < 0 and slope > 0 else 0.0,
                         "fall_market_selloff": 1.0 if (ret_1d < 0 and live_breadth < 50.0) else 0.0,
                         "fall_sector_selloff": 1.0 if (ret_1d < -2.0 and ret_5d < -5.0) else 0.0,
@@ -310,6 +314,7 @@ class BistMLScanner:
                             "ret_20d": ret_20d,
                             "is_breakout": is_breakout,
                             "is_dip": is_dip,
+                            "kap_metrics": kap_metrics,
                         }
                     )
                 except Exception as row_err:
@@ -400,7 +405,7 @@ class BistMLScanner:
                         tags = ["VOLUME_BREAKOUT"]
                     elif is_dip or rsi_14 <= 38.0 or (buyer_press >= 55.0 and change_pct < 2.0):
                         strategy_type = "PULLBACK_BOUNCE"
-                        sig_name = "GÜÇLÜ DİP DÖNÜŞÜ AL" if is_high_conviction else "DİP DÖNÜŞÜ AL"
+                        sig_name = "GÜÇLÜ DİP DÖNÜŞü AL" if is_high_conviction else "DİP DÖNÜŞÜ AL"
                         spec_rsn = f"RSI: {rsi_14:.1f} | Alıcı: %{buyer_press:.0f} | ML Sıralama: %{ml_conviction*100:.1f}"
                         tags = ["PULLBACK_BOUNCE"]
                     else:
@@ -408,6 +413,10 @@ class BistMLScanner:
                         sig_name = "GÜÇLÜ TREND LİDERİ AL" if is_high_conviction else "TREND LİDERİ AL"
                         spec_rsn = f"Trend: %{ret_20d:.1f} | ML Sıralama: %{ml_conviction*100:.1f}"
                         tags = ["MOMENTUM_LEADER"]
+
+                    kap_meta = meta.get("kap_metrics", {})
+                    if kap_meta.get("has_positive_catalyst"):
+                        tags.append("KAP_CATALYST")
 
                     if is_high_conviction:
                         tags.append("HIGH_CONVICTION")
@@ -436,6 +445,11 @@ class BistMLScanner:
                             "risk_reward_ratio": risk_rew,
                             "rsi": round(rsi_14, 1),
                             "volume_ratio": round(vol_surge, 2),
+                            "buyer_pressure": round(buyer_press, 1),
+                            "ml_conviction": ml_conviction,
+                            "kap_sentiment": kap_meta.get("kap_sentiment_latest", 0.50),
+                            "kap_catalyst": kap_meta.get("latest_event_type", "NONE"),
+                            "kap_title": kap_meta.get("latest_title", ""),
                             "momentum_1m": round(ret_20d, 1),
                             "momentum_3m": round(ret_20d * 2.5, 1),
                             "horizon": "5-10 Gün",
@@ -496,6 +510,11 @@ class BistMLScanner:
                 exp_ret_swing = round(atr_pct * 2.5, 1)
                 stop_dist = round(float(np.clip(atr_val * 1.5, latest_p * 0.02, latest_p * 0.07)), 2)
 
+                kap_m = kap_intelligence_service.get_ticker_kap_metrics(sym)
+                w_tags = ["VOLUME_BREAKOUT", "HIGH_CONVICTION"]
+                if kap_m.get("has_positive_catalyst"):
+                    w_tags.append("KAP_CATALYST")
+
                 candidates.append(
                     {
                         "ticker": sym,
@@ -510,7 +529,7 @@ class BistMLScanner:
                         "strategy_type": "VOLUME_BREAKOUT",
                         "spec_category": "HIGH_CONVICTION",
                         "is_high_conviction": True,
-                        "tags": ["VOLUME_BREAKOUT", "HIGH_CONVICTION"],
+                        "tags": w_tags,
                         "spec_reason": f"RVOL: {vol_surge:.1f}x | ATR: %{atr_pct:.1f}",
                         "expected_return_pct": exp_ret_swing,
                         "target_price": round(latest_p * (1.0 + (exp_ret_swing / 100.0)), 2),
@@ -519,6 +538,9 @@ class BistMLScanner:
                         "rsi": round(rsi_14, 1),
                         "volume_ratio": round(vol_surge, 2),
                         "atr_pct": round(atr_pct, 2),
+                        "kap_sentiment": kap_m.get("kap_sentiment_latest", 0.50),
+                        "kap_catalyst": kap_m.get("latest_event_type", "NONE"),
+                        "kap_title": kap_m.get("latest_title", ""),
                     }
                 )
 
