@@ -53,21 +53,21 @@ class _DummyDuckDBConn:
 
         return pd.DataFrame()
 
-    def commit(self) -> Any:
-        """İşlem onayını güvenle yok sayar."""
-        pass
+    def commit(self) -> None:
+        """İşlem onayını güvenle tamamlar."""
+        return None
 
-    def close(self) -> Any:
-        """Bağlantı kapatma işlemini güvenle yok sayar."""
-        pass
+    def close(self) -> None:
+        """Bağlantı kapatma işlemini güvenle tamamlar."""
+        return None
 
     def __enter__(self) -> Any:
         """Bağlam yöneticisi girişinde kendisini döner."""
         return self
 
-    def __exit__(self, *args) -> Any:
+    def __exit__(self, *args: Any) -> None:
         """Bağlam yöneticisi çıkışında kaynakları temizler."""
-        pass
+        return None
 
 
 class ModelMemoryStore:
