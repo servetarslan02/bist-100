@@ -1,7 +1,4 @@
-from typing import Any
-
-"""
-ALPHA BIST — API Test Suite v1.0
+"""ALPHA BIST — API Test Suite v1.0
 
 Tüm API bileşenleri için test'ler.
 
@@ -10,6 +7,7 @@ Kullanım:
 """
 
 import time
+from typing import Any
 
 import pytest
 

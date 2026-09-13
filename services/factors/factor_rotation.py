@@ -230,16 +230,19 @@ def get_rotation_weights(
     regime: str | None,
     current_weights: dict[str, float] | None = None,
     rotation_strength: float = 0.5,
+    macro_tilt: dict[str, float] | None = None,
 ) -> dict[str, float]:
     """Rejime göre faktör ağırlıklarını döndür.
 
     Mevcut ağırlıklar ile hedef rejim ağırlıklarını rotation_strength
-    oranında karıştırarak yeni ağırlık vektörü oluşturur.
+    oranında karıştırarak ve opsiyonel makro eğilim (macro_tilt) çarpanlarını
+    uygulayarak yeni ağırlık vektörü oluşturur.
 
     Args:
         regime: Tespit edilen rejim (BULL/BEAR/SIDEWAYS/HIGH_VOL/NORMAL).
         current_weights: Mevcut faktör ağırlıkları (opsiyonel).
         rotation_strength: Rotasyon gücü (0-1). 0 = mevcut korunur, 1 = tam rotasyon.
+        macro_tilt: Opsiyonel makro faktör çarpanları (ör. {"quality": 1.2, "momentum": 0.8}).
 
     Returns:
         Normalize edilmiş yeni faktör ağırlıkları.
@@ -273,7 +276,14 @@ def get_rotation_weights(
     for factor in all_factors:
         base_w = base.get(factor, 0.0)
         target_w = target.get(factor, 0.0)
-        new_weights[factor] = base_w + (target_w - base_w) * rotation_strength
+        blended_w = base_w + (target_w - base_w) * rotation_strength
+
+        # Makro eğilim çarpanı (varsa)
+        if macro_tilt and factor in macro_tilt:
+            tilt = max(0.0, float(macro_tilt[factor]))
+            blended_w *= tilt
+
+        new_weights[factor] = blended_w
 
     # Normalize — sıfıra bölmeyi önle
     total = sum(new_weights.values())
@@ -286,6 +296,7 @@ def get_rotation_weights(
         "rotation_weights_calculated",
         regime=regime,
         rotation_strength=rotation_strength,
+        macro_tilt_applied=bool(macro_tilt),
         n_factors=len(new_weights),
     )
 
@@ -293,20 +304,21 @@ def get_rotation_weights(
 
 
 def calculate_rotation_signal(
-    factor_performance: dict[str, float] | None,
+    factor_performance: dict[str, Any] | None,
     lookback_periods: int = 20,
 ) -> dict[str, Any]:
-    """Faktör momentum sinyali — hangi faktörler performans gösteriyor.
+    """Faktör momentum ve sebat (persistence) sinyali.
 
-    Faktör getirilerini sıralayarak üst/alt üçüncüleri belirler ve
-    rotasyon sinyali üretir.
+    Faktör getirilerini veya zaman serilerini sıralayarak üst/alt dilimleri
+    belirler; risk ayarlı getiri (Sharpe/IR) ve otokorelasyon kalıcılığını
+    hesaplayarak kurumsal kalitede rotasyon sinyali üretir.
 
     Args:
-        factor_performance: {factor_name: recent_return} sözlüğü. None olamaz.
-        lookback_periods: Geriye bakış periyodu (bilgi amaçlı, sıralama için kullanılmaz).
+        factor_performance: {factor_name: recent_return_or_returns_list} sözlüğü. None olamaz.
+        lookback_periods: Geriye bakış periyodu.
 
     Returns:
-        Dict with rotation_signal, top_factors, bottom_factors, spread.
+        Dict with rotation_signal, top_factors, bottom_factors, spread, persistence_score.
 
     Raises:
         TypeError: factor_performance None veya dict değilse.
@@ -325,47 +337,95 @@ def calculate_rotation_signal(
             "top_factors": [],
             "bottom_factors": [],
             "spread": 0.0,
+            "persistence_score": 0.0,
         }
 
-    # Değerlerin güvenli float olduğundan emin ol
-    clean_performance: dict[str, float] = {}
-    for name, ret in factor_performance.items():
+    # Değerlerin güvenli float veya zaman serisi float array olduğundan emin ol
+    clean_metrics: dict[str, dict[str, float]] = {}
+    for name, raw_val in factor_performance.items():
         try:
-            val = float(ret)
-            if math.isnan(val) or math.isinf(val):
-                logger.warning("rotation_nan_inf_factor", factor=name, value=ret, action="skipped")
-                continue
-            clean_performance[name] = val
+            if isinstance(raw_val, (list, np.ndarray)):
+                arr = np.array(raw_val, dtype=float)
+                arr = arr[np.isfinite(arr)]
+                if len(arr) == 0:
+                    continue
+                mean_ret = float(np.mean(arr))
+                vol = float(np.std(arr)) if len(arr) > 1 else 0.0
+                sharpe = mean_ret / max(vol, 1e-6)
+                # AR(1) Otokorelasyon / Sebat (Persistence)
+                if len(arr) >= 4:
+                    autocorr = float(np.corrcoef(arr[:-1], arr[1:])[0, 1])
+                    autocorr = 0.0 if np.isnan(autocorr) else autocorr
+                else:
+                    autocorr = 0.0
+                clean_metrics[name] = {
+                    "return": mean_ret,
+                    "volatility": vol,
+                    "sharpe": sharpe,
+                    "persistence": autocorr,
+                    "score": sharpe if vol > 1e-4 else mean_ret,
+                }
+            else:
+                val = float(raw_val)
+                if math.isnan(val) or math.isinf(val):
+                    logger.warning("rotation_nan_inf_factor", factor=name, value=raw_val, action="skipped")
+                    continue
+                clean_metrics[name] = {
+                    "return": val,
+                    "volatility": 0.0,
+                    "sharpe": val,
+                    "persistence": 0.5,
+                    "score": val,
+                }
         except (ValueError, TypeError) as exc:
-            logger.warning("rotation_invalid_factor_value", factor=name, value=ret, error=str(exc))
+            logger.warning("rotation_invalid_factor_value", factor=name, value=raw_val, error=str(exc))
             continue
 
-    if not clean_performance:
+    if not clean_metrics:
         logger.warning("rotation_all_factors_invalid")
         return {
             "rotation_signal": "NEUTRAL",
             "top_factors": [],
             "bottom_factors": [],
             "spread": 0.0,
+            "persistence_score": 0.0,
         }
 
-    # Sırala (yüksek getiri → düşük getiri)
-    sorted_factors = sorted(clean_performance.items(), key=lambda x: x[1], reverse=True)
+    # Skorlarına göre sırala (yüksek → düşük)
+    sorted_factors = sorted(clean_metrics.items(), key=lambda x: x[1]["score"], reverse=True)
 
     n = len(sorted_factors)
     top_n = max(n // 3, 1)
     bottom_n = max(n // 3, 1)
 
-    top_factors = [{"factor": name, "return": round(ret, 4)} for name, ret in sorted_factors[:top_n]]
-    bottom_factors = [{"factor": name, "return": round(ret, 4)} for name, ret in sorted_factors[-bottom_n:]]
+    top_factors = [
+        {
+            "factor": name,
+            "return": round(m["return"], 4),
+            "sharpe": round(m["sharpe"], 4),
+            "persistence": round(m["persistence"], 4),
+        }
+        for name, m in sorted_factors[:top_n]
+    ]
+    bottom_factors = [
+        {
+            "factor": name,
+            "return": round(m["return"], 4),
+            "sharpe": round(m["sharpe"], 4),
+            "persistence": round(m["persistence"], 4),
+        }
+        for name, m in sorted_factors[-bottom_n:]
+    ]
 
-    # Rotasyon sinyali
+    # Rotasyon metrikleri
     top_return = float(np.mean([f["return"] for f in top_factors]))
     bottom_return = float(np.mean([f["return"] for f in bottom_factors]))
     spread = top_return - bottom_return
 
+    avg_persistence = float(np.mean([f["persistence"] for f in top_factors]))
+
     if top_return > _SIGNAL_SPREAD_ACTIVE and bottom_return < -_SIGNAL_SPREAD_ACTIVE:
-        signal = "ACTIVE_ROTATION"
+        signal = "ACTIVE_ROTATION_STRONG" if avg_persistence > 0.3 else "ACTIVE_ROTATION"
     elif top_return > _SIGNAL_SPREAD_FAVOR:
         signal = "FAVOR_TOP"
     elif bottom_return < -_SIGNAL_SPREAD_FAVOR:
@@ -377,6 +437,7 @@ def calculate_rotation_signal(
         "rotation_signal_calculated",
         signal=signal,
         spread=round(spread, 4),
+        persistence=round(avg_persistence, 4),
         n_factors=n,
     )
 
@@ -385,4 +446,5 @@ def calculate_rotation_signal(
         "top_factors": top_factors,
         "bottom_factors": bottom_factors,
         "spread": round(spread, 4),
+        "persistence_score": round(avg_persistence, 4),
     }

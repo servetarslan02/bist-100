@@ -20,9 +20,9 @@ logger = structlog.get_logger(__name__)
 
 # Cari açık rejimi eşik sabitleri (milyar USD yıllıklandırılmış)
 DEFAULT_CA_REGIME_SURPLUS: float = 0.0
-DEFAULT_CA_REGIME_SMALL_DEFICIT: float = -10.0
-DEFAULT_CA_REGIME_MEDIUM_DEFICIT: float = -25.0
-DEFAULT_CA_REGIME_CRITICAL_DEFICIT: float = -45.0
+DEFAULT_CA_REGIME_SMALL_DEFICIT: float = -5.0
+DEFAULT_CA_REGIME_MEDIUM_DEFICIT: float = -15.0
+DEFAULT_CA_REGIME_CRITICAL_DEFICIT: float = -30.0
 
 # GSYH Oranı Eşikleri (%)
 DEFAULT_CA_GDP_WARNING_THRESHOLD: float = -4.5
@@ -174,6 +174,8 @@ ca_engine = CurrentAccountEngine()
 
 def compute_ca_features(ca_data: dict[str, Any]) -> dict[str, float]:
     """Sistem genelinde Feature Store ile tam uyumlu çalışan cari denge feature fonksiyonu."""
+    if not ca_data:
+        return {}
     metrics = ca_engine.evaluate_current_account(ca_data)
 
     return {

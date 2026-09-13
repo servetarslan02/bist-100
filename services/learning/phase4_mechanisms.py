@@ -1,10 +1,10 @@
-from typing import Any
-
 """FAZ 4: MEKANİZMA BAZLI ADAY TESTLERİ (Anti-Overfit Protocol)
+
 V3 Baseline ve 4 Aday birbirinden bağımsız olarak test edilir.
 """
 
 from datetime import timedelta
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -22,7 +22,7 @@ logger = structlog.get_logger()
 
 
 def calculate_capture_ratios(port_rets, bench_rets) -> Any:
-    """Otomatik eklendi."""
+    """Portföyün yukarı ve aşağı yönlü piyasa yakalama oranlarını (Upside/Downside Capture) hesaplar."""
     if len(port_rets) == 0 or len(bench_rets) == 0:
         return 0.0, 0.0
     df = pd.DataFrame({"port": port_rets, "bench": bench_rets})
@@ -36,7 +36,7 @@ def calculate_capture_ratios(port_rets, bench_rets) -> Any:
 
 
 def run_mechanism_candidate(eval_dates, features_by_ticker, xu100_close, trainer, candidate_name) -> Any:
-    """Otomatik eklendi."""
+    """Aday mekanizma varyantı için yürütme simülasyonunu çalıştırır."""
     portfolio_cash = 10_000_000.0
     positions = {}
 

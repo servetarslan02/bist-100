@@ -1,10 +1,4 @@
-import structlog
-
-logger = structlog.get_logger(__name__)
-from typing import Any
-
-"""
-ALPHA BIST — Mum Formasyonları Ampirik Eğitim & Trend Rider 30 Yıllık Testi
+"""ALPHA BIST — Mum Formasyonları Ampirik Eğitim & Trend Rider 30 Yıllık Testi
 ==========================================================================
 1. 12 Japon Mumunun BIST Tarihsel Başarı / Zarar Karnesini Çıkarır (Empirical Edge).
 2. Yapay Zeka Modelini (LightGBM) bu özelliklerle eğitir ve ağırlıklarını çıkarır.
@@ -14,11 +8,15 @@ ALPHA BIST — Mum Formasyonları Ampirik Eğitim & Trend Rider 30 Yıllık Test
 import os
 import sys
 import warnings
+from typing import Any
 
 import lightgbm as lgb
 import numpy as np
 import polars as pl
+import structlog
 import yfinance as yf
+
+logger = structlog.get_logger(__name__)
 
 warnings.filterwarnings("ignore")
 

@@ -69,10 +69,8 @@ def compute_inflation_features(inflation_data: dict[str, Any]) -> dict[str, floa
             features["inf_ppi_level"] = round(ppi_val, 2)
 
             if cpi_yoy is not None:
-                # ÜFE - TÜFE makası: Pozitif olması üretici maliyetlerinin tüketici fiyatlarından hızlı arttığını,
-                # yani sanayi şirketlerinin kâr marjlarının baskılandığını gösterir.
-                ppi_cpi_gap = ppi_val - float(cpi_yoy)
-                features["inf_cpi_ppi_spread"] = round(ppi_cpi_gap, 2)
+                cpi_ppi_gap = float(cpi_yoy) - ppi_val
+                features["inf_cpi_ppi_spread"] = round(cpi_ppi_gap, 2)
                 # Marj sıkışma rasyosu (PPI / CPI)
                 features["inf_producer_margin_squeeze_ratio"] = round(ppi_val / max(float(cpi_yoy), 0.1), 3)
 

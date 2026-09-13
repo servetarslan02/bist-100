@@ -1,10 +1,9 @@
-from typing import Any
-
 """FAZ 17: ALPHA STABILITY & INDEPENDENCE AUDIT"""
 
 import random
 import warnings
 from datetime import timedelta
+from typing import Any
 
 import lightgbm as lgb
 import numpy as np
@@ -20,7 +19,7 @@ from services.learning.institutional_walkforward_engine import detect_market_reg
 
 
 def extract_forensic_features(df) -> Any:
-    """Otomatik eklendi."""
+    """Alfa kararlılığı ve adli bağımsızlık denetimi için zaman serisi özniteliklerini çıkarır."""
     feats = pd.DataFrame(index=df.index)
     close = df["Close"]
     high = df["High"]
@@ -61,7 +60,7 @@ def extract_forensic_features(df) -> Any:
 
 
 def run_alpha_stability_audit() -> Any:
-    """Otomatik eklendi."""
+    """Alfa stabilitesi, rejim dayanıklılığı ve bağımsızlık denetimini çalıştırır."""
     logger.info("🚀 FAZ 17: ALPHA STABILITY & INDEPENDENCE AUDIT\n")
     logger.info("Kurallar İşletiliyor: Final Holdout Kilitli. PnL Backtest YOK. Sadece Alpha Stabilitesi.")
 

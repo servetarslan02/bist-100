@@ -27,7 +27,7 @@ logger.info("=" * 65)
 
 
 def adf_pvalue(series) -> Any:
-    """Otomatik eklendi."""
+    """Zaman serisinin durağanlığını (stationarity) test eden yaklaşık ADF p-değerini hesaplar."""
     s = np.array(series.dropna())
     n = len(s)
     if n < 20:

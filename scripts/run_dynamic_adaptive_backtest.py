@@ -1,10 +1,4 @@
-import structlog
-
-logger = structlog.get_logger(__name__)
-from typing import Any
-
-"""
-ALPHA BIST — 100% Dinamik, Sıfır Statik Veri ve 3 Aşamalı OOS Doğrulama Simülasyonu
+"""ALPHA BIST — 100% Dinamik, Sıfır Statik Veri ve 3 Aşamalı OOS Doğrulama Simülasyonu
 =================================================================================
 1. SIFIR STATİK VERİ: Mum ağırlıkları ve formasyon katsayıları sabit değil; her hisse için
    kayan pencerede (Rolling Window) son 252 günlük ampirik başarıya göre anlık hesaplanır.
@@ -20,9 +14,13 @@ ALPHA BIST — 100% Dinamik, Sıfır Statik Veri ve 3 Aşamalı OOS Doğrulama S
 import os
 import sys
 import warnings
+from typing import Any
 
 import numpy as np
 import polars as pl
+import structlog
+
+logger = structlog.get_logger(__name__)
 
 warnings.filterwarnings("ignore")
 

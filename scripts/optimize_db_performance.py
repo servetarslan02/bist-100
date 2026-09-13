@@ -1,7 +1,4 @@
-from typing import Any
-
-"""
-ALPHA BIST — Database Performance Optimization Script
+"""ALPHA BIST — Database Performance Optimization Script
 
 PostgreSQL performans optimizasyonları:
 - Index analizi ve optimizasyonu
@@ -19,6 +16,7 @@ import argparse
 import asyncio
 import sys
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 

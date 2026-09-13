@@ -15,6 +15,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 import numpy as np
+import scipy.stats as stats
 import structlog
 
 from services.macro.config.macro_config import macro_config
@@ -33,13 +34,17 @@ class CorrelationResult:
     significant: bool
     sample_count: int
     window_days: int
+    ewma_correlation: float = 0.0
+    spearman_correlation: float = 0.0
+    lead_lag_dominant: str = "SYNCHRONOUS"
 
     def __repr__(self) -> str:
         """Korelasyon sonucunun okunabilir string temsili."""
         return (
             f"CorrelationResult({self.var1} vs {self.var2}: "
-            f"corr={self.correlation:.4f}, p={self.p_value:.4f}, "
-            f"significant={self.significant}, n={self.sample_count})"
+            f"corr={self.correlation:.4f}, ewma={self.ewma_correlation:.4f}, "
+            f"spearman={self.spearman_correlation:.4f}, lead_lag={self.lead_lag_dominant}, "
+            f"p={self.p_value:.4f}, significant={self.significant}, n={self.sample_count})"
         )
 
 
@@ -116,12 +121,55 @@ class MacroCorrelationTracker:
                 self._history[key] = self._history[key][-self._window * 2 :]
                 self._timestamps[key] = self._timestamps[key][-self._window * 2 :]
 
+    def _calc_ewma_corr(self, x: np.ndarray, y: np.ndarray, decay: float = 0.94) -> float:
+        """RiskMetrics standardı EWMA (Exponentially Weighted Moving Average) korelasyonu."""
+        n = len(x)
+        if n < 5:
+            return 0.0
+        weights = np.array([(1.0 - decay) * (decay ** (n - 1 - i)) for i in range(n)])
+        w_sum = np.sum(weights)
+        if w_sum <= 0:
+            return 0.0
+        weights = weights / w_sum
+
+        mu_x = np.sum(weights * x)
+        mu_y = np.sum(weights * y)
+
+        cov_xy = np.sum(weights * (x - mu_x) * (y - mu_y))
+        var_x = np.sum(weights * (x - mu_x) ** 2)
+        var_y = np.sum(weights * (y - mu_y) ** 2)
+
+        denom = np.sqrt(var_x * var_y)
+        if denom < 1e-9:
+            return 0.0
+        return float(np.clip(cov_xy / denom, -1.0, 1.0))
+
+    def _calc_lead_lag(self, x: np.ndarray, y: np.ndarray) -> str:
+        """Lag-1 ve Lag-2 çapraz korelasyonu inceleyerek öncü-artçı ilişkiyi belirler."""
+        if len(x) < 8:
+            return "SYNCHRONOUS"
+
+        # x leads y: corr(x[:-1], y[1:])
+        corr_x_leads = np.corrcoef(x[:-1], y[1:])[0, 1]
+        # y leads x: corr(y[:-1], x[1:])
+        corr_y_leads = np.corrcoef(y[:-1], x[1:])[0, 1]
+
+        corr_x_leads = 0.0 if np.isnan(corr_x_leads) else corr_x_leads
+        corr_y_leads = 0.0 if np.isnan(corr_y_leads) else corr_y_leads
+
+        diff = abs(corr_x_leads) - abs(corr_y_leads)
+        if diff > 0.15:
+            return "VAR1_LEADS"
+        elif diff < -0.15:
+            return "VAR2_LEADS"
+        return "SYNCHRONOUS"
+
     def get_correlation(
         self,
         var1: str,
         var2: str,
     ) -> CorrelationResult | None:
-        """İki değişken arası korelasyon hesapla."""
+        """İki değişken arası çok boyutlu korelasyon hesapla."""
         cfg = macro_config.correlation
 
         h1 = self._history.get(var1, [])
@@ -142,18 +190,26 @@ class MacroCorrelationTracker:
         if len(arr1) < cfg.min_samples:
             return None
 
-        # Korelasyon hesapla
+        # Standart Pearson Korelasyonu
         corr = np.corrcoef(arr1, arr2)[0, 1]
         if np.isnan(corr):
             corr = 0.0
+
+        # EWMA Korelasyonu (Rejim duyarlılığı yüksek)
+        ewma_corr = self._calc_ewma_corr(arr1, arr2, decay=0.94)
+
+        # Spearman Sıra Korelasyonu (Aykırı değer ve ağır kuyruklara dirençli)
+        spearman_res = stats.spearmanr(arr1, arr2)
+        spearman_corr = float(spearman_res.statistic) if not np.isnan(spearman_res.statistic) else 0.0
+
+        # Öncü - Artçı Dinamik Analizi
+        lead_lag = self._calc_lead_lag(arr1, arr2)
 
         # P-value hesapla (t-test)
         n_obs = len(arr1)
         if abs(corr) < 1.0 and n_obs > 2:
             t_stat = corr * np.sqrt((n_obs - 2) / (1 - corr**2))
-            from scipy import stats
-
-            p_value = 2 * (1 - stats.t.cdf(abs(t_stat), n_obs - 2))
+            p_value = float(2 * (1 - stats.t.cdf(abs(t_stat), n_obs - 2)))
         else:
             p_value = 0.0
 
@@ -174,6 +230,9 @@ class MacroCorrelationTracker:
             significant=significant,
             sample_count=n_obs,
             window_days=n,
+            ewma_correlation=round(float(ewma_corr), 4),
+            spearman_correlation=round(float(spearman_corr), 4),
+            lead_lag_dominant=lead_lag,
         )
 
     def get_correlation_matrix(self) -> dict[str, dict[str, float]]:
@@ -241,6 +300,7 @@ class MacroCorrelationTracker:
         cfg = macro_config.correlation
         features = {}
 
+        all_corrs = []
         for v1, v2 in cfg.tracked_pairs:
             result = self.get_correlation(v1, v2)
             pair_key = self._pair_key(v1, v2)
@@ -248,9 +308,14 @@ class MacroCorrelationTracker:
             if result:
                 features[f"corr_{v1}_{v2}"] = result.correlation
                 features[f"corr_{v1}_{v2}_significant"] = 1.0 if result.significant else 0.0
+                features[f"corr_{v1}_{v2}_ewma"] = result.ewma_correlation
+                features[f"corr_{v1}_{v2}_spearman"] = result.spearman_correlation
+                all_corrs.append(abs(result.correlation))
             else:
                 features[f"corr_{v1}_{v2}"] = 0.0
                 features[f"corr_{v1}_{v2}_significant"] = 0.0
+                features[f"corr_{v1}_{v2}_ewma"] = 0.0
+                features[f"corr_{v1}_{v2}_spearman"] = 0.0
 
             # Korelasyon stabilitesi (son 30 günün std'si)
             hist = self._correlation_history.get(pair_key, [])
@@ -263,6 +328,8 @@ class MacroCorrelationTracker:
         breakdowns = self.detect_correlation_breakdown()
         features["correlation_stress"] = float(sum(1 for b in breakdowns if b.alert))
         features["correlation_stress_pct"] = round(sum(1 for b in breakdowns if b.alert) / max(len(breakdowns), 1), 4)
+        # Sistemik Kohezyon: Piyasa krizlerinde korelasyonların 1.0'e kilitlenme derecesi
+        features["systemic_correlation_cohesion"] = round(float(np.mean(all_corrs)), 4) if all_corrs else 0.0
 
         return features
 

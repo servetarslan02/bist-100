@@ -1,10 +1,9 @@
-from typing import Any
-
 """FAZ 14: ABSOLUTE + RELATIVE ALPHA ARCHITECTURE"""
 
 import random
 import warnings
 from datetime import timedelta
+from typing import Any
 
 import lightgbm as lgb
 import numpy as np
@@ -27,14 +26,15 @@ from services.learning.institutional_walkforward_engine import (
 # M0: OLD TRAINER (REGRESSOR)
 # =====================================================================
 class ModelTrainerM0:
-    """Otomatik eklendi."""
+    """M0 Temel Regresyon Model Eğiticisi."""
+
     def __init__(self, feature_cols):
-        """Otomatik eklendi."""
+        """Model eğiticisi başlatıcı."""
         self.feature_cols = feature_cols
         self.lgb_model = None
 
     def retrain_fold(self, train_df) -> Any:
-        """Otomatik eklendi."""
+        """Belirtilen fold verisi üzerinde LightGBM regresyon modelini eğitir."""
         if len(train_df) < 100:
             return
         X = train_df[self.feature_cols].values
@@ -46,14 +46,14 @@ class ModelTrainerM0:
             "learning_rate": 0.05,
             "num_leaves": 15,
             "min_data_in_leaf": 10,
-            "verbose": -1,
+            "verbosity": -1,
             "seed": 42,
             "num_threads": 2,
         }
         self.lgb_model = lgb.train(params_lgb, train_data, num_boost_round=40)
 
     def predict_batch_day(self, tickers, features_list) -> Any:
-        """Otomatik eklendi."""
+        """Günlük hisse listesi için regresyon alfa tahminlerini üretir."""
         X_mat = np.array([f[self.feature_cols].values for f in features_list])
         lgb_preds = np.zeros(len(tickers))
         if self.lgb_model:
@@ -66,14 +66,15 @@ class ModelTrainerM0:
 # M1/M2: RANKER TRAINER
 # =====================================================================
 class ModelTrainerRanker:
-    """Otomatik eklendi."""
+    """LambdaRank Sıralama (Cross-Sectional Ranking) Model Eğiticisi."""
+
     def __init__(self, feature_cols):
-        """Otomatik eklendi."""
+        """Sıralama modeli başlatıcı."""
         self.feature_cols = feature_cols
         self.rank_model = None
 
     def retrain_fold(self, train_df) -> Any:
-        """Otomatik eklendi."""
+        """Enine kesit sıralama (NDCG) hedefiyle LightGBMRanker modelini eğitir."""
         if len(train_df) < 100:
             return
         df_sorted = train_df.sort_values("date").copy()
@@ -96,7 +97,7 @@ class ModelTrainerRanker:
         self.rank_model.fit(X_df, y_rel, group=groups)
 
     def predict_batch_day(self, tickers, features_list) -> Any:
-        """Otomatik eklendi."""
+        """Günlük hisselerin göreceli alfa sıralamasını normalize edilmiş skorlara dönüştürür."""
         X_mat = np.array([f[self.feature_cols].values for f in features_list])
         lgb_preds = np.zeros(len(tickers))
         if self.rank_model:
@@ -111,7 +112,7 @@ class ModelTrainerRanker:
 # WALK-FORWARD ENGINE WITH FILTER SUPPORT
 # =====================================================================
 def run_simulation(trainer, eval_dates, features_by_ticker, xu100_close, filter_mode="NONE") -> Any:
-    """Otomatik eklendi."""
+    """Walk-forward portföy simülasyonunu ve filtreleme mekanizmalarını çalıştırır."""
     INITIAL_CAPITAL = 10_000_000.0
     portfolio_cash = INITIAL_CAPITAL
     positions = {}
@@ -279,7 +280,7 @@ if __name__ == "__main__":
     )
 
     def print_metrics(name, eq_curve, trades, gp, gl, exp) -> Any:
-        """Otomatik eklendi."""
+        """Simülasyon sonuç metriklerini hesaplar ve loglar."""
         init = 10_000_000.0
         final = eq_curve[-1]
         cagr = ((final / init) ** (252.0 / len(eq_curve)) - 1.0) * 100.0

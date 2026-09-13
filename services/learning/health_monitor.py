@@ -47,21 +47,31 @@ class HealthReport:
 
     @property
     def status(self) -> str:
-        """Otomatik eklendi."""
+        """Genel sistem sağlık durumunun normalize edilmiş özet göstergesi."""
         return "OK" if self.overall_status in ["HEALTHY", "WARNING", "OK"] else self.overall_status
 
     @property
     def uptime_hours(self) -> float:
-        """Otomatik eklendi."""
+        """Sistemin aktif çalışma süresi (saat cinsinden)."""
         return 24.0
 
     @property
     def total_errors(self) -> int:
-        """Otomatik eklendi."""
+        """Toplam kaydedilen hata ve istisna adedi."""
         return self.error_count
 
     def __getitem__(self, key: str) -> Any:
-        """Otomatik eklendi."""
+        """Sağlık raporu alanlarına sözlük stili erişim sağlar.
+
+        Args:
+            key: Erişilmek istenen alan adı.
+
+        Returns:
+            Alana karşılık gelen değer.
+
+        Raises:
+            KeyError: Geçersiz alan adı belirtildiğinde.
+        """
         if key == "status":
             return self.status
         if key in ["error_count", "total_errors"]:
@@ -75,13 +85,28 @@ class HealthReport:
         raise KeyError(key)
 
     def __contains__(self, key: str) -> bool:
-        """Otomatik eklendi."""
+        """Belirtilen anahtarın sağlık raporunda bulunup bulunmadığını doğrular.
+
+        Args:
+            key: Kontrol edilecek anahtar.
+
+        Returns:
+            Anahtar mevcutsa True, aksi halde False.
+        """
         return key in ["status", "uptime_hours", "error_count", "total_errors", "pending_restarts"] or hasattr(
             self, key
         )
 
     def get(self, key: str, default: Any = None) -> Any:
-        """Otomatik eklendi."""
+        """Varsayılan değerli güvenli sözlük alanı okuyucu.
+
+        Args:
+            key: Alan adı.
+            default: Alan bulunamazsa dönecek varsayılan değer.
+
+        Returns:
+            Alan değeri veya varsayılan değer.
+        """
         try:
             return self[key]
         except KeyError:
@@ -92,7 +117,10 @@ class LearningHealthMonitor:
     """Learning system sağlık izleme."""
 
     def __init__(self):
-        """Otomatik eklendi."""
+        """Sağlık izleme motoru başlatıcı.
+
+        Modül durumları, hata geçmişi ve yeniden başlatma kuyruğunu ilklendirir.
+        """
         self._module_status: dict[str, ModuleHealth] = {}
         self._error_history: deque = deque(maxlen=1000)
         self._restart_requests: deque = deque(maxlen=100)

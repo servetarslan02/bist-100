@@ -1,11 +1,11 @@
-from typing import Any
-
 """Phase 1 & 2: Baseline and Upside/BULL_TREND Loss Audit
+
 Bu betik, Train/Validation (Holdout ÖNCESİ) dönemdeki işlemleri derinlemesine analiz eder.
 Amacı: BULL_TREND rejimindeki kayıpların ve kaçırılan rallilerin (V-dip) KÖK NEDENİNİ bulmaktır.
 """
 
 from datetime import timedelta
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -23,7 +23,7 @@ logger = structlog.get_logger()
 
 
 def run_audit_simulation(eval_dates, features_by_ticker, xu100_close, trainer, initial_capital=10_000_000.0) -> Any:
-    """Otomatik eklendi."""
+    """Yükseliş ve boğa rejimi kayıplarını derinlemesine analiz eden denetim simülasyonunu çalıştırır."""
     portfolio_cash = initial_capital
     positions = {}
 

@@ -1,11 +1,4 @@
-#!/usr/bin/env python3
-import structlog
-
-logger = structlog.get_logger(__name__)
-from typing import Any
-
-"""
-Async Provider Testleri
+"""Async Provider Testleri
 
 Kapsam:
 - Async HTTP client
@@ -17,6 +10,11 @@ Kapsam:
 import asyncio
 import os
 import sys
+from typing import Any
+
+import structlog
+
+logger = structlog.get_logger(__name__)
 
 import orjson
 

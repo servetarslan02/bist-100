@@ -1,10 +1,9 @@
-from typing import Any
-
 """FAZ 16: PORTFOLIO-RELEVANT ALPHA FORENSICS"""
 
 import random
 import warnings
 from datetime import timedelta
+from typing import Any
 
 import lightgbm as lgb
 import numpy as np
@@ -22,7 +21,7 @@ from services.learning.institutional_walkforward_engine import detect_market_reg
 
 
 def extract_forensic_features(df) -> Any:
-    """Otomatik eklendi."""
+    """Adli alfa analizi ve IC değerlendirmesi için zaman serisi özniteliklerini çıkarır."""
     feats = pd.DataFrame(index=df.index)
     close = df["Close"]
     high = df["High"]
@@ -65,17 +64,17 @@ def extract_forensic_features(df) -> Any:
 
 
 def get_top_k(scores_dict, k) -> Any:
-    """Otomatik eklendi."""
+    """En yüksek skora sahip k adet hisse senedini seçer."""
     return sorted(scores_dict.keys(), key=lambda x: scores_dict[x], reverse=True)[:k]
 
 
 def get_bottom_k(scores_dict, k) -> Any:
-    """Otomatik eklendi."""
+    """En düşük skora sahip k adet hisse senedini seçer."""
     return sorted(scores_dict.keys(), key=lambda x: scores_dict[x])[:k]
 
 
 def run_forensics() -> Any:
-    """Otomatik eklendi."""
+    """Portföy alfa adli tıp analiz motorunu ve horizon bazlı metrikleri çalıştırır."""
     logger.info("🚀 FAZ 16: PORTFOLIO-RELEVANT ALPHA FORENSICS\n")
     logger.info("Kurallar İşletiliyor: Final Holdout Kilitli. PnL Backtest YOK. Hyperparameter Tuning YOK.")
 

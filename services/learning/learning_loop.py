@@ -1,5 +1,3 @@
-from typing import Any
-
 """ALPHA BIST — Learning Loop v2.0 (DuckDB Persistence)
 
 Kendi kendine öğrenme döngüsü:
@@ -12,6 +10,7 @@ v2.0: DuckDB tabanlı persistence — restart sonrası kaybolmaz
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from typing import Any
 
 import structlog
 

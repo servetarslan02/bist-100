@@ -160,6 +160,8 @@ credit_engine = CreditCycleEngine()
 
 def compute_credit_features(credit_data: dict[str, Any]) -> dict[str, float]:
     """Feature Store ve portföy risk motoruyla tam uyumlu kredi feature fonksiyonu."""
+    if not credit_data:
+        return {}
     metrics = credit_engine.evaluate_credit(credit_data)
 
     return {

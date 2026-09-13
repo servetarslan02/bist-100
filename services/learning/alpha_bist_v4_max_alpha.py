@@ -1,11 +1,11 @@
-from typing import Any
-
 """Phase 7, 8 & 9: V4 Max Alpha (Final Holdout Confirmation)
+
 Bu script, Train/Val üzerinde muazzam sinerji yaratan 'C_Combined'
 (Dynamic Trailing + Scout Entries) stratejisini dondurur ve FINAL HOLDOUT'ta test eder.
 """
 
 from datetime import timedelta
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -61,7 +61,19 @@ V4_PARAMS = {
 def run_v4_strategy(
     eval_dates, features_by_ticker, xu100_close, trainer, initial_capital=10_000_000.0, label="V4_Max_Alpha"
 ) -> Any:
-    """Otomatik eklendi."""
+    """V4 Max Alpha stratejisini dondurulmuş parametrelerle çalıştırır.
+
+    Args:
+        eval_dates: Değerlendirme tarihleri dizisi.
+        features_by_ticker: Hisse bazlı öznitelik veri çerçeveleri.
+        xu100_close: BIST-100 endeks kapanış serisi.
+        trainer: Eğitilmiş makine öğrenmesi model yöneticisi.
+        initial_capital: Başlangıç portföy sermayesi.
+        label: Raporlama etiketi.
+
+    Returns:
+        Portföy getiri, işlem ve rejim bazlı PnL istatistikleri sözlüğü.
+    """
     portfolio_cash = initial_capital
     positions = {}
     equity_curve = []
@@ -313,7 +325,11 @@ def run_v4_strategy(
 
 
 def print_final_report(m) -> Any:
-    """Otomatik eklendi."""
+    """Nihai holdout doğrulama metriklerini yapısal olarak loglar.
+
+    Args:
+        m: Hesaplanan performans metrikleri sözlüğü.
+    """
     logger.info(f"\n{'=' * 60}")
     logger.info(f"🏆 NİHAİ HOLDOUT RAPORU — {m['label']}")
     logger.info(f"{'=' * 60}")

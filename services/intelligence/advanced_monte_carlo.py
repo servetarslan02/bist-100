@@ -1,7 +1,4 @@
-from typing import Any
-
-"""
-ALPHA BIST — Advanced Monte Carlo Engine v1.0
+"""ALPHA BIST — Advanced Monte Carlo Engine v1.0
 
 Gelişmiş Monte Carlo simülasyonları:
 - Merton Jump-Diffusion Model
@@ -14,24 +11,24 @@ Kullanım:
     result = engine.jump_diffusion_sim(current_price=100, mu=0.15, sigma=0.25)
 """
 
+from dataclasses import dataclass
+from typing import Any
+
 import numpy as np
+import structlog
 
 try:
     from numba import jit
 except ImportError:
 
-    def jit(*args, **kwargs) -> Any:
+    def jit(*args: Any, **kwargs: Any) -> Any:
         """Numba bulunmadığında kullanılan şeffaf dekoratör sarmalayıcısı."""
-        def decorator(func) -> Any:
+        def decorator(func: Any) -> Any:
             """Orijinal fonksiyonu derlemeden doğrudan döndüren geri dönüş işlevi."""
             return func
 
         return decorator
 
-
-from dataclasses import dataclass
-
-import structlog
 
 logger = structlog.get_logger()
 
@@ -165,6 +162,56 @@ class AdvancedMonteCarloEngine:
 
     def __repr__(self) -> str:
         return "AdvancedMonteCarloEngine(models=['gbm', 'jump_diffusion', 'student_t', 'heston'])"
+
+    def calibrate_from_history(self, returns: np.ndarray | list[float]) -> dict[str, float]:
+        """Tarihsel getiri serisinden BIST Monte Carlo parametrelerini otomatik kalibre eder.
+
+        Yıllıklandırılmış drift (mu), volatilite (sigma), sıçrama yoğunluğu (jump_intensity),
+        sıçrama parametreleri ve Student-t serbestlik derecesini hesaplar.
+
+        Args:
+            returns: Günlük getiri serisi (yüzdelik değil, oran formatında).
+
+        Returns:
+            Kalibre edilmiş parametre sözlüğü.
+        """
+        arr = np.array(returns, dtype=float)
+        arr = arr[np.isfinite(arr)]
+        if len(arr) < 20:
+            return {
+                "mu": 0.20,
+                "sigma": 0.30,
+                "jump_intensity": 0.1,
+                "jump_mean": -0.02,
+                "jump_std": 0.05,
+                "degrees_of_freedom": 5.0,
+            }
+
+        daily_mu = float(np.mean(arr))
+        daily_sigma = float(np.std(arr))
+        mu_ann = daily_mu * 252.0
+        sigma_ann = daily_sigma * np.sqrt(252.0)
+
+        # 2.5 sigma üzerindeki sıçramaları (jumps) tespit et
+        threshold = 2.5 * max(daily_sigma, 1e-6)
+        jumps = arr[np.abs(arr - daily_mu) > threshold]
+        jump_intensity = float(len(jumps) / len(arr) * 252.0) if len(arr) > 0 else 0.1
+
+        jump_mean = float(np.mean(jumps - daily_mu)) if len(jumps) > 0 else -0.02
+        jump_std = float(np.std(jumps)) if len(jumps) > 1 else 0.05
+
+        # Kurtosis bazlı Student-t serbestlik derecesi
+        excess_kurt = float(np.mean(((arr - daily_mu) / max(daily_sigma, 1e-6)) ** 4) - 3.0)
+        df_est = float(np.clip(4.0 + 6.0 / max(excess_kurt, 0.2), 3.0, 30.0))
+
+        return {
+            "mu": round(mu_ann, 4),
+            "sigma": round(sigma_ann, 4),
+            "jump_intensity": round(jump_intensity, 4),
+            "jump_mean": round(jump_mean, 4),
+            "jump_std": round(jump_std, 4),
+            "degrees_of_freedom": round(df_est, 2),
+        }
 
     def gbm_sim(
         self,

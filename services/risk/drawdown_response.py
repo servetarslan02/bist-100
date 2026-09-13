@@ -1,7 +1,4 @@
-from typing import Any
-
-"""
-ALPHA BIST — Drawdown Response System v1.0
+"""ALPHA BIST — Drawdown Response System v1.0
 
 Otomatik drawdown yönetimi.
 Drawdown eşiğine göre otomatik aksiyon alır.
@@ -15,6 +12,7 @@ import threading
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
+from typing import Any
 
 import structlog
 

@@ -112,7 +112,17 @@ rsi14 = 100 - (100 / (1 + rs))
 # SISTEM 1: DUAL MOMENTUM + PPF REPO NAKIT KORUMASI (Bi-weekly Rebalance)
 # ═════════════════════════════════════════════════════════════════════════
 def sim_dual_momentum(top_n=5, mom_type="126", breadth_filter=0.35, use_repo=True) -> Any:
-    """Otomatik eklendi."""
+    """İkili momentum ve repo nakit koruması stratejisini simüle eder.
+
+    Args:
+        top_n: Portföye dahil edilecek en yüksek momentumlu hisse sayısı.
+        mom_type: Momentum hesaplama periyodu ("63", "126", "252").
+        breadth_filter: Minimum piyasa genişliği eşik değeri.
+        use_repo: Nakitte kalan sermaye için repo getirisi uygulanıp uygulanmayacağı.
+
+    Returns:
+        Günlük PnL getiri serisi (pd.Series).
+    """
     score_df = sharpe_score if mom_type == "126" else (mom63 / (vol20 + 1e-6) if mom_type == "63" else mom252)
     # Sadece 50 SMA uzerindeki hisseleri sec
     filtered_score = score_df.where(close > sma50, np.nan)
@@ -156,7 +166,16 @@ def sim_dual_momentum(top_n=5, mom_type="126", breadth_filter=0.35, use_repo=Tru
 # SISTEM 2: DONCHIAN 20-DAY BREAKOUT + VOLUME SURGE
 # ═════════════════════════════════════════════════════════════════════════
 def sim_breakout(top_n=5, vol_mult=1.3, use_repo=True) -> Any:
-    """Otomatik eklendi."""
+    """Donchian kanal kırılımı ve hacim artışı stratejisini simüle eder.
+
+    Args:
+        top_n: Maksimum eşzamanlı aktif pozisyon sayısı.
+        vol_mult: 20 günlük ortalama hacme göre kırılım hacim çarpanı.
+        use_repo: Boşta kalan nakit için risksiz repo faizi ekleme bayrağı.
+
+    Returns:
+        Kanal kırılım stratejisi günlük net getiri serisi.
+    """
     is_breakout = (close > high20) & (volume > vol_mult * vol_avg20) & (close > sma50)
     is_exit = close < low10
 
@@ -192,7 +211,17 @@ def sim_breakout(top_n=5, vol_mult=1.3, use_repo=True) -> Any:
 # SISTEM 3: TREND + RSI PULLBACK SWING (Guclu Trendde Dibi Yakalama)
 # ═════════════════════════════════════════════════════════════════════════
 def sim_rsi_pullback(top_n=5, rsi_entry=40, rsi_exit=65, use_repo=True) -> Any:
-    """Otomatik eklendi."""
+    """Yükselen trendde RSI geri çekilmesi (pullback) swing stratejisini simüle eder.
+
+    Args:
+        top_n: Maksimum eşzamanlı pozisyon adedi.
+        rsi_entry: Alım için RSI üst sınır eşiği.
+        rsi_exit: Satım için RSI kar alma eşiği.
+        use_repo: Nakit bakiye için repo faizi getirisi hesaplama tercihi.
+
+    Returns:
+        Pullback swing stratejisi günlük net getiri serisi.
+    """
     # Trend sarti: Fiyat > SMA200 ve SMA50 > SMA200
     in_uptrend = (close > sma200) & (sma50 > sma200)
     buy_signal = in_uptrend & (rsi14 < rsi_entry)
@@ -227,7 +256,14 @@ def sim_rsi_pullback(top_n=5, rsi_entry=40, rsi_exit=65, use_repo=True) -> Any:
 # SONUÇLAR VE METRİKLER
 # ═════════════════════════════════════════════════════════════════════════
 def metrics(s) -> Any:
-    """Otomatik eklendi."""
+    """Getiri serisinden CAGR, Sharpe ve Maksimum Drawdown metriklerini hesaplar.
+
+    Args:
+        s: Günlük getiri serisi.
+
+    Returns:
+        Tuple[float, float, float]: (CAGR %, Sharpe Oranı, Max Drawdown %).
+    """
     cum = (1 + s).cumprod()
     if len(cum) == 0 or cum.iloc[-1] <= 0:
         return 0.0, 0.0, 0.0

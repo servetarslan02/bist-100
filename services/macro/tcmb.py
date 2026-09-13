@@ -131,23 +131,18 @@ def compute_tcmb_features(tcmb_data: dict[str, Any]) -> dict[str, float]:
             if reserves_prev is not None:
                 features["tcmb_net_reserve_change_1m"] = round(float(net_reserves) - float(reserves_prev), 2)
 
-        # 8. Bütünleşik Para Politikası Duruşu (Reel faiz ve Taylor boşluğu sentezi)
-        real_rate_val = features.get("tcmb_forward_real_rate", features.get("tcmb_real_rate", 0.0))
-        taylor_gap_val = features.get("tcmb_taylor_gap", 0.0)
-
-        composite_tightness = (0.6 * real_rate_val) + (0.4 * taylor_gap_val)
-        if composite_tightness > DEFAULT_TCMB_STANCE_VERY_TIGHT:
-            stance = 2.0  # ÇOK SIKI (Agresif dezenflasyon)
-        elif composite_tightness > DEFAULT_TCMB_STANCE_TIGHT:
-            stance = 1.0  # SIKI
-        elif composite_tightness > DEFAULT_TCMB_STANCE_NEUTRAL:
-            stance = 0.0  # DENGELİ / NÖTR
-        elif composite_tightness > DEFAULT_TCMB_STANCE_LOOSE:
-            stance = -1.0  # GEVŞEK
-        else:
-            stance = -2.0  # ÇOK GEVŞEK (Enflasyonist baskı yüksek)
-
-        features["tcmb_policy_stance"] = stance
+        # 8. Para Politikası Duruşu (Reel faiz rejimi)
+        real_rate_val = features.get("tcmb_real_rate")
+        if real_rate_val is not None:
+            if real_rate_val > DEFAULT_TCMB_STANCE_VERY_TIGHT:
+                stance = 2.0  # ÇOK SIKI (> 3.0%)
+            elif real_rate_val > DEFAULT_TCMB_STANCE_TIGHT:
+                stance = 1.0  # SIKI (> 0.0%)
+            elif real_rate_val > DEFAULT_TCMB_STANCE_LOOSE:
+                stance = -1.0  # GEVŞEK (> -3.0%)
+            else:
+                stance = -2.0  # ÇOK GEVŞEK (<= -3.0%)
+            features["tcmb_policy_stance"] = stance
 
     except Exception as e:
         logger.error("TCMB kurumsal analitik hesaplaması başarısız oldu", error=str(e))
