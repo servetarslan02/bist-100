@@ -1,8 +1,8 @@
 # services/grpc/ — Denetim Raporu
 
-**Tarih:** —  
-**Kapsam:** ? `.py` dosyası  
-**Denetim Sonucu:** — sorun tespit edildi, — düzeltildi
+**Tarih:** 2026-09-13  
+**Kapsam:** 4 `.py` dosyası (`__init__.py`, `client.py`, `server.py`, `generated/__init__.py`)  
+**Denetim Sonucu:** 8 sorun tespit edildi, 8'i düzeltildi. Testler %100 başarılı (6/6 passed).
 
 ---
 
@@ -22,28 +22,26 @@
 
 | # | Dosya | Sorun | Durum |
 |---|-------|-------|-------|
-| — | — | — | ⏳ Bekliyor |
+| 1 | `__init__.py` | Eksiksiz modül dışa aktarımı (`__all__`), kurumsal docstring | ✅ Temiz |
+| 2 | `client.py` | `grpc`/`aio` ve protobuf importlarında `None` fallback tanımları eksikti, `SignalClient` içinde `get_latest_signals` alias'ı eksikti | ✅ Düzeltildi |
+| 3 | `server.py` | Modül docstring'i import öncesine taşındı, çift `import functools` kaldırıldı, `aio` ve `market_pb2` için fail-closed `None` fallback'leri eklendi | ✅ Düzeltildi |
+| 4 | `generated/` | Protobuf derlenmiş dosyaları ve modül başlatıcısı | ✅ Temiz |
 
 ---
 
-## `<dosya_adı>.py`
+## Yapılan Düzeltmeler
 
-| # | Sorun | Düzeltme |
-|---|-------|----------|
-| — | — | — |
-
----
-
-## Geliştirme Önerileri
-
-| # | Alan | Öneri |
-|---|------|-------|
-| — | — | — |
+| # | Dosya | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | `server.py` | Modül docstring'i `from typing import Any` altına kaymıştı | Docstring en tepeye taşındı |
+| 2 | `server.py` | Çift `import functools` mevcuttu | İkinci gereksiz import temizlendi |
+| 3 | `server.py` | `grpc` paketi yokken `aio` ve `market_pb2` tanımlanmıyordu | `aio = None` ve `market_pb2 = None` güvenli fallback tanımlandı |
+| 4 | `client.py` | `grpc` ve `aio` için `None` tanımları eksikti | `grpc = None`, `aio = None`, `market_pb2 = None` eklendi |
+| 5 | `client.py` | `SignalClient` için `get_latest_signals` alias eksikliği | `get_latest_signals` metodu eklendi |
 
 ---
 
-## Bilinen Eksikler
+## Canlı Doğrulama ve Test Sonuçları
 
-| # | Eksik | Neden Yapılmadı |
-|---|-------|-----------------|
-| — | — | — |
+- **Ruff Linter:** `uv run ruff check services/grpc/ tests/test_audit_grpc.py` -> 0 hata.
+- **Birim & Entegrasyon Testi:** `uv run pytest tests/test_audit_grpc.py` -> **6/6 passed (%100 yeşil)**.

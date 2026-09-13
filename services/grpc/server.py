@@ -1,7 +1,4 @@
-from typing import Any
-
-"""
-ALPHA BIST — gRPC Server v2.0 (Protobuf Native)
+"""ALPHA BIST — gRPC Server v2.0 (Protobuf Native).
 
 Gerçek protobuf serialization ile servisler arası iletişim.
 JSON'dan 10x küçük, 10x hızlı.
@@ -12,7 +9,9 @@ Kullanım:
 """
 
 import asyncio
+import functools
 import time
+from typing import Any
 
 import structlog
 
@@ -21,6 +20,7 @@ try:
 
     HAS_GRPC = True
 except ImportError:
+    aio = None  # type: ignore[assignment]
     HAS_GRPC = False
 
 # Generated protobuf imports
@@ -29,9 +29,9 @@ try:
 
     HAS_PROTOBUF = True
 except ImportError:
+    market_pb2 = None  # type: ignore[assignment]
+    market_pb2_grpc = None  # type: ignore[assignment]
     HAS_PROTOBUF = False
-
-import functools
 
 from opentelemetry import trace
 

@@ -25,6 +25,8 @@ try:
 
     HAS_GRPC = True
 except ImportError:
+    grpc = None  # type: ignore[assignment]
+    aio = None  # type: ignore[assignment]
     HAS_GRPC = False
 
 # Generated protobuf imports
@@ -33,6 +35,8 @@ try:
 
     HAS_PROTOBUF = True
 except ImportError:
+    market_pb2 = None  # type: ignore[assignment]
+    market_pb2_grpc = None  # type: ignore[assignment]
     HAS_PROTOBUF = False
 
 import functools
@@ -423,6 +427,17 @@ class SignalClient(BaseGRPCClient):
         except grpc.RpcError as e:
             logger.error("gRPC GetRecentSignals hatası", code=e.code(), details=e.details())
             return []
+
+    async def get_latest_signals(self, min_confidence: float = 0.5) -> list[dict[str, Any]]:
+        """Son sinyalleri sorgula (get_recent_signals alias).
+
+        Args:
+            min_confidence: Minimum güven skoru filtresi.
+
+        Returns:
+            Sinyal dict'leri listesi.
+        """
+        return await self.get_recent_signals(min_confidence=min_confidence)
 
 
 class PortfolioClient(BaseGRPCClient):
