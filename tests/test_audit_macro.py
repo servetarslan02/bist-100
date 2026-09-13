@@ -3,6 +3,8 @@ Test suite for hardened services/macro components.
 Validates all institutional quantitative macro models, thread-safety, edge cases, and feature calculators.
 """
 
+import polars as pl
+
 from services.macro import (
     CARegimeType,
     CDSMetricsResult,
@@ -62,6 +64,18 @@ def test_dynamic_sensitivity_engine() -> None:
     assert comp_sens.sector == "BANKING"
     assert "SensitivityResult" in repr(comp_sens)
 
+    # Polars vectorized panel test
+    panel_df = pl.DataFrame({
+        "sector": ["BANK", "BANK", "AVIATION", "AVIATION"],
+        "return": [0.02, -0.01, 0.03, -0.02],
+        "usdtry_change": [0.01, -0.005, 0.01, -0.005],
+        "rate_change": [0.005, -0.002, 0.005, -0.002],
+    })
+    panel_res = engine.compute_panel_sensitivities_polars(panel_df)
+    assert isinstance(panel_res, pl.DataFrame)
+    assert "corr_usdtry" in panel_res.columns
+    assert panel_res.height == 2
+
 
 def test_macro_regime_detector() -> None:
     """Regime classification and transition detection test."""
@@ -88,8 +102,8 @@ def test_macro_regime_detector() -> None:
 
 
 def test_macro_historical_store(tmp_path) -> None:
-    """Thread-safe historical store persistence test."""
-    store_file = str(tmp_path / "macro_store.json")
+    """Thread-safe DuckDB historical store persistence & Point-In-Time test."""
+    store_file = str(tmp_path / "macro_store.duckdb")
     store = MacroHistoricalStore(storage_path=store_file)
 
     store.save(date="2026-03-01", indicator="cpi_yoy", value=52.5, source="tuik")
@@ -99,6 +113,12 @@ def test_macro_historical_store(tmp_path) -> None:
     latest = store.get_latest("cpi_yoy")
     assert latest is not None
     assert latest["value"] == 51.8
+
+    # Point-In-Time (PIT) test
+    pit_res = store.get_latest_before(date="2026-03-01", indicator="cpi_yoy")
+    assert pit_res is not None
+    assert pit_res["value"] == 52.5
+    assert pit_res["date"] == "2026-03-01"
 
     rng = store.get_date_range("cpi_yoy")
     assert rng is not None
@@ -117,6 +137,7 @@ def test_macro_historical_store(tmp_path) -> None:
     )
     assert "MacroDataPoint" in repr(dp)
     assert "MacroHistoricalStore" in repr(store)
+    store.close()
 
 
 def test_macro_impact_analyzer() -> None:
@@ -221,6 +242,21 @@ def test_macro_factor_decomposition() -> None:
     assert "MacroFactorDecomposition" in repr(engine)
     assert "DecompositionResult" in repr(decomp)
     assert len(decomp.factor_contributions) > 0
+
+    # Polars vectorized dataframe decomposition test
+    df_panel = pl.DataFrame({
+        "ticker": ["FROTO", "GARAN"],
+        "sector": ["AUTOMOTIVE", "BANK"],
+        "return": [-1.5, 2.0],
+        "usdtry": [0.005, 0.005],
+        "interest_rate": [0.02, 0.02],
+        "inflation": [0.015, 0.015],
+    })
+    res_df = engine.decompose_dataframe(df_panel)
+    assert isinstance(res_df, pl.DataFrame)
+    assert "factor_total_explained" in res_df.columns
+    assert "factor_residual" in res_df.columns
+    assert res_df.height == 2
 
 
 def test_macro_feature_calculators() -> None:

@@ -15,6 +15,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 import numpy as np
+import polars as pl
 import structlog
 
 logger = structlog.get_logger()
@@ -340,6 +341,61 @@ class MacroFactorDecomposition:
                 for c in sorted(result.factor_contributions, key=lambda c: abs(c.contribution), reverse=True)
             ],
         }
+
+    def decompose_dataframe(
+        self,
+        df: pl.DataFrame,
+        ticker_col: str = "ticker",
+        sector_col: str = "sector",
+        return_col: str = "return",
+    ) -> pl.DataFrame:
+        """Polars DataFrame tabanlı toplu makro faktör ayrıştırması.
+
+        BIST 100 hisselerinin faktör katkılarını, toplam açıklanan getiriyi
+        ve residual değerlerini tek bir vektörize operasyon ile hesaplar.
+
+        Args:
+            df: 'ticker', 'sector', 'return' ve faktör değişim sütunlarını içeren Polars DataFrame.
+            ticker_col: Hisse kodu sütun adı (varsayılan: 'ticker').
+            sector_col: Sektör sütun adı (varsayılan: 'sector').
+            return_col: Toplam getiri sütun adı (varsayılan: 'return').
+
+        Returns:
+            pl.DataFrame: Faktör katkıları ve residual metrikleri eklenmiş Polars DataFrame.
+        """
+        if df.is_empty():
+            return df
+
+        cols = df.columns
+        exprs: list[pl.Expr] = []
+        active_factors = [f for f in self.FACTORS if f in cols]
+
+        for factor in active_factors:
+            sens_map = {sec: weights.get(factor, 0.0) for sec, weights in self.SECTOR_SENSITIVITY.items()}
+            sens_expr = pl.col(sector_col).replace_strict(
+                sens_map,
+                default=self.SECTOR_SENSITIVITY["OTHER"].get(factor, 0.0),
+                return_dtype=pl.Float64,
+            )
+            exprs.append((sens_expr * pl.col(factor)).alias(f"factor_{factor}_contribution"))
+
+        if not exprs:
+            return df
+
+        res_df = df.with_columns(exprs)
+        contrib_cols = [f"factor_{f}_contribution" for f in active_factors]
+        total_explained_expr = pl.sum_horizontal(contrib_cols)
+
+        return res_df.with_columns(
+            [
+                total_explained_expr.alias("factor_total_explained"),
+                (pl.col(return_col) - total_explained_expr).alias("factor_residual"),
+                pl.when(pl.col(return_col).abs() > 1e-6)
+                .then(((total_explained_expr / pl.col(return_col)) * 100.0).clip(-100.0, 100.0))
+                .otherwise(0.0)
+                .alias("factor_explained_pct"),
+            ]
+        )
 
 
 # Singleton

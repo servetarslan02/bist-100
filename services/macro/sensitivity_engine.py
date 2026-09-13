@@ -16,6 +16,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 import numpy as np
+import polars as pl
 import structlog
 from scipy import stats
 
@@ -546,6 +547,45 @@ class DynamicSensitivityEngine:
             n_observations=0,
             window_days=self._window,
         )
+
+    def compute_panel_sensitivities_polars(
+        self,
+        df: pl.DataFrame,
+        sector_col: str = "sector",
+        return_col: str = "return",
+        macro_cols: list[str] | None = None,
+    ) -> pl.DataFrame:
+        """Polars DataFrame tabanlı çoklu sektör/hisse makro korelasyon analitiği.
+
+        Sektör getiri serileri ile makro değişkenler arasındaki ampirik kovaryans
+        ve korelasyon katsayılarını Polars ile vektörize olarak hesaplar.
+
+        Args:
+            df: Sektör getirilerini ve makro serilerini içeren Polars DataFrame.
+            sector_col: Sektör veya hisse tanımlayıcı sütun adı (varsayılan: 'sector').
+            return_col: Getiri sütunu adı (varsayılan: 'return').
+            macro_cols: Analiz edilecek makro faktör sütunları listesi.
+
+        Returns:
+            pl.DataFrame: Sektör bazında korelasyon ve hassasiyet özet tablosu.
+        """
+        if df.is_empty():
+            return pl.DataFrame()
+
+        target_macros = macro_cols or ["usdtry_change", "rate_change", "inflation", "vix", "oil_change", "gold_change"]
+        active_macros = [m for m in target_macros if m in df.columns]
+
+        if not active_macros or sector_col not in df.columns or return_col not in df.columns:
+            return pl.DataFrame()
+
+        agg_exprs: list[pl.Expr] = [pl.len().alias("n_obs")]
+        for m in active_macros:
+            clean_name = m.replace("_change", "")
+            agg_exprs.append(
+                pl.corr(return_col, m).fill_nan(0.0).alias(f"corr_{clean_name}")
+            )
+
+        return df.group_by(sector_col).agg(agg_exprs)
 
 
 # Singleton
