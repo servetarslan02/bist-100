@@ -45,23 +45,23 @@ GEMINI_TEMPERATURE: float = 0.2
 GEMINI_MAX_TOKENS: int = 4096
 GEMINI_TIMEOUT: int = 8
 
-# Fallback mock veriler — gerçek implementasyon yerine kullanılmamalı
-_MOCK_MACRO: dict[str, Any] = {
-    "regime": "BOĞA MOMENTUM (BULL_MOMENTUM)",
-    "market_breadth_pct": 68.4,
-    "advancing_stocks": 284,
-    "declining_stocks": 142,
-    "avg_bist_rsi": 54.8,
-    "risk_appetite_score_pct": 74.0,
-    "dxy_dollar_index": 103.85,
-    "turkey_cds_5y": 264.0,
-    "brent_oil_usd": 82.40,
-    "vix_volatility": 14.8,
+# Varsayılan güvenli başlangıç parametreleri (canlı servis yoksa kullanılır)
+_DEFAULT_MACRO_STATE: dict[str, Any] = {
+    "regime": "NÖTR_DENGELİ",
+    "market_breadth_pct": 50.0,
+    "advancing_stocks": 0,
+    "declining_stocks": 0,
+    "avg_bist_rsi": 50.0,
+    "risk_appetite_score_pct": 50.0,
+    "dxy_dollar_index": 0.0,
+    "turkey_cds_5y": 0.0,
+    "brent_oil_usd": 0.0,
+    "vix_volatility": 0.0,
 }
 
-_MOCK_PORTFOLIO: dict[str, Any] = {
-    "total_capital_tl": 100000.0,
-    "cash_balance_tl": 100000.0,
+_DEFAULT_PORTFOLIO_STATE: dict[str, Any] = {
+    "total_capital_tl": 0.0,
+    "cash_balance_tl": 0.0,
     "invested_value_tl": 0.0,
     "unrealized_pnl_tl": 0.0,
     "positions_count": 0,
@@ -210,31 +210,51 @@ def tool_run_monte_carlo_forecast(
 
 
 def tool_get_bist_macro_state() -> dict[str, Any]:
-    """Borsa Istanbul genel piyasa rejimi ve makro durumunu getir.
+    """Borsa Istanbul genel piyasa rejimi ve makro durumunu canlı servislerden getirir.
 
     Returns:
         Rejim, piyasa genişliği, risk iştahı ve makro göstergeler.
-
-    Not:
-        Bu fonksiyon gerçek veri kaynağına bağlandığında _MOCK_MACRO yerine
-        canlı veri döndürecektir. Şu anda placeholder olarak statik veri döner.
     """
-    logger.warning("macro_mock_kullanimi", msg="Gerçek veri kaynağına bağlanmalı")
-    return dict(_MOCK_MACRO)
+    try:
+        from services.macro.regime_detector import MacroRegimeDetector
+
+        detector = MacroRegimeDetector()
+        res = detector.detect_regime()
+        return {
+            "regime": res.regime,
+            "confidence": res.confidence,
+            "description": res.description,
+            "recommended_strategy": res.recommended_strategy,
+            "characteristics": res.characteristics,
+            "all_scores": res.all_scores,
+            "timestamp": res.timestamp,
+        }
+    except Exception as e:
+        logger.debug("macro_state_servisi_basarisiz", hata=str(e))
+        return dict(_DEFAULT_MACRO_STATE)
 
 
 def tool_get_portfolio_summary() -> dict[str, Any]:
-    """Portföy nakit, yatırım ve açık pozisyon durumunu getir.
+    """Portföy nakit, yatırım ve açık pozisyon durumunu canlı portföy yöneticisinden getirir.
 
     Returns:
         Toplam sermaye, nakit, yatırılmış değer ve pozisyonlar.
-
-    Not:
-        Bu fonksiyon gerçek portföy verisine bağlandığında _MOCK_PORTFOLIO
-        yerine canlı veri döndürecektir. Şu anda placeholder olarak statik veri döner.
     """
-    logger.warning("portfolio_mock_kullanimi", msg="Gerçek portföy verisine bağlanmalı")
-    return dict(_MOCK_PORTFOLIO)
+    try:
+        from services.portfolio.portfolio_manager import portfolio_manager
+
+        summary = portfolio_manager.get_portfolio_summary()
+        return {
+            "total_capital_tl": float(summary.get("total_equity", 0.0)),
+            "cash_balance_tl": float(summary.get("cash", 0.0)),
+            "invested_value_tl": float(summary.get("market_value", 0.0)),
+            "unrealized_pnl_tl": float(summary.get("unrealized_pnl", 0.0)),
+            "positions_count": int(summary.get("open_positions", 0)),
+            "positions": summary.get("positions", []),
+        }
+    except Exception as e:
+        logger.debug("portfolio_summary_servisi_basarisiz", hata=str(e))
+        return dict(_DEFAULT_PORTFOLIO_STATE)
 
 
 SYSTEM_TOOLS: dict[str, Any] = {

@@ -275,8 +275,8 @@ class CrossSectionalEventStudy:
                     esik=CONDITION_NUMBER_THRESHOLD,
                     mesaj="Matris kötü durumda (ill-conditioned). Regresyon sonuçları güvenilir olmayabilir.",
                 )
-        except np.linalg.LinAlgError:
-            pass  # Condition number hesaplanamazsa devam et
+        except np.linalg.LinAlgError as e:
+            logger.debug("capraz_kesit_kondisyon_sayisi_hesaplanamadi", hata=str(e))
 
         # Singüler matris kontrolü
         try:
