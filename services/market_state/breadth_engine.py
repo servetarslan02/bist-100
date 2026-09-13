@@ -19,6 +19,7 @@ BIST-specific:
 - Sektörel breadth ayrı hesaplanır
 - Döviz etkisini breadth'den izole etmek için normalize
 """
+from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -26,6 +27,11 @@ from typing import Any
 
 import numpy as np
 import structlog
+
+__all__ = [
+    "BreadthResult",
+    "MarketBreadthEngine",
+]
 
 logger = structlog.get_logger()
 

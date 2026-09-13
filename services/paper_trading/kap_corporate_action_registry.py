@@ -4,12 +4,18 @@ Bu modül, kamuya açık yayımlanmış VBTS (Volatilite Bazlı Tedbir Sistemi) 
 brüt takas, kredili işlem yasağı ve işlem sırası durdurma bildirimlerini zaman damgalı olarak tutar.
 Eğer hissenin kurumsal/seans durumu doğrulanamıyorsa fail-safe olarak NO_TRADE kuralını işletir.
 """
+from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
 import structlog
+
+__all__ = [
+    "CorporateActionRecord",
+    "KAPCorporateActionRegistry",
+]
 
 logger = structlog.get_logger()
 

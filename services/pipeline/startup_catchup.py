@@ -11,6 +11,7 @@ Bilgisayar kapalı kaldığında (1 gün, 3 gün, 1 hafta fark etmeksizin) siste
 4. Kaçırılan yapay zeka model eğitimlerini ve performans kalibrasyonunu telafi eder.
 5. Portföyü ve Fırsatlar sayfasını anlık bugüne eşitler.
 """
+from __future__ import annotations
 
 import os
 from datetime import date, datetime, timedelta, timezone

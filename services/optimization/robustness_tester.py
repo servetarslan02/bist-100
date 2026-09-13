@@ -5,6 +5,7 @@ ALPHA BIST — Sağlamlık, Stres ve Parametre Platosu Test Motoru (Robustness T
 2. Maliyet Stres Testi: %0.25 -> %0.50 -> %1.00 -> %1.50 round-trip işlem maliyeti.
 3. Parametre Platosu Analizi: Sivri zirveleri eleyip geniş ve kararlı kâr platolarını seçer.
 """
+from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any

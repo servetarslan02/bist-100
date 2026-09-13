@@ -6,6 +6,7 @@ Yürütülen adımlar:
 3. Model tahminlerinin ve portföy ağırlıklarının hesaplanması.
 4. BacktestEngine ile komisyon, kayma ve mikro-yapı simülasyonu.
 """
+from __future__ import annotations
 
 import gc
 from typing import Any

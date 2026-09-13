@@ -13,6 +13,7 @@ Fail-Closed Prensibi:
 Kritik veri bayatladığında (Data Stale/Outdated) sistem otomatik olarak DEFENSIVE moda
 veya ALARM_HALT moduna geçerek sahte/eski verilerle emir gönderilmesini engeller.
 """
+from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime

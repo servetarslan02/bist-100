@@ -13,11 +13,16 @@ Endpoint'ler:
 - GET /api/scan/tiers — tier bazlı özet
 - POST /api/scan/trigger — manuel tarama tetikle
 """
+from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import Any
 
 import structlog
+
+__all__ = [
+    "ScanAPI",
+]
 
 logger = structlog.get_logger()
 

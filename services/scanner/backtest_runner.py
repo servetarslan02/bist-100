@@ -12,17 +12,31 @@ Optimizasyonlar:
 
 Geçmiş versiyonla aynı finansal sonuçları üretir.
 """
+from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
-import polars as pl
 import structlog
 
 from ..core.data_quality import DataQualityChecker as DataQualityV2
 from ..core.tradability_mask import TradabilityMask
 from ..features.calculator import feature_calculator
+
+if TYPE_CHECKING:
+    import polars as pl
+
+__all__ = [
+    "BacktestResult",
+    "BacktestSignal",
+    "BacktestTrade",
+    "DailySnapshot",
+    "FeatureCache",
+    "PortfolioSimulator",
+    "QualityCache",
+    "ScannerBacktestRunner",
+]
 
 logger = structlog.get_logger()
 

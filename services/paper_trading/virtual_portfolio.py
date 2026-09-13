@@ -9,6 +9,7 @@ Kurumsal Düzey Borsa İstanbul Sanal Portföy Yönetimi:
 - Kısmi & Tam Pozisyon Kapatma, Ağırlıklı Ortalama Maliyet
 - Realized / Unrealized P&L ve Mark-to-Market
 """
+from __future__ import annotations
 
 import uuid
 from collections import defaultdict
@@ -16,6 +17,10 @@ from datetime import UTC, datetime
 from typing import Any
 
 import structlog
+
+__all__ = [
+    "VirtualPortfolio",
+]
 
 logger = structlog.get_logger()
 

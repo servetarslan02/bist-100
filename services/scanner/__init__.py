@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 # ALPHA BIST — Scanner System v2.0
 #
 # Modüller:
@@ -17,7 +19,6 @@
 # - scan_alerts: Alert sistemi
 # - custom_filters: BIST'e özel filtreler
 # - scan_api: Scan metrics API
-
 from .alpha_scanner import AlphaScanner, ScannerResult, SignalType, alpha_scanner
 from .backtest_runner import BacktestResult, BacktestSignal, BacktestTrade, ScannerBacktestRunner
 from .bist_ml_scanner import BistMLScanner

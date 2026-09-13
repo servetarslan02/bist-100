@@ -10,6 +10,7 @@ VIOP sözleşme kataloğu:
 
 Kaynak: Borsa İstanbul resmi
 """
+from __future__ import annotations
 
 import calendar
 from dataclasses import dataclass

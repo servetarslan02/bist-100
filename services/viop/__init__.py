@@ -5,6 +5,7 @@ Modüller:
 - enhanced_options: Black-Scholes, Greeks, IV, Options Chain, Strategies, Hedging, SPAN, Arbitrage, Risk, Backtest
 - contract_catalog: VIOP sözleşme kataloğu (BIST resmi)
 """
+from __future__ import annotations
 
 from .contract_catalog import (
     OptionContract,

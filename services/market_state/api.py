@@ -17,6 +17,10 @@ from typing import Any
 
 import structlog
 
+__all__ = [
+    "register_market_state_routes",
+]
+
 logger = structlog.get_logger()
 
 

@@ -13,6 +13,10 @@ from typing import Any
 
 import structlog
 
+__all__ = [
+    "EventScanner",
+]
+
 logger = structlog.get_logger()
 
 

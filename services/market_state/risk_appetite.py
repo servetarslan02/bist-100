@@ -12,12 +12,17 @@
 0 = tam risk-off (kaçış)
 1 = tam risk-on (agresif alım)
 """
+from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import Any
 
 import numpy as np
 import structlog
+
+__all__ = [
+    "RiskAppetiteEngine",
+]
 
 logger = structlog.get_logger()
 

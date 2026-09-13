@@ -6,15 +6,26 @@ Kritik tarama sonuçlarını bildirim sistemine bağlar.
 
 Kaynaklar: Mometic (2026), Endüstri standardı
 """
+from __future__ import annotations
 
 import time
-from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+__all__ = [
+    "ScanAlert",
+    "ScanAlertManager",
+    "ScanAlertRule",
+    "ScanAlertSeverity",
+    "ScanAlertType",
+]
 
 logger = structlog.get_logger()
 

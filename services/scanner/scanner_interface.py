@@ -6,11 +6,19 @@ Ensures backtest and live scanning use the same code path.
 
 Kaynaklar: awesome-quant, SCANNER-NIHAI-SPEC.md
 """
+from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from datetime import datetime
+
+__all__ = [
+    "ScanResult",
+    "ScannerInterface",
+]
 
 
 @dataclass

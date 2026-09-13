@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 # ALPHA BIST — Simulation System v2.0
 #
 # Modüller:
@@ -8,7 +10,6 @@
 # - enhanced_stress_test: 8+ stres senaryosu, breaking point analysis
 # - auction_engine: BIST Call Auction Tek Fiyat Açık Artırma Motoru
 # - order_book: Derinlikli emir defteri simülasyonu
-
 from .auction_engine import (
     AuctionOrder,
     AuctionResult,

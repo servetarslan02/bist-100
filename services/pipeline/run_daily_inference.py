@@ -6,6 +6,7 @@ Arka planda veya zamanlayıcı (scheduler) ile periyodik olarak çalışarak:
 3. Güncel tarih için en yüksek potansiyele sahip hisse senetlerini tahmin eder.
 4. RiskManager ile makro rejim analizi yaparak sonuçları paper trading portföy tablosuna kaydeder.
 """
+from __future__ import annotations
 
 import asyncio
 from datetime import UTC, date, datetime, timedelta

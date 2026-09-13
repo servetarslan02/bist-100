@@ -12,6 +12,7 @@ Kullanım:
         async for msg in nc.subscribe(Subjects.TICKS):
             print(msg)
 """
+from __future__ import annotations
 
 from .client import HAS_NATS, NatsClient, Subjects, nats_client, otel_trace
 

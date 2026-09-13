@@ -1,10 +1,10 @@
 """ALPHA BIST - Risk Engine Service"""
+from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-import numpy as np
 import orjson
 import structlog
 
@@ -23,6 +23,16 @@ from ..core.event_bus import (
 )
 from ..core.event_schema import CanonicalEvent
 from ..core.logging import setup_logging
+
+if TYPE_CHECKING:
+    import numpy as np
+
+__all__ = [
+    "RiskEngine",
+    "assess_portfolio_risk",
+    "assess_viop_risk",
+    "main",
+]
 
 logger = structlog.get_logger()
 

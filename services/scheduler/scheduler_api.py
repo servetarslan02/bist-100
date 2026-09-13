@@ -17,12 +17,17 @@ Endpoint'ler:
 - POST /api/scheduler/interval       — runtime interval güncelleme
 - POST /api/scheduler/enable         — job enable/disable
 """
+from __future__ import annotations
 
 import time
 from datetime import UTC, datetime
 from typing import Any
 
 import structlog
+
+__all__ = [
+    "SchedulerAPI",
+]
 
 logger = structlog.get_logger()
 

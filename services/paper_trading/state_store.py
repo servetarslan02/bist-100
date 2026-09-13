@@ -7,6 +7,7 @@ Persistent state yönetimi: DuckDB.
 - Atomic write & DuckDB sütunsal OLAP persistence
 - Backup/rollback desteği
 """
+from __future__ import annotations
 
 import shutil
 import threading
@@ -616,6 +617,10 @@ paper_state_store = PaperStateStore()
 # Graceful shutdown: buffer'ı flush et
 import atexit
 import signal as _signal
+
+__all__ = [
+    "PaperStateStore",
+]
 
 
 def _flush_paper_on_exit() -> None:

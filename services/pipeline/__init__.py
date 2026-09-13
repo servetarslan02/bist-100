@@ -4,6 +4,7 @@ Bu paket, Borsa İstanbul (BIST) işlem döngülerini, gün sonu sinyal üretimi
 sabah seans açılışı mikro-yapı emir yürütümünü ve sistem kapalı kaldığında kaçırılan
 seansları otonom olarak telafi eden MasterStartupCatchup motorunu sağlar.
 """
+from __future__ import annotations
 
 from services.pipeline.main_backtest import (
     DEFAULT_BACKTEST_END_DATE,

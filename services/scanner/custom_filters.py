@@ -6,12 +6,21 @@ Tarama sonuçlarını son kez filtreler.
 
 Kaynaklar: Mometic (2026), BIST kuralları
 """
+from __future__ import annotations
 
-from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+__all__ = [
+    "CustomFilter",
+    "CustomFilterEngine",
+    "FilterResult",
+]
 
 logger = structlog.get_logger()
 

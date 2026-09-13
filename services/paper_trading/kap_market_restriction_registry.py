@@ -8,11 +8,17 @@ Kritik İlke:
 - Seans kapandıktan sonra (18:15+) yayımlanan tedbir, ertesi seans (T+1) başından itibaren yürürlüğe girer.
 - Eksik veya gecikmiş veri durumunda fail-safe olarak NO_TRADE kuralı işletilir.
 """
+from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
 
 import structlog
+
+__all__ = [
+    "KAPMarketRestrictionRegistry",
+    "MarketRestrictionRecord",
+]
 
 logger = structlog.get_logger()
 

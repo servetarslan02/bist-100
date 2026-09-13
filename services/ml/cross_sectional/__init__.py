@@ -8,6 +8,7 @@ ROADMAP v3.0:
 
 KURAL: Hisse yalnız değil, bağlamında değerlendir!
 """
+from __future__ import annotations
 
 from collections import defaultdict
 from typing import Any

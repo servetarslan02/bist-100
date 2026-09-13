@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 # ALPHA BIST — Scheduler System v2.0
 #
 # Modüller:
@@ -7,7 +9,6 @@
 # - learning_scheduler: Learning cycle scheduling (drift, retrain, backtest)
 # - scheduler_api: Scheduler API endpoints (status, jobs, monitor, trigger)
 # - daily_report: Günlük rapor üretici
-
 from .daily_report import generate_daily_report
 from .daily_workflow import DailyWorkflow, WorkflowPhase, WorkflowStatus, daily_workflow
 from .job_monitor import JobAlert, JobMonitor, JobRecord, JobStatus, job_monitor

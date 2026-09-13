@@ -7,6 +7,7 @@ Event-driven force scan ile cooldown bypass edilebilir.
 Gerekçe: 800 hisseyi her taramada tekrar analiz etmek CPU israfı.
 Deduplication ile sadece değişen veya önemli hisseler taranır.
 """
+from __future__ import annotations
 
 import time
 from dataclasses import dataclass
@@ -14,6 +15,11 @@ from datetime import UTC, datetime
 from typing import Any
 
 import structlog
+
+__all__ = [
+    "ScanDeduplicator",
+    "ScanRecord",
+]
 
 logger = structlog.get_logger()
 

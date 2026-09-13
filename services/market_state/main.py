@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import Any
 
 """ALPHA BIST — Market State Engine v2.0 (Main Entry Point)
@@ -52,6 +54,11 @@ from .multi_timeframe import MultiTimeframeEngine, MultiTimeframeResult
 from .output_formatter import MarketStateFormatter, MarketStateOutput
 from .risk_appetite import RiskAppetiteEngine
 from .transition_tracker import RegimeTransitionTracker
+
+__all__ = [
+    "MarketStateService",
+    "main",
+]
 
 logger = structlog.get_logger()
 

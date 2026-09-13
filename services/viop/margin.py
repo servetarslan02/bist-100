@@ -8,6 +8,7 @@ BIST VIOP ve Takasbank standartlarına uygun kurumsal portföy teminat mimarisi:
 - Delta-Bazlı Netleştirme ve Aşırı Risk Senaryo Analizi (Extreme Move Scenarios)
 - Nakit ve Teminat Karşılama Oranı (Margin Coverage Ratio & Margin Call Trigger)
 """
+from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 from enum import StrEnum

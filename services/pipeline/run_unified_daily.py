@@ -16,6 +16,7 @@ iki aşamalı günlük işlem akışını yönetir:
    - 10 Kademeli sentetik derinlik defteri ve Walk-the-Book (SyntheticOrderBookBuilder) ile emirler yürütülür.
    - Gerçekleşen işlemler tekil portföy defterine (VirtualPortfolio) kaydedilir.
 """
+from __future__ import annotations
 
 import asyncio
 from datetime import date, datetime, timedelta, timezone

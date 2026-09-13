@@ -1,4 +1,5 @@
 """ALPHA BIST — Async Task Queue (Celery)"""
+from __future__ import annotations
 
 from .queue import celery_app, get_task_status, submit_task
 

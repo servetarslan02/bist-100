@@ -4,6 +4,7 @@ ALPHA BIST — Optimizasyon ve Sağlamlık Test Modülü (Optimization & Robustn
 Bu paket, BIST 100 verisi üzerinde çok çekirdekli Bayesian hiperparametre optimizasyonu,
 asimetrik boğa/ayı rejim optimizasyonu ve parametre platosu sağlamlık testlerini sağlar.
 """
+from __future__ import annotations
 
 from .asymmetric_optimizer import (
     AsymmetricBayesianOptimizer,

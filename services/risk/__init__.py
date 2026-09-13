@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 # ALPHA BIST — Risk Management System v2.0
 #
 # Modüller:
@@ -16,7 +18,6 @@
 # - tail_hedge: Tail risk hedging strategies
 # - risk_parity: Risk parity position sizing
 # - monitoring: Real-time risk monitoring + alerting
-
 from .calibration import CalibrationParams, ScoreCalibrator
 from .covariance import (
     CovarianceEstimator,

@@ -18,6 +18,7 @@ Mevcut modelleri kullanir:
 - services.ml.ranking_model (OpportunityScore)
 - services.learning.continuous_learning (ModelRegistry)
 """
+from __future__ import annotations
 
 from .kap_corporate_action_registry import CorporateActionRecord, KAPCorporateActionRegistry
 from .kap_market_restriction_registry import KAPMarketRestrictionRegistry, MarketRestrictionRecord

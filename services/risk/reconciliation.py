@@ -8,6 +8,7 @@ Portföy Muhasebesi, Takas (Takasbank) ve Saklama (MKK) mutabakat motoru:
 - Otomatik Düzeltme (Auto-Correction) ve Hata Ayrıştırma Kategorileri
 - Audit Loglama ve Uyuşmazlık Tutanakları (Discrepancy Incident Tracking)
 """
+from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime

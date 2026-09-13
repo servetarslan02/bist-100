@@ -13,6 +13,7 @@ Modüller:
 - api: REST API endpoints
 - monitoring: Prometheus metrics + Grafana dashboard
 """
+from __future__ import annotations
 
 from .breadth_engine import BreadthResult, MarketBreadthEngine
 from .component_states import ComponentStateEngine, ComponentStates

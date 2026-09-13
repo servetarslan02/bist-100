@@ -6,6 +6,7 @@ v2.0: PortfolioManager v2.0 muhasebe altyapısıyla uyumlu.
 - EQUITY = CASH + MARKET_VALUE invariant korunur.
 - Tek gerçek muhasebe kaynağı: PortfolioManager v2.0 + DB.
 """
+from __future__ import annotations
 
 import asyncio
 import os
@@ -21,6 +22,12 @@ from ..portfolio.portfolio_manager import (
     CommissionModel,
     PortfolioManager,
 )
+
+__all__ = [
+    "PortfolioService",
+    "get_portfolio_enhancements",
+    "main",
+]
 
 logger = structlog.get_logger()
 

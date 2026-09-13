@@ -5,6 +5,7 @@ Eğitilen LightGBM + CatBoost + XGBoost modellerini yükleyip
 648 BIST hissesini anlık olarak tarar, gerçek model skorları,
 20G Breakout ve Dip Dönüşü sinyalleri üretir.
 """
+from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
@@ -15,6 +16,10 @@ import structlog
 
 logger = structlog.get_logger()
 from services.data.historical_warehouse import HistoricalDataWarehouse
+
+__all__ = [
+    "BistMLScanner",
+]
 
 
 class BistMLScanner:

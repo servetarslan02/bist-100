@@ -16,6 +16,10 @@ from typing import Any
 import numpy as np
 import structlog
 
+__all__ = [
+    "LiveScanner",
+]
+
 logger = structlog.get_logger()
 
 

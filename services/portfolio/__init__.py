@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 # ALPHA BIST — Portfolio Management System v2.0
 #
 # Modüller:
@@ -6,7 +8,6 @@
 # - portfolio_enhancements: Turnover penalty, cost-aware rebalance, hysteresis, sector/liquidity constraints
 # - main: PortfolioService (DB-backed, atomic operations, lock)
 # - enhancements: Tax, dividend, benchmark, attribution, multi-currency, TCA
-
 from .autonomous_conviction_engine import (
     AllocationPlan,
     AutonomousConvictionEngine,

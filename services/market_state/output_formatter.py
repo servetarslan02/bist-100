@@ -3,18 +3,25 @@
 Tüm bileşenleri tek bir MarketStateOutput'ta birleştirir.
 API ve event bus için standart format.
 """
+from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
-from .breadth_engine import BreadthResult
-from .component_states import ComponentStates
-from .ensemble_regime import EnsembleResult
-from .multi_timeframe import MultiTimeframeResult
-from .transition_tracker import TransitionStats
+if TYPE_CHECKING:
+    from .breadth_engine import BreadthResult
+    from .component_states import ComponentStates
+    from .ensemble_regime import EnsembleResult
+    from .multi_timeframe import MultiTimeframeResult
+    from .transition_tracker import TransitionStats
+
+__all__ = [
+    "MarketStateFormatter",
+    "MarketStateOutput",
+]
 
 logger = structlog.get_logger()
 

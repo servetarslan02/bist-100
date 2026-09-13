@@ -31,6 +31,21 @@ from typing import Any
 import orjson
 import structlog
 
+__all__ = [
+    "BaseTaskWithDLQ",
+    "DEFAULT_BEAT_SCHEDULE",
+    "DEFAULT_TASK_ROUTES",
+    "data_backfill_task",
+    "generate_report_task",
+    "get_task_status",
+    "health_check_task",
+    "optimize_portfolio_task",
+    "run_backtest_task",
+    "stress_test_task",
+    "submit_task",
+    "train_model_task",
+]
+
 try:
     from celery import Celery, Task
     from celery.schedules import crontab

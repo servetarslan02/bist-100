@@ -6,6 +6,7 @@ Geçmiş tarama analizi ve performans takibi için.
 
 Kaynaklar: TradingAgents (TauricResearch 2025), Endüstri standardı
 """
+from __future__ import annotations
 
 import threading
 import time
@@ -588,6 +589,11 @@ scan_persistence = ScanPersistence()
 # Graceful shutdown: buffer'ı flush et
 import atexit
 import signal as _signal
+
+__all__ = [
+    "ScanPersistence",
+    "ScanResultRecord",
+]
 
 
 def _flush_scan_on_exit() -> None:

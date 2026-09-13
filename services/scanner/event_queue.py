@@ -16,6 +16,11 @@ if TYPE_CHECKING:
 
 import structlog
 
+__all__ = [
+    "EventPriorityQueue",
+    "EventTask",
+]
+
 logger = structlog.get_logger()
 
 

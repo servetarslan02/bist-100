@@ -17,6 +17,7 @@ BULL, BEAR, SIDEWAYS, HIGH_VOLATILITY, LOW_VOLATILITY,
 RISK_ON, RISK_OFF, CRISIS, RECOVERY,
 MOMENTUM_EXPANSION, MOMENTUM_CONTRACTION
 """
+from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -24,6 +25,11 @@ from typing import Any
 
 import numpy as np
 import structlog
+
+__all__ = [
+    "EnsembleRegimeDetector",
+    "EnsembleResult",
+]
 
 logger = structlog.get_logger()
 
