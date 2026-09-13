@@ -260,3 +260,57 @@ def test_contract_catalog():
     d = viop_catalog.to_dict("XU030")
     assert d is not None
     assert d["symbol"] == "XU030"
+
+
+def test_institutional_viop_engines():
+    """Kurumsal seviyeye yükseltilen options_pricing, greeks, parity ve hedging motorlarının testi."""
+    from services.viop.greeks import greeks_engine
+    from services.viop.hedging import calculate_tail_risk_hedge
+    from services.viop.options_pricing import options_pricing_engine
+    from services.viop.parity import put_call_parity_engine
+    from services.viop.strategies import (
+        create_bear_put_spread,
+        create_bull_call_spread,
+        create_butterfly,
+        create_collar,
+        create_iron_condor,
+        create_straddle,
+        create_strangle,
+    )
+
+    # 1. Options Pricing Engine
+    res_bs = options_pricing_engine.price(S=100.0, K=100.0, T=0.25, sigma=0.30, option_type="call", model="black_scholes")
+    assert res_bs.theoretical_price > 0.0
+    assert res_bs.is_atm is True
+    assert "OptionPricingResult" in repr(res_bs)
+
+    res_crr = options_pricing_engine.price(S=100.0, K=100.0, T=0.25, sigma=0.30, option_type="put", model="binomial_crr")
+    assert res_crr.theoretical_price > 0.0
+
+    # 2. Greeks Engine
+    g_res = greeks_engine.compute(S=100.0, K=100.0, T=0.25, r=0.45, sigma=0.30, option_type="call")
+    assert 0.0 < g_res.delta < 1.0
+    assert g_res.gamma > 0.0
+    assert g_res.vega > 0.0
+    assert "GreeksResult" in repr(g_res)
+
+    # 3. Put-Call Parity & Arbitrage Engine
+    parity_check = put_call_parity_engine.verify_parity(
+        call_price=10.0, put_price=5.0, spot_price=100.0, strike=100.0, r=0.45, T=0.25, ticker="THYAO"
+    )
+    assert "arbitrage_details" in parity_check
+    assert "strategy_type" in parity_check["arbitrage_details"]
+
+    # 4. Tail Risk Hedge
+    tail_plan = calculate_tail_risk_hedge(portfolio_value=1_000_000.0, spot_index=11000.0)
+    assert tail_plan.contracts_needed > 0
+    assert "TailRiskHedgePlan" in repr(tail_plan)
+
+    # 5. Advanced Multi-Leg Strategies
+    assert create_collar(100.0, 95.0, 2.0, 105.0, 3.0)["strategy"] == "COLLAR"
+    assert create_straddle(100.0, 100.0, 5.0, 4.0)["strategy"] == "STRADDLE"
+    assert create_strangle(100.0, 95.0, 3.0, 105.0, 3.0)["strategy"] == "STRANGLE"
+    assert create_iron_condor(100.0, 90.0, 1.0, 95.0, 2.5, 105.0, 2.5, 110.0, 1.0)["strategy"] == "IRON_CONDOR"
+    assert create_bull_call_spread(100.0, 100.0, 5.0, 110.0, 2.0)["strategy"] == "BULL_CALL_SPREAD"
+    assert create_bear_put_spread(100.0, 100.0, 5.0, 90.0, 2.0)["strategy"] == "BEAR_PUT_SPREAD"
+    assert create_butterfly(100.0, 90.0, 12.0, 100.0, 5.0, 110.0, 1.5)["strategy"] == "BUTTERFLY"
