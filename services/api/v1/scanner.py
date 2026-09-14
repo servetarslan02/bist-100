@@ -420,6 +420,8 @@ async def trigger_scan(
             "scan_type": scan_type,
             "message": "Birleşik günlük tarama ve işlem döngüsü kuyruğa alındı.",
         }
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("tarama_tetikleme_hatasi: hata=%s", str(exc))
         raise HTTPException(500, detail="Tarama tetiklenemedi.") from exc
@@ -467,6 +469,8 @@ async def report_event(
             "importance": importance,
             "status": "received",
         }
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("event_bildirim_hatasi: hata=%s", str(exc))
         raise HTTPException(500, detail="Event bildirimi alınamadı.") from exc

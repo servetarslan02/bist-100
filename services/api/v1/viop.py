@@ -125,6 +125,8 @@ async def price_option(
             "greeks": greeks,
             "inputs": {"S": S, "K": K, "T": T, "r": r, "sigma": sigma, "type": option_type},
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("viop_fiyat_hatasi: S=%s K=%s hata=%s", S, K, str(e))
         raise HTTPException(status_code=500, detail="Opsiyon fiyatlaması başarısız.") from e
@@ -166,6 +168,8 @@ async def calculate_iv(
             "market_price": market_price,
             "inputs": {"S": S, "K": K, "T": T, "r": r, "type": option_type},
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("viop_iv_hatasi: market_price=%s S=%s hata=%s", market_price, S, str(e))
         raise HTTPException(status_code=500, detail="Implied volatility hesaplanamadı.") from e
@@ -200,6 +204,8 @@ async def get_portfolio_greeks(
     try:
         result = portfolio_greeks.aggregate(positions)
         return result.to_dict()
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("viop_greeks_hatasi: pozisyon_sayisi=%d hata=%s", len(positions), str(e))
         raise HTTPException(status_code=500, detail="Greeks hesaplanamadı.") from e
@@ -237,6 +243,8 @@ async def list_strategies(
                 {"name": "BUTTERFLY", "description": "Dar aralık beklentisi"},
             ]
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("viop_strateji_listesi_hatasi: hata=%s", str(e))
         raise HTTPException(status_code=500, detail="Strateji listesi alınamadı.") from e
@@ -378,6 +386,8 @@ async def calculate_hedge(
     try:
         result = delta_hedger.hedge(portfolio_delta, spot_price, futures_price, contract_multiplier)
         return result.to_dict()
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("viop_hedge_hatasi: delta=%s hata=%s", portfolio_delta, str(e))
         raise HTTPException(status_code=500, detail="Delta hedge hesaplanamadı.") from e
@@ -406,6 +416,8 @@ async def gamma_scalp(
     """
     try:
         return delta_hedger.gamma_scalp(portfolio_gamma, spot_price, price_move_pct)
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("viop_gamma_scalp_hatasi: gamma=%s hata=%s", portfolio_gamma, str(e))
         raise HTTPException(status_code=500, detail="Gamma scalping hesaplanamadı.") from e
@@ -436,6 +448,8 @@ async def calculate_margin(
     try:
         result = span_margin.calculate(positions)
         return result
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("viop_teminat_hatasi: pozisyon_sayisi=%d hata=%s", len(positions), str(e))
         raise HTTPException(status_code=500, detail="SPAN teminat hesaplanamadı.") from e
@@ -476,6 +490,8 @@ async def check_arbitrage(
             spot_price, futures_price, risk_free_rate, dividend_yield, time_to_expiry
         )
         return result.to_dict()
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("viop_arbitraj_hatasi: spot=%s futures=%s hata=%s", spot_price, futures_price, str(e))
         raise HTTPException(status_code=500, detail="Arbitraj analizi başarısız.") from e
@@ -515,6 +531,8 @@ async def check_parity(
     """
     try:
         return check_put_call_parity(call_price, put_price, spot_price, strike, r, T)
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("viop_parite_hatasi: call=%s put=%s hata=%s", call_price, put_price, str(e))
         raise HTTPException(status_code=500, detail="Put-Call parity hesaplanamadı.") from e
@@ -546,6 +564,8 @@ async def calculate_viop_risk(
     """
     try:
         return viop_risk.calculate_portfolio_viop_risk(viop_positions, portfolio_value)
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("viop_risk_hatasi: deger=%s hata=%s", portfolio_value, str(e))
         raise HTTPException(status_code=500, detail="VIOP risk hesabı başarısız.") from e
@@ -575,6 +595,8 @@ async def list_contracts(
             contracts = viop_catalog.get_contracts_by_category(category)
             return {"contracts": [viop_catalog.to_dict(c.symbol) for c in contracts]}
         return {"contracts": [viop_catalog.to_dict(s) for s in viop_catalog.get_all_contracts()]}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("viop_sozlesme_listesi_hatasi: hata=%s", str(e))
         raise HTTPException(status_code=500, detail="Sözleşme listesi alınamadı.") from e

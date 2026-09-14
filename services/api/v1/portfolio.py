@@ -84,6 +84,8 @@ async def positions(
         pos_list = pm.get_all_positions()
         total_val = pm.get_total_value()
         return {"positions": pos_list, "count": len(pos_list), "total_value": total_val}
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("pozisyon_hatasi: hata=%s", exc)
         raise HTTPException(status_code=500, detail=f"Pozisyonlar alınamadı: {exc}") from exc
@@ -108,6 +110,8 @@ async def trades(
         pm = _get_pm()
         all_trades = pm.get_trades()
         return {"trades": all_trades[-limit:], "total_trades": len(all_trades)}
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("islem_gecmisi_hatasi: hata=%s", exc)
         raise HTTPException(status_code=500, detail=f"İşlem geçmişi alınamadı: {exc}") from exc
@@ -137,6 +141,8 @@ async def pnl(
             "net_pnl": summary.get("total_pnl", 0.0),
             "return_on_equity_pct": summary.get("total_pnl_pct", 0.0),
         }
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("pnl_hatasi: hata=%s", exc)
         raise HTTPException(status_code=500, detail=f"K/Z verisi alınamadı: {exc}") from exc
@@ -169,6 +175,8 @@ async def equity_curve(
                 default=pm.initial_capital,
             ),
         }
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("equity_curve_hatasi: hata=%s", exc)
         raise HTTPException(status_code=500, detail=f"Equity curve alınamadı: {exc}") from exc
@@ -203,6 +211,8 @@ async def risk_metrics(
             "unsettled_t1": summary.get("unsettled_cash_t1", 0.0),
             "unsettled_t2": summary.get("unsettled_cash_t2", 0.0),
         }
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("risk_metrik_hatasi: hata=%s", exc)
         raise HTTPException(status_code=500, detail=f"Risk metrikleri alınamadı: {exc}") from exc
@@ -228,6 +238,8 @@ async def drawdown(
             "max_drawdown_pct": summary.get("max_drawdown_pct", 0.0),
             "current_drawdown_pct": summary.get("current_drawdown_pct", 0.0),
         }
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("drawdown_hatasi: hata=%s", exc)
         raise HTTPException(status_code=500, detail=f"Drawdown verisi alınamadı: {exc}") from exc
@@ -327,6 +339,8 @@ async def accounting(
             "realized_pnl_total": summary.get("realized_pnl", 0.0),
             "total_pnl": summary.get("total_pnl", 0.0),
         }
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("muhasebe_hatasi: hata=%s", exc)
         raise HTTPException(status_code=500, detail=f"Muhasebe özeti alınamadı: {exc}") from exc
@@ -360,6 +374,8 @@ async def reset_portfolio_to_cash(
             "cash": pm.cash,
             "message": "Portföy sıfırlandı.",
         }
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("portfoy_sifirlama_hatasi: hata=%s", exc)
         raise HTTPException(status_code=500, detail=f"Portföy sıfırlanamadı: {exc}") from exc
@@ -393,6 +409,8 @@ async def cash_ledger(
             "cash": round(pm.cash, 2),
             "settled_cash": round(pm.settled_cash, 2),
         }
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("nakit_hareket_hatasi: hata=%s", exc)
         raise HTTPException(status_code=500, detail=f"Nakit hareket geçmişi alınamadı: {exc}") from exc
@@ -417,6 +435,8 @@ async def portfolio_orders(
         pm = _get_pm()
         orders = pm.get_orders()
         return {"orders": orders[-limit:], "total_orders": len(orders)}
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("emir_gecmisi_hatasi: hata=%s", exc)
         raise HTTPException(status_code=500, detail=f"Emir geçmişi alınamadı: {exc}") from exc
@@ -442,6 +462,8 @@ async def position_history(
     try:
         pm = _get_pm()
         return {"history": pm.get_position_history(ticker=ticker, limit=limit)}
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("pozisyon_gecmisi_hatasi: hata=%s", exc)
         raise HTTPException(status_code=500, detail=f"Pozisyon geçmişi alınamadı: {exc}") from exc
@@ -465,6 +487,8 @@ async def equity_snapshots(
     try:
         pm = _get_pm()
         return {"snapshots": pm.get_equity_snapshots(limit=limit)}
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("equity_snapshot_hatasi: hata=%s", exc)
         raise HTTPException(status_code=500, detail=f"Equity snapshot'lar alınamadı: {exc}") from exc
@@ -536,6 +560,8 @@ async def tax_analysis(
             commissions=pm.get_total_commission() if hasattr(pm, "get_total_commission") else 0.0,
         )
         return result
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("vergi_analizi_hatasi: hata=%s", exc)
         raise HTTPException(status_code=500, detail=f"Vergi analizi yapılamadı: {exc}") from exc
@@ -564,6 +590,8 @@ async def transaction_cost_analysis(
         from ...portfolio.enhancements import tca_analyzer
 
         return tca_analyzer.analyze(order_value, daily_volume, volatility)
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("tca_hatasi: hata=%s", exc)
         raise HTTPException(status_code=500, detail=f"İşlem maliyeti analizi yapılamadı: {exc}") from exc
@@ -645,6 +673,8 @@ async def rebalance_orders(
             "total_value": sum(o.get("value", 0.0) for o in orders),
             "turnover_limit": turnover_limit,
         }
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("rebalance_emir_hatasi: hata=%s", exc)
         raise HTTPException(status_code=500, detail=f"Rebalance emirleri oluşturulamadı: {exc}") from exc
@@ -678,6 +708,8 @@ async def trigger_portfolio_cycle(
             "message": "Günlük portföy ve seans yürütme döngüsü arka planda başlatıldı.",
             "timestamp": datetime.now(UTC).isoformat(),
         }
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("portfoy_tetikleme_hatasi: hata=%s", exc)
         raise HTTPException(status_code=500, detail=f"Portföy döngüsü tetiklenemedi: {exc}") from exc
@@ -867,6 +899,8 @@ async def portfolio_status(
             "drawdown_pct": summary.get("max_drawdown_pct", 0.0),
             "strict_t2": getattr(paper_orchestrator.portfolio, "strict_t2", False),
         }
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("portfoy_durum_hatasi: hata=%s", exc)
         raise HTTPException(status_code=500, detail=f"Portföy durumu alınamadı: {exc}") from exc
@@ -894,6 +928,8 @@ async def trigger_eod_signals(
             "message": "EOD sinyal üretimi ve portföy MTM değerlemesi tamamlandı.",
             "details": res,
         }
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("eod_sinyal_hatasi: hata=%s", exc)
         raise HTTPException(status_code=500, detail=f"EOD sinyal üretimi başarısız: {exc}") from exc
@@ -921,6 +957,8 @@ async def trigger_morning_execution(
             "message": "Sabah açılışı mikro-yapı yürütme döngüsü tamamlandı.",
             "details": res,
         }
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("sabah_acilisi_hatasi: hata=%s", exc)
         raise HTTPException(status_code=500, detail=f"Sabah açılışı yürütmesi başarısız: {exc}") from exc
@@ -944,6 +982,8 @@ async def trigger_phase18(
 
         res = await run_unified_daily_cycle()
         return {"status": "success", "message": "Unified Daily döngüsü tetiklendi.", "details": res}
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("phase18_hatasi: hata=%s", exc)
         raise HTTPException(status_code=500, detail=f"Phase 18 döngüsü tetiklenemedi: {exc}") from exc
@@ -977,6 +1017,8 @@ async def trigger_auto_rebalance(
                 "max_turnover": body.get("max_turnover") if body else None,
             },
         }
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("oto_rebalance_hatasi: hata=%s", exc)
         raise HTTPException(status_code=500, detail=f"Otonom rebalance tetiklenemedi: {exc}") from exc

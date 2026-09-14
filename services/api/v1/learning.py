@@ -49,62 +49,6 @@ async def learning_status(
         return {"status": "error", "error": str(exc)}
 
 
-def seed_learning_pipeline_if_empty(pipeline: LearningPipeline) -> None:
-    """Modeller için tarihsel out-of-sample doğrulama ve değerlendirme verilerini hafızaya yükler."""
-    import numpy as np
-
-    # En az 20 değerlendirilmiş tahmin var mı kontrol et
-    sample_check = pipeline.store.get_evaluated_predictions_for_model("LightGBM_LambdaRank", limit=40)
-    if len(sample_check) >= 20:
-        return
-
-    models_config = [
-        {"id": "LightGBM_LambdaRank", "version": "v3.2", "acc": 0.74, "ret_mean": 3.8, "brier": 0.12},
-        {"id": "SPEC_Anomaly_Detector", "version": "v1.2", "acc": 0.71, "ret_mean": 6.5, "brier": 0.14},
-        {"id": "CatBoost_Classifier", "version": "v2.1", "acc": 0.68, "ret_mean": 2.9, "brier": 0.15},
-        {"id": "Cross_Sectional_Momentum", "version": "v2.0", "acc": 0.64, "ret_mean": 2.2, "brier": 0.18},
-        {"id": "KAP_NLP_Sentiment", "version": "v3.0", "acc": 0.62, "ret_mean": 2.6, "brier": 0.19},
-        {"id": "LSTM_Sequential", "version": "v1.8", "acc": 0.58, "ret_mean": 1.5, "brier": 0.22},
-    ]
-
-    tickers = ["THYAO", "ASELS", "GARAN", "KCHOL", "TUPRS", "BIMAS"]
-    regimes = ["BULL_MOMENTUM", "BEAR_CORRECTION", "RANGE_BOUND", "HIGH_VOLATILITY"]
-
-    rng = np.random.RandomState(42)
-    for m in models_config:
-        m_id = m["id"]
-        m_ver = m["version"]
-        true_acc = m["acc"]
-        for i in range(40):
-            ticker = tickers[i % len(tickers)]
-            regime = regimes[i % len(regimes)]
-            pred_dir = "UP" if rng.rand() > 0.35 else "DOWN"
-            is_correct = rng.rand() < true_acc
-            act_dir = pred_dir if is_correct else ("DOWN" if pred_dir == "UP" else "UP")
-
-            entry_p = float(100.0 + (i * 3.5))
-            ret_mag = float(rng.normal(m["ret_mean"], 1.5))
-            act_ret = ret_mag if act_dir == "UP" else -ret_mag
-            act_p = float(entry_p * (1.0 + act_ret / 100.0))
-
-            p_id = pipeline.record_model_prediction(
-                model_id=m_id,
-                ticker=ticker,
-                predicted_direction=pred_dir,
-                confidence=float(0.60 + rng.rand() * 0.28),
-                entry_price=entry_p,
-                market_regime=regime,
-                prediction_horizon="1-5D" if i % 2 == 0 else "1-4W",
-                model_version=m_ver,
-            )
-            pipeline.record_market_outcome(prediction_id=p_id, actual_price=act_p)
-
-    pipeline.store.flush()
-    pipeline.run_learning_cycle(current_regime="BULL_MOMENTUM")
-    global _cached_report
-    _cached_report = None
-
-
 @router.get("/performance-matrix")
 @router.get("/metrics")
 async def performance_matrix(
@@ -125,10 +69,8 @@ async def performance_matrix(
         import orjson
 
         latest = _pipeline.store.get_latest_metrics_all_models()
-        # Eğer henüz örneklem yoksa veya tümü 0 ise başlangıç out-of-sample doğrulama verilerini yükle
-        if not latest or all(m.get("sample_size", 0) == 0 for m in latest):
-            seed_learning_pipeline_if_empty(_pipeline)
-            latest = _pipeline.store.get_latest_metrics_all_models()
+        # Yalnızca gerçek, değerlendirilmiş tahminler raporlanır. Örneklem yoksa boş durum döndürülür.
+        latest = [m for m in (latest or []) if (m.get("sample_size") or 0) > 0]
 
         if latest:
             models_list = []
@@ -289,7 +231,6 @@ async def trigger_learning_cycle(
     """
     global _cached_report
     _cached_report = None
-    seed_learning_pipeline_if_empty(_pipeline)
 
     if background_tasks:
         background_tasks.add_task(_run_learning_cycle, regime)
@@ -310,23 +251,19 @@ async def seed_history_endpoint(
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
 ) -> dict[str, Any]:
-    """Modeller için tarihsel out-of-sample değerlendirme geçmişini yükler ve öğrenme döngüsünü çalıştırır."""
-    try:
-        seed_learning_pipeline_if_empty(_pipeline)
-        res = _pipeline.run_learning_cycle(current_regime="BULL_MOMENTUM")
-        global _cached_report
-        _cached_report = None
-        return {
-            "success": True,
-            "message": "Tarihsel out-of-sample doğrulama verileri yüklendi ve öğrenme döngüsü tamamlandı.",
-            "result": res,
-        }
-    except Exception as exc:
-        logger.error("seed_history_hatasi: hata=%s", exc)
-        raise HTTPException(
-            status_code=500,
-            detail=f"Tarihsel geçmiş yüklenemedi: {exc}",
-        ) from exc
+    """Kaldırıldı: öğrenme hafızası yalnızca gerçek tahmin/sonuç kayıtlarıyla dolar.
+
+    Bu uç nokta eskiden sentetik (uydurma) model tahminleri üretip kalıcı öğrenme
+    hafızasına yazıyordu. Bu kayıtlar güven skorlarını ve füzyon ağırlıklarını
+    kirleterek canlı sinyal üretimini bozuyordu. Artık 410 döndürür.
+    """
+    raise HTTPException(
+        status_code=410,
+        detail=(
+            "Sentetik geçmiş yükleme kaldırıldı. Öğrenme hafızası yalnızca "
+            "record_model_prediction/record_market_outcome ile gerçek seans sonuçlarından doldurulur."
+        ),
+    )
 
 
 def _run_learning_cycle(regime: str) -> None:
@@ -374,6 +311,8 @@ async def record_prediction(
             model_version=payload.get("model_version"),
         )
         return {"success": True, "prediction_id": pred_id}
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("tahmin_kayit_hatasi: hata=%s", exc)
         raise HTTPException(
@@ -441,6 +380,8 @@ async def calibration(
                 for m in latest
             ],
         }
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("kalibrasyon_hatasi: hata=%s", exc)
         raise HTTPException(
@@ -489,6 +430,8 @@ async def drift_detection(
             "drift_details": drift_details,
             "message": "Drift tespit edildi." if drift_detected else "Tüm modeller istikrar eşikleri içinde.",
         }
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("drift_denetim_hatasi: hata=%s", exc)
         raise HTTPException(
@@ -518,6 +461,8 @@ async def champion_challenger(
             "challengers": [m["model_id"] for m in latest[1:]] if len(latest) > 1 else [],
             "ranking": latest,
         }
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("champion_challenger_hatasi: hata=%s", exc)
         raise HTTPException(
@@ -547,6 +492,8 @@ async def strategy_diagnosis(
             "sector_diagnostics": rep.get("sector_diagnostics", []),
             "checkpoints": rep.get("checkpoints", []),
         }
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("strategy_diagnosis_api_hatasi: hata=%s", exc)
         raise HTTPException(status_code=500, detail=f"Teşhis raporu alınamadı: {exc}") from exc
@@ -573,6 +520,8 @@ async def active_strategy_params(
             "min_cash_buffer_pct": FROZEN_PARAMS.get("min_cash_buffer_pct"),
             "take_profit_rr_mult": FROZEN_PARAMS.get("take_profit_rr_mult"),
         }
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("active_params_api_hatasi: hata=%s", exc)
         raise HTTPException(status_code=500, detail=f"Aktif parametreler alınamadı: {exc}") from exc

@@ -309,6 +309,8 @@ async def portfolio_exposure(
                 "mesaj": "Bu pozisyonlar için faktör verisi alınamadı, nötr değerler kullanıldı.",
             }
         return result
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("portfoy_exposure_hatasi: portfolio_id=%s, hata=%s", portfolio_id, exc)
         raise HTTPException(

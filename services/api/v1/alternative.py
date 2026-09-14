@@ -141,6 +141,8 @@ async def sentiment(
         from ...ingestion.providers.news_provider import news_provider
 
         news = await news_provider.fetch_news_for_ticker(sym, max_items=10)
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("sentiment_haber_alinamadi: ticker=%s, hata=%s", sym, exc)
         raise HTTPException(

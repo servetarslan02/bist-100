@@ -46,6 +46,8 @@ async def list_agents(user=Depends(get_current_user), _=Depends(check_rate_limit
         return {"agents": agents, "count": len(agents), "status": "ok"}
     except ImportError as exc:
         raise HTTPException(status_code=503, detail="Ajan sistemi mevcut değil") from exc
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ajan listesi alınamadı: {e}") from e
 
@@ -79,6 +81,8 @@ async def run_agent(
         raise HTTPException(status_code=503, detail="Ajan sistemi mevcut değil") from exc
     except ValueError as e:
         raise HTTPException(status_code=404, detail=f"Ajan bulunamadı: {e}") from e
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ajan çalıştırılamadı: {e}") from e
 
@@ -111,6 +115,8 @@ async def run_agent_pipeline(
             "trace_id": result.trace_id,
             "result": result.to_dict(),
         }
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(
             status_code=500,
@@ -142,6 +148,8 @@ async def run_batch_agent_pipeline(
             "count": len(batch_results),
             "results": {sym: res.to_dict() for sym, res in batch_results.items()},
         }
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(
             status_code=500,

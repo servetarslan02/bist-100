@@ -198,6 +198,8 @@ async def macro_impact(
         result = engine.get_company_sensitivity(ticker) if hasattr(engine, "get_company_sensitivity") else {}
         if result:
             return {"ticker": ticker, "macro_available": True, **result}
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.warning("makro_duyarlilik_hatasi: ticker=%s, hata=%s", ticker, exc)
 
@@ -232,6 +234,8 @@ async def sector_sensitivity(
         result = engine.get_sector_sensitivity(sector) if hasattr(engine, "get_sector_sensitivity") else {}
         if result:
             return {"sector": sector, "sensitivity": result, "source": "macro_sensitivity_engine"}
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.warning("sektor_duyarlilik_hatasi: sector=%s, hata=%s", sector, exc)
 

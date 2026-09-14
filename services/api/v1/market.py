@@ -365,6 +365,8 @@ async def instruments(
         }
         _instruments_cache.set(result)
         return result
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("enstruman_hatasi: hata=%s", exc)
         raise HTTPException(
@@ -397,6 +399,8 @@ async def instrument_detail(
             "sector": meta.get("sector", "Bilinmeyen"),
             "available": True,
         }
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("enstruman_detay_hatasi: ticker=%s, hata=%s", ticker, exc)
         raise HTTPException(
@@ -747,6 +751,8 @@ async def sectors(
         sector_map = bist_universe.SECTOR_MAP
         unique_sectors = sorted(set(sector_map.values()))
         return {"sectors": unique_sectors, "count": len(unique_sectors)}
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("sektor_hatasi: hata=%s", exc)
         raise HTTPException(

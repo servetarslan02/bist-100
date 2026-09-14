@@ -270,6 +270,8 @@ async def risk_dashboard(
             },
             "calibration": cal_quality,
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("uc_nokta_hatasi: hata=%s", str(e))
         raise HTTPException(500, detail=f"Sunucu hatası: {e}") from e
@@ -334,6 +336,8 @@ async def var_report(
             "cvar_95": round(cvar, 2),
             "var_pct": round((param_var / max(1, portfolio_value)) * 100, 2),
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("uc_nokta_hatasi: hata=%s", str(e))
         raise HTTPException(500, detail=f"Sunucu hatası: {e}") from e
@@ -369,6 +373,8 @@ async def portfolio_risk(
             "portfolio_risk": report,
             "source": "risk_orchestrator_live",
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("uc_nokta_hatasi: hata=%s", str(e))
         raise HTTPException(500, detail=f"Sunucu hatası: {e}") from e
@@ -409,6 +415,8 @@ async def liquidity_risk(
             "is_tradable": metrics.is_tradable,
             "warnings": metrics.warnings,
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("uc_nokta_hatasi: hata=%s", str(e))
         raise HTTPException(500, detail=f"Sunucu hatası: {e}") from e
@@ -472,6 +480,8 @@ async def risk_limits(
                 "vix": vix,
             },
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("uc_nokta_hatasi: hata=%s", str(e))
         raise HTTPException(500, detail=f"Sunucu hatası: {e}") from e
@@ -512,6 +522,8 @@ async def drawdown_status(user=Depends(get_current_user), _=Depends(check_rate_l
             ],
             "alert_message": dd.get_alert_message(state),
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("uc_nokta_hatasi: hata=%s", str(e))
         raise HTTPException(500, detail=f"Sunucu hatası: {e}") from e
@@ -567,6 +579,8 @@ async def stress_test_scenarios(user=Depends(get_current_user), _=Depends(check_
             "prob_positive": prob_pos,
             "portfolio_heat": heat,
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("uc_nokta_hatasi: hata=%s", str(e))
         raise HTTPException(500, detail=f"Sunucu hatası: {e}") from e
@@ -640,6 +654,8 @@ async def run_stress_test(
                 "recovery_estimate_days": int(result.recovery_estimate_days),
                 "position_impacts": position_impacts_clean,
             }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("uc_nokta_hatasi: hata=%s", str(e))
         raise HTTPException(500, detail=f"Sunucu hatası: {e}") from e
@@ -671,6 +687,8 @@ async def tail_hedge_status(user=Depends(get_current_user), _=Depends(check_rate
             },
             "vix_levels": hedger.VIX_LEVELS,
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("uc_nokta_hatasi: hata=%s", str(e))
         raise HTTPException(500, detail=f"Sunucu hatası: {e}") from e
@@ -713,6 +731,8 @@ async def analyze_tail_hedge(
             "description": result.description,
             "instruments": result.instruments,
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("uc_nokta_hatasi: hata=%s", str(e))
         raise HTTPException(500, detail=f"Sunucu hatası: {e}") from e
@@ -739,6 +759,8 @@ async def risk_parity_info(user=Depends(get_current_user), _=Depends(check_rate_
             "max_iterations": rp.max_iterations,
             "usage": "POST /api/v1/risk/risk-parity/optimize ile ağırlıkları hesaplayın",
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("uc_nokta_hatasi: hata=%s", str(e))
         raise HTTPException(500, detail=f"Sunucu hatası: {e}") from e
@@ -825,6 +847,8 @@ async def risk_monitoring(user=Depends(get_current_user), _=Depends(check_rate_l
             "active_rules": sum(1 for r in rules if r["enabled"]),
             "alert_summary": monitor.get_alert_summary(),
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("uc_nokta_hatasi: hata=%s", str(e))
         raise HTTPException(500, detail=f"Sunucu hatası: {e}") from e
@@ -911,6 +935,8 @@ async def calibration_quality(user=Depends(get_current_user), _=Depends(check_ra
             "calibration_curve": curve,
             "brier_history": cal.get_brier_history()[-10:],
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("uc_nokta_hatasi: hata=%s", str(e))
         raise HTTPException(500, detail=f"Sunucu hatası: {e}") from e
@@ -985,6 +1011,8 @@ async def pre_trade_check(
                 "position_scale": dd_state.position_scale,
             },
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("uc_nokta_hatasi: hata=%s", str(e))
         raise HTTPException(500, detail=f"Sunucu hatası: {e}") from e
@@ -1041,6 +1069,8 @@ async def compliance(
             },
             "drawdown_state": dd_state.severity.value,
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("uc_nokta_hatasi: hata=%s", str(e))
         raise HTTPException(500, detail=f"Sunucu hatası: {e}") from e
@@ -1053,8 +1083,19 @@ async def compliance(
 _cached_daily_returns = None
 
 
-def _get_historical_returns() -> np.ndarray:
-    """30 yıllık BIST deposundan tarihsel günlük getirileri döndürür."""
+_RETURNS_UNAVAILABLE = (
+    "Tarihsel BIST getiri serisi yüklenemedi. Risk ölçümleri yalnızca gerçek "
+    "piyasa verisiyle hesaplanır; sentetik seri kullanılmaz."
+)
+
+
+def _get_historical_returns() -> np.ndarray | None:
+    """30 yıllık BIST deposundan tarihsel günlük getirileri döndürür.
+
+    Depo okunamazsa ``None`` döner. Sentetik/üretilmiş getiri serisi ASLA
+    döndürülmez: uydurma bir seri, VaR ve stres testi sonuçlarını sessizce
+    anlamsız hale getirir.
+    """
     global _cached_daily_returns
     if _cached_daily_returns is not None and len(_cached_daily_returns) > 30:
         return _cached_daily_returns
@@ -1068,12 +1109,9 @@ def _get_historical_returns() -> np.ndarray:
             _cached_daily_returns = np.diff(closes) / closes[:-1]
             return _cached_daily_returns
     except Exception as e:
-        logger.debug("tarihsel_getiri_depo: %s", str(e))
+        logger.error("tarihsel_getiri_depo_okunamadi: hata=%s", str(e))
 
-    # BIST 100 ampirik getiri ve volatilite dağılımı (Drift: %0.12/gün, Volatilite: %1.85/gün, 10 Yıllık)
-    rng = np.random.default_rng(42)
-    _cached_daily_returns = rng.normal(0.0012, 0.0185, 2520)
-    return _cached_daily_returns
+    return None
 
 
 @router.get("/stress-test")
@@ -1088,6 +1126,8 @@ async def run_stress_test_quick(
     """30 Yıllık BIST Deposu ve Monte Carlo Motoru ile stres testi."""
     try:
         daily_returns = _get_historical_returns()
+        if daily_returns is None or len(daily_returns) < 30:
+            raise HTTPException(503, _RETURNS_UNAVAILABLE)
 
         # Senaryo şokları
         scenario_shocks = {
@@ -1201,6 +1241,8 @@ async def run_stress_test_quick(
             "histogram": histogram,
             "paths": paths_list,
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("uc_nokta_hatasi: hata=%s", str(e))
         raise HTTPException(500, detail=f"Sunucu hatası: {e}") from e

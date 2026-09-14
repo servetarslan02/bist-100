@@ -233,6 +233,8 @@ async def today_status(
             "is_weekend": is_weekend,
             "name": name,
         }
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("bugun_durum_hatasi: hata=%s", exc)
         raise HTTPException(
@@ -283,6 +285,8 @@ async def list_holidays_by_year(
             "half_days": [d.isoformat() for d in sorted(half_days)],
             "total": len(result),
         }
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("yil_tatil_hatasi: year=%s, hata=%s", year, exc)
         raise HTTPException(
@@ -422,6 +426,8 @@ async def sync_holidays(
             "holidays_found": 0,
             "message": "Hiçbir kaynaktan tatil bilgisi çekilemedi. Proxy ayarlarını kontrol edin.",
         }
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("tatil_senkron_hatasi: hata=%s", exc)
         raise HTTPException(
@@ -450,6 +456,8 @@ async def get_audit_log(
 
         log = holiday_manager.get_audit_log(limit)
         return {"entries": log, "total": len(log)}
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("audit_log_hatasi: hata=%s", exc)
         raise HTTPException(

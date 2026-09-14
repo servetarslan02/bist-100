@@ -273,6 +273,8 @@ async def ask_gemini_endpoint(
         loop = asyncio.get_running_loop()
         response = await loop.run_in_executor(None, call_gemini, prompt)
         return {"response": response, "model": "gemini-3.7-flash", "status": "ok"}
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("gemini_hatasi: hata=%s", exc)
         raise HTTPException(
@@ -331,6 +333,8 @@ async def gemini_report(
             ),
         )
         return {"ticker": ticker, "report": report, "model": "gemini-3.7-flash", "status": "ok"}
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("gemini_rapor_hatasi: ticker=%s, hata=%s", ticker, exc)
         raise HTTPException(
@@ -355,6 +359,8 @@ async def get_kap_intelligence_feed(
             "total": len(events),
             "events": events,
         }
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("kap_feed_api_hatasi: %s", exc)
         raise HTTPException(status_code=500, detail=f"KAP akışı alınamadı: {exc}") from exc
@@ -376,6 +382,8 @@ async def get_ticker_kap_intelligence(
             "ticker": ticker.upper(),
             "metrics": metrics,
         }
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("ticker_kap_api_hatasi: ticker=%s, hata=%s", ticker, exc)
         raise HTTPException(status_code=500, detail=f"Hisse KAP bilgisi alınamadı: {exc}") from exc

@@ -347,6 +347,8 @@ async def walk_forward(
             status_code=503,
             detail="Walk-forward analiz motoru şu anda kullanılamıyor.",
         ) from exc
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("walk_forward_hatasi: ticker=%s, hata=%s", ticker, exc)
         raise HTTPException(

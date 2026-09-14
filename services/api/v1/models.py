@@ -101,6 +101,8 @@ async def model_performance(
             "model_count": len(versions),
             "data_source": "model_registry",
         }
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("model_performans_hatasi: hata=%s", exc)
         raise HTTPException(
@@ -198,6 +200,8 @@ async def get_learning_state(
             "canonical_features_count": canonical_features_count,
             "calibration_status": calibration_status,
         }
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("ogrenme_durumu_hatasi: hata=%s", exc)
         raise HTTPException(
@@ -230,6 +234,8 @@ async def retrain(
         loop = asyncio.get_running_loop()
         result = await loop.run_in_executor(None, learning_loop.trigger_autonomous_retrain, force)
         return result
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("yeniden_egitim_hatasi: hata=%s", exc)
         raise HTTPException(
@@ -318,6 +324,8 @@ async def get_feature_importance(
             "features_count": len(importances),
             "top_features": normalized,
         }
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("feature_importance_hatasi: hata=%s", exc)
         raise HTTPException(
