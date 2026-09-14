@@ -54,6 +54,20 @@ export default function DashboardClient({ initialData }: { initialData?: Dashboa
   const [filterType, setFilterType] = useState<"ALL" | "STRONG_BUY" | "BREAKOUT">("ALL");
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // Tablo Sıralama State'leri
+  type DashSortField = "ticker" | "price" | "change_pct" | "score" | "expected_return_pct";
+  const [dashSortField, setDashSortField] = useState<DashSortField>("score");
+  const [dashSortAsc, setDashSortAsc] = useState<boolean>(false);
+
+  const handleDashSort = (field: DashSortField) => {
+    if (dashSortField === field) {
+      setDashSortAsc(!dashSortAsc);
+    } else {
+      setDashSortField(field);
+      setDashSortAsc(false); // Default: azalan (en yüksek skor, en çok artan vb.)
+    }
+  };
+
   // Canlı Polling Bağlantıları (SSR verisi ile anında 0.0ms hydration)
   const { data: market, refetch: refetchMarket } = usePolling<MarketState>("/market/state", 3000, initialData?.market);
   const { data: rawSignals, refetch: refetchSignals } = usePolling<{ signals?: any[] } | any[]>("/scanner/signals?limit=15", 3000);
@@ -78,9 +92,9 @@ export default function DashboardClient({ initialData }: { initialData?: Dashboa
     return [];
   }, [rawSignals, initialData]);
 
-  // Filtrelenmiş sinyaller
+  // Filtrelenmiş ve Sıralanmış sinyaller
   const filteredSignals = useMemo(() => {
-    return signals.filter((s) => {
+    const matched = signals.filter((s) => {
       const sym = (s.ticker || s.symbol || "").toLowerCase();
       const name = (s.name || "").toLowerCase();
       const q = stockSearch.toLowerCase();
@@ -94,8 +108,37 @@ export default function DashboardClient({ initialData }: { initialData?: Dashboa
         return s.signal_type === "VOLUME_BREAKOUT" || (s.signal && s.signal.includes("KIRILIM"));
       }
       return true;
+    });
+
+    return [...matched].sort((a, b) => {
+      if (dashSortField === "ticker") {
+        const valA = (a.ticker || a.symbol || "").toUpperCase();
+        const valB = (b.ticker || b.symbol || "").toUpperCase();
+        return dashSortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      }
+      if (dashSortField === "price") {
+        const valA = Number(a.price ?? 0);
+        const valB = Number(b.price ?? 0);
+        return dashSortAsc ? valA - valB : valB - valA;
+      }
+      if (dashSortField === "change_pct") {
+        const valA = Number(a.change_pct ?? 0);
+        const valB = Number(b.change_pct ?? 0);
+        return dashSortAsc ? valA - valB : valB - valA;
+      }
+      if (dashSortField === "score") {
+        const valA = Number(a.score ?? 75);
+        const valB = Number(b.score ?? 75);
+        return dashSortAsc ? valA - valB : valB - valA;
+      }
+      if (dashSortField === "expected_return_pct") {
+        const valA = Number(a.expected_return_pct ?? 4.2);
+        const valB = Number(b.expected_return_pct ?? 4.2);
+        return dashSortAsc ? valA - valB : valB - valA;
+      }
+      return 0;
     }).slice(0, 10);
-  }, [signals, stockSearch, filterType]);
+  }, [signals, stockSearch, filterType, dashSortField, dashSortAsc]);
 
   // Portföy Hesaplamaları
   const initialCap = portfolio?.initial_capital ?? 1000000;
@@ -344,14 +387,59 @@ export default function DashboardClient({ initialData }: { initialData?: Dashboa
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs font-data">
                   <thead>
-                    <tr className="text-xs uppercase font-semibold text-zinc-400 bg-zinc-950/60 border-b border-white/[0.06]">
-                      <th className="py-2.5 px-3.5">Hisse</th>
-                      <th className="py-2.5 px-2.5 text-right">Son Fiyat</th>
-                      <th className="py-2.5 px-2.5 text-right">Değişim</th>
-                      <th className="py-2.5 px-3 text-right">Model Skoru</th>
-                      <th className="py-2.5 px-3 text-center">Karar</th>
-                      <th className="py-2.5 px-3 text-right">Beklenen Getiri</th>
-                      <th className="py-2.5 px-3 text-center">İşlem</th>
+                    <tr className="text-xs uppercase font-semibold bg-zinc-950/60 border-b border-white/[0.06] select-none">
+                      <th 
+                        onClick={() => handleDashSort("ticker")} 
+                        className={`py-2.5 px-3.5 cursor-pointer transition-colors hover:text-white ${dashSortField === "ticker" ? "text-emerald-400" : "text-zinc-400"}`}
+                        title="Hisse adına göre sırala"
+                      >
+                        <div className="flex items-center gap-1">
+                          <span>Hisse</span>
+                          <span className="text-[10px] font-mono">{dashSortField === "ticker" ? (dashSortAsc ? "▲" : "▼") : "↕"}</span>
+                        </div>
+                      </th>
+                      <th 
+                        onClick={() => handleDashSort("price")} 
+                        className={`py-2.5 px-2.5 text-right cursor-pointer transition-colors hover:text-white ${dashSortField === "price" ? "text-emerald-400" : "text-zinc-400"}`}
+                        title="Fiyata göre sırala"
+                      >
+                        <div className="flex items-center justify-end gap-1">
+                          <span>Son Fiyat</span>
+                          <span className="text-[10px] font-mono">{dashSortField === "price" ? (dashSortAsc ? "▲" : "▼") : "↕"}</span>
+                        </div>
+                      </th>
+                      <th 
+                        onClick={() => handleDashSort("change_pct")} 
+                        className={`py-2.5 px-2.5 text-right cursor-pointer transition-colors hover:text-white ${dashSortField === "change_pct" ? "text-emerald-400" : "text-zinc-400"}`}
+                        title="Değişime / en çok artana göre sırala"
+                      >
+                        <div className="flex items-center justify-end gap-1">
+                          <span>Değişim</span>
+                          <span className="text-[10px] font-mono">{dashSortField === "change_pct" ? (dashSortAsc ? "▲" : "▼") : "↕"}</span>
+                        </div>
+                      </th>
+                      <th 
+                        onClick={() => handleDashSort("score")} 
+                        className={`py-2.5 px-3 text-right cursor-pointer transition-colors hover:text-white ${dashSortField === "score" ? "text-emerald-400" : "text-zinc-400"}`}
+                        title="Model skoruna göre sırala"
+                      >
+                        <div className="flex items-center justify-end gap-1">
+                          <span>Model Skoru</span>
+                          <span className="text-[10px] font-mono">{dashSortField === "score" ? (dashSortAsc ? "▲" : "▼") : "↕"}</span>
+                        </div>
+                      </th>
+                      <th className="py-2.5 px-3 text-center text-zinc-400">Karar</th>
+                      <th 
+                        onClick={() => handleDashSort("expected_return_pct")} 
+                        className={`py-2.5 px-3 text-right cursor-pointer transition-colors hover:text-white ${dashSortField === "expected_return_pct" ? "text-emerald-400" : "text-zinc-400"}`}
+                        title="Beklenen getiriye göre sırala"
+                      >
+                        <div className="flex items-center justify-end gap-1">
+                          <span>Beklenen Getiri</span>
+                          <span className="text-[10px] font-mono">{dashSortField === "expected_return_pct" ? (dashSortAsc ? "▲" : "▼") : "↕"}</span>
+                        </div>
+                      </th>
+                      <th className="py-2.5 px-3 text-center text-zinc-400">İşlem</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/[0.04]">

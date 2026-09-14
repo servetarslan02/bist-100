@@ -127,12 +127,49 @@ export default function StrategyPage() {
   const [rebalancing, setRebalancing] = useState(false);
   const [rebalanceMsg, setRebalanceMsg] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
-  // Sinyalleri normalize et (sahte sabit değerler kaldırıldı, gerçek 0.0 güvenliği)
+  // Sıralama State'leri
+  type StrategySortField = "symbol" | "weight_pct" | "score" | "return_1m_pct" | "volatility_ann_pct";
+  const [strategySortField, setStrategySortField] = useState<StrategySortField>("weight_pct");
+  const [strategySortAsc, setStrategySortAsc] = useState<boolean>(false);
+
+  const handleStrategySort = (field: StrategySortField) => {
+    if (strategySortField === field) {
+      setStrategySortAsc(!strategySortAsc);
+    } else {
+      setStrategySortField(field);
+      setStrategySortAsc(false); // Default descending
+    }
+  };
+
+  type TradeSortField = "trade_id" | "entry_date" | "exit_date" | "entry_price" | "exit_price" | "quantity" | "pnl";
+  const [tradeSortField, setTradeSortField] = useState<TradeSortField>("trade_id");
+  const [tradeSortAsc, setTradeSortAsc] = useState<boolean>(true);
+
+  const handleTradeSort = (field: TradeSortField) => {
+    if (tradeSortField === field) {
+      setTradeSortAsc(!tradeSortAsc);
+    } else {
+      setTradeSortField(field);
+      setTradeSortAsc(field === "trade_id" || field === "entry_date");
+    }
+  };
+
+  // Sinyalleri normalize et ve sırala
   const normalizedSignals = useMemo(() => {
+    let list: Array<{
+      symbol: string;
+      price: number;
+      score: number;
+      sector: string;
+      weight_pct: number;
+      return_1m_pct: number;
+      volatility_ann_pct: number;
+    }> = [];
+
     if (!alphaData) return [];
     if (alphaData.top_selected_stocks && alphaData.top_selected_stocks.length > 0) {
       const defaultWeight = Math.round(100 / alphaData.top_selected_stocks.length);
-      return alphaData.top_selected_stocks.map(s => ({
+      list = alphaData.top_selected_stocks.map(s => ({
         symbol: s.symbol,
         price: Number(s.price || 0.0),
         score: Number(s.score || 0.0),
@@ -141,9 +178,8 @@ export default function StrategyPage() {
         return_1m_pct: Number(s.return_1m_pct ?? 0.0),
         volatility_ann_pct: Number(s.volatility_ann_pct ?? 0.0),
       }));
-    }
-    if (alphaData.active_positions && alphaData.active_positions.length > 0) {
-      return alphaData.active_positions.map(p => ({
+    } else if (alphaData.active_positions && alphaData.active_positions.length > 0) {
+      list = alphaData.active_positions.map(p => ({
         symbol: p.ticker,
         price: Number(p.price || 0.0),
         score: Number(p.score || 0.0),
@@ -153,8 +189,26 @@ export default function StrategyPage() {
         volatility_ann_pct: 0.0,
       }));
     }
-    return [];
-  }, [alphaData]);
+
+    return [...list].sort((a, b) => {
+      if (strategySortField === "symbol") {
+        return strategySortAsc ? a.symbol.localeCompare(b.symbol) : b.symbol.localeCompare(a.symbol);
+      }
+      if (strategySortField === "weight_pct") {
+        return strategySortAsc ? a.weight_pct - b.weight_pct : b.weight_pct - a.weight_pct;
+      }
+      if (strategySortField === "score") {
+        return strategySortAsc ? a.score - b.score : b.score - a.score;
+      }
+      if (strategySortField === "return_1m_pct") {
+        return strategySortAsc ? a.return_1m_pct - b.return_1m_pct : b.return_1m_pct - a.return_1m_pct;
+      }
+      if (strategySortField === "volatility_ann_pct") {
+        return strategySortAsc ? a.volatility_ann_pct - b.volatility_ann_pct : b.volatility_ann_pct - a.volatility_ann_pct;
+      }
+      return 0;
+    });
+  }, [alphaData, strategySortField, strategySortAsc]);
 
   // Sayfa ilk yüklendiğinde otomatik THYAO 1Y momentum backtesti koştur
   useEffect(() => {
@@ -273,13 +327,38 @@ export default function StrategyPage() {
     }
   };
 
-  // Filtrelenmiş işlemler
+  // Filtrelenmiş ve Sıralanmış işlemler
   const filteredTrades = useMemo(() => {
     if (!btResult || !btResult.trades) return [];
-    if (tradeFilter === "win") return btResult.trades.filter(t => t.pnl > 0);
-    if (tradeFilter === "loss") return btResult.trades.filter(t => t.pnl <= 0);
-    return btResult.trades;
-  }, [btResult, tradeFilter]);
+    let list = btResult.trades;
+    if (tradeFilter === "win") list = btResult.trades.filter(t => t.pnl > 0);
+    if (tradeFilter === "loss") list = btResult.trades.filter(t => t.pnl <= 0);
+
+    return [...list].sort((a, b) => {
+      if (tradeSortField === "trade_id") {
+        return tradeSortAsc ? a.trade_id - b.trade_id : b.trade_id - a.trade_id;
+      }
+      if (tradeSortField === "entry_date") {
+        return tradeSortAsc ? a.entry_date.localeCompare(b.entry_date) : b.entry_date.localeCompare(a.entry_date);
+      }
+      if (tradeSortField === "exit_date") {
+        return tradeSortAsc ? a.exit_date.localeCompare(b.exit_date) : b.exit_date.localeCompare(a.exit_date);
+      }
+      if (tradeSortField === "entry_price") {
+        return tradeSortAsc ? a.entry_price - b.entry_price : b.entry_price - a.entry_price;
+      }
+      if (tradeSortField === "exit_price") {
+        return tradeSortAsc ? a.exit_price - b.exit_price : b.exit_price - a.exit_price;
+      }
+      if (tradeSortField === "quantity") {
+        return tradeSortAsc ? a.quantity - b.quantity : b.quantity - a.quantity;
+      }
+      if (tradeSortField === "pnl") {
+        return tradeSortAsc ? a.pnl - b.pnl : b.pnl - a.pnl;
+      }
+      return 0;
+    });
+  }, [btResult, tradeFilter, tradeSortField, tradeSortAsc]);
 
   return (
     <ErrorBoundary name="strategy">
@@ -428,13 +507,58 @@ export default function StrategyPage() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
                     <thead>
-                      <tr className="border-b border-white/[0.06] text-[11px] font-bold text-zinc-400 uppercase tracking-wider bg-white/[0.01]">
-                        <th className="py-3 px-4">Hisse Senedi</th>
-                        <th className="py-3 px-3 text-right">Hedef Ağırlık</th>
-                        <th className="py-3 px-3 text-right">Algoritmik Skor</th>
-                        <th className="py-3 px-3 text-right">1 Aylık Momentum</th>
-                        <th className="py-3 px-3 text-right">Yıllık Volatilite</th>
-                        <th className="py-3 px-4 text-center">İşlem / Analiz</th>
+                      <tr className="border-b border-white/[0.06] text-[11px] font-bold uppercase tracking-wider bg-white/[0.01] select-none">
+                        <th 
+                          onClick={() => handleStrategySort("symbol")} 
+                          className={`py-3 px-4 cursor-pointer transition-colors hover:text-white ${strategySortField === "symbol" ? "text-emerald-400" : "text-zinc-400"}`}
+                          title="Hisse adına göre sırala"
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <span>Hisse Senedi</span>
+                            <span className="text-xs font-mono">{strategySortField === "symbol" ? (strategySortAsc ? "▲" : "▼") : "↕"}</span>
+                          </div>
+                        </th>
+                        <th 
+                          onClick={() => handleStrategySort("weight_pct")} 
+                          className={`py-3 px-3 text-right cursor-pointer transition-colors hover:text-white ${strategySortField === "weight_pct" ? "text-emerald-400" : "text-zinc-400"}`}
+                          title="Hedef ağırlığa göre sırala"
+                        >
+                          <div className="flex items-center justify-end gap-1.5">
+                            <span>Hedef Ağırlık</span>
+                            <span className="text-xs font-mono">{strategySortField === "weight_pct" ? (strategySortAsc ? "▲" : "▼") : "↕"}</span>
+                          </div>
+                        </th>
+                        <th 
+                          onClick={() => handleStrategySort("score")} 
+                          className={`py-3 px-3 text-right cursor-pointer transition-colors hover:text-white ${strategySortField === "score" ? "text-emerald-400" : "text-zinc-400"}`}
+                          title="Skora göre sırala"
+                        >
+                          <div className="flex items-center justify-end gap-1.5">
+                            <span>Algoritmik Skor</span>
+                            <span className="text-xs font-mono">{strategySortField === "score" ? (strategySortAsc ? "▲" : "▼") : "↕"}</span>
+                          </div>
+                        </th>
+                        <th 
+                          onClick={() => handleStrategySort("return_1m_pct")} 
+                          className={`py-3 px-3 text-right cursor-pointer transition-colors hover:text-white ${strategySortField === "return_1m_pct" ? "text-emerald-400" : "text-zinc-400"}`}
+                          title="1 aylık momentuma / getiriye göre sırala"
+                        >
+                          <div className="flex items-center justify-end gap-1.5">
+                            <span>1 Aylık Momentum</span>
+                            <span className="text-xs font-mono">{strategySortField === "return_1m_pct" ? (strategySortAsc ? "▲" : "▼") : "↕"}</span>
+                          </div>
+                        </th>
+                        <th 
+                          onClick={() => handleStrategySort("volatility_ann_pct")} 
+                          className={`py-3 px-3 text-right cursor-pointer transition-colors hover:text-white ${strategySortField === "volatility_ann_pct" ? "text-emerald-400" : "text-zinc-400"}`}
+                          title="Yıllık volatiliteye göre sırala"
+                        >
+                          <div className="flex items-center justify-end gap-1.5">
+                            <span>Yıllık Volatilite</span>
+                            <span className="text-xs font-mono">{strategySortField === "volatility_ann_pct" ? (strategySortAsc ? "▲" : "▼") : "↕"}</span>
+                          </div>
+                        </th>
+                        <th className="py-3 px-4 text-center text-zinc-400">İşlem / Analiz</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/[0.04]">
@@ -896,15 +1020,78 @@ export default function StrategyPage() {
 
                     <div className="overflow-x-auto max-h-72">
                       <table className="w-full text-left text-xs">
-                        <thead className="sticky top-0 bg-zinc-950 border-b border-white/[0.06] text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                        <thead className="sticky top-0 bg-zinc-950 border-b border-white/[0.06] text-[10px] font-bold uppercase tracking-wider select-none">
                           <tr>
-                            <th className="py-2.5 px-4">#</th>
-                            <th className="py-2.5 px-3">Giriş Tarihi</th>
-                            <th className="py-2.5 px-3">Çıkış Tarihi</th>
-                            <th className="py-2.5 px-3 text-right">Alış Fiyatı</th>
-                            <th className="py-2.5 px-3 text-right">Satış Fiyatı</th>
-                            <th className="py-2.5 px-3 text-right">Lot Adedi</th>
-                            <th className="py-2.5 px-4 text-right">Net K/Z (TL & %)</th>
+                            <th 
+                              onClick={() => handleTradeSort("trade_id")} 
+                              className={`py-2.5 px-4 cursor-pointer transition-colors hover:text-white ${tradeSortField === "trade_id" ? "text-emerald-400" : "text-zinc-400"}`}
+                              title="İşlem numarasına göre sırala"
+                            >
+                              <div className="flex items-center gap-1">
+                                <span>#</span>
+                                <span className="text-[10px] font-mono">{tradeSortField === "trade_id" ? (tradeSortAsc ? "▲" : "▼") : "↕"}</span>
+                              </div>
+                            </th>
+                            <th 
+                              onClick={() => handleTradeSort("entry_date")} 
+                              className={`py-2.5 px-3 cursor-pointer transition-colors hover:text-white ${tradeSortField === "entry_date" ? "text-emerald-400" : "text-zinc-400"}`}
+                              title="Giriş tarihine göre sırala"
+                            >
+                              <div className="flex items-center gap-1">
+                                <span>Giriş Tarihi</span>
+                                <span className="text-[10px] font-mono">{tradeSortField === "entry_date" ? (tradeSortAsc ? "▲" : "▼") : "↕"}</span>
+                              </div>
+                            </th>
+                            <th 
+                              onClick={() => handleTradeSort("exit_date")} 
+                              className={`py-2.5 px-3 cursor-pointer transition-colors hover:text-white ${tradeSortField === "exit_date" ? "text-emerald-400" : "text-zinc-400"}`}
+                              title="Çıkış tarihine göre sırala"
+                            >
+                              <div className="flex items-center gap-1">
+                                <span>Çıkış Tarihi</span>
+                                <span className="text-[10px] font-mono">{tradeSortField === "exit_date" ? (tradeSortAsc ? "▲" : "▼") : "↕"}</span>
+                              </div>
+                            </th>
+                            <th 
+                              onClick={() => handleTradeSort("entry_price")} 
+                              className={`py-2.5 px-3 text-right cursor-pointer transition-colors hover:text-white ${tradeSortField === "entry_price" ? "text-emerald-400" : "text-zinc-400"}`}
+                              title="Alış fiyatına göre sırala"
+                            >
+                              <div className="flex items-center justify-end gap-1">
+                                <span>Alış Fiyatı</span>
+                                <span className="text-[10px] font-mono">{tradeSortField === "entry_price" ? (tradeSortAsc ? "▲" : "▼") : "↕"}</span>
+                              </div>
+                            </th>
+                            <th 
+                              onClick={() => handleTradeSort("exit_price")} 
+                              className={`py-2.5 px-3 text-right cursor-pointer transition-colors hover:text-white ${tradeSortField === "exit_price" ? "text-emerald-400" : "text-zinc-400"}`}
+                              title="Satış fiyatına göre sırala"
+                            >
+                              <div className="flex items-center justify-end gap-1">
+                                <span>Satış Fiyatı</span>
+                                <span className="text-[10px] font-mono">{tradeSortField === "exit_price" ? (tradeSortAsc ? "▲" : "▼") : "↕"}</span>
+                              </div>
+                            </th>
+                            <th 
+                              onClick={() => handleTradeSort("quantity")} 
+                              className={`py-2.5 px-3 text-right cursor-pointer transition-colors hover:text-white ${tradeSortField === "quantity" ? "text-emerald-400" : "text-zinc-400"}`}
+                              title="Lot adedine göre sırala"
+                            >
+                              <div className="flex items-center justify-end gap-1">
+                                <span>Lot Adedi</span>
+                                <span className="text-[10px] font-mono">{tradeSortField === "quantity" ? (tradeSortAsc ? "▲" : "▼") : "↕"}</span>
+                              </div>
+                            </th>
+                            <th 
+                              onClick={() => handleTradeSort("pnl")} 
+                              className={`py-2.5 px-4 text-right cursor-pointer transition-colors hover:text-white ${tradeSortField === "pnl" ? "text-emerald-400" : "text-zinc-400"}`}
+                              title="Net Kâr/Zarara göre sırala"
+                            >
+                              <div className="flex items-center justify-end gap-1">
+                                <span>Net K/Z (TL & %)</span>
+                                <span className="text-[10px] font-mono">{tradeSortField === "pnl" ? (tradeSortAsc ? "▲" : "▼") : "↕"}</span>
+                              </div>
+                            </th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-white/[0.04] font-data">

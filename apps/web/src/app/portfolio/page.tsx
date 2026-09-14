@@ -49,6 +49,34 @@ export default function PortfolioPage() {
   const [pnlFilter, setPnlFilter] = useState<"ALL" | "PROFIT" | "LOSS">("ALL");
   const [orderFilter, setOrderFilter] = useState<"ALL" | "BUY" | "SELL">("ALL");
 
+  // Kolon Sıralama State'leri
+  type PositionSortField = "ticker" | "quantity" | "current_price" | "market_value" | "unrealized_pnl" | "unrealized_pnl_pct";
+  type OrderSortField = "date" | "ticker" | "quantity" | "execution_price" | "realized_pnl";
+
+  const [sortField, setSortField] = useState<PositionSortField>("market_value");
+  const [sortAsc, setSortAsc] = useState<boolean>(false);
+
+  const [orderSortField, setOrderSortField] = useState<OrderSortField>("date");
+  const [orderSortAsc, setOrderSortAsc] = useState<boolean>(false);
+
+  const handleSort = (field: PositionSortField) => {
+    if (sortField === field) {
+      setSortAsc(!sortAsc);
+    } else {
+      setSortField(field);
+      setSortAsc(false); // Default: azalan (en büyük hisse, en çok artan vb.)
+    }
+  };
+
+  const handleOrderSort = (field: OrderSortField) => {
+    if (orderSortField === field) {
+      setOrderSortAsc(!orderSortAsc);
+    } else {
+      setOrderSortField(field);
+      setOrderSortAsc(false);
+    }
+  };
+
   const prevPricesRef = useRef<Record<string, number>>({});
 
   useEffect(() => {
@@ -94,9 +122,9 @@ export default function PortfolioPage() {
     }
   }, [data]);
 
-  // Filtrelenmiş Pozisyonlar
+  // Filtrelenmiş ve Sıralanmış Pozisyonlar
   const filteredPositions = useMemo(() => {
-    return positions.filter((pos) => {
+    const matched = positions.filter((pos) => {
       const sym = (pos.ticker || pos.symbol || "").toUpperCase();
       const name = (pos.name || pos.company_name || "").toLowerCase();
       const sec = (pos.sector || "").toLowerCase();
@@ -110,16 +138,83 @@ export default function PortfolioPage() {
       if (pnlFilter === "LOSS") return pnlVal < 0;
       return true;
     });
-  }, [positions, searchTerm, pnlFilter]);
 
-  // Filtrelenmiş Emirler
+    return [...matched].sort((a, b) => {
+      if (sortField === "ticker") {
+        const valA = (a.ticker || a.symbol || "").toUpperCase();
+        const valB = (b.ticker || b.symbol || "").toUpperCase();
+        return sortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      }
+      if (sortField === "quantity") {
+        const valA = Number(a.quantity ?? 0);
+        const valB = Number(b.quantity ?? 0);
+        return sortAsc ? valA - valB : valB - valA;
+      }
+      if (sortField === "current_price") {
+        const valA = Number(a.current_price ?? a.avg_cost ?? 0);
+        const valB = Number(b.current_price ?? b.avg_cost ?? 0);
+        return sortAsc ? valA - valB : valB - valA;
+      }
+      if (sortField === "market_value") {
+        const valA = Number(a.market_value ?? 0);
+        const valB = Number(b.market_value ?? 0);
+        return sortAsc ? valA - valB : valB - valA;
+      }
+      if (sortField === "unrealized_pnl") {
+        const valA = Number(a.unrealized_pnl ?? 0);
+        const valB = Number(b.unrealized_pnl ?? 0);
+        return sortAsc ? valA - valB : valB - valA;
+      }
+      if (sortField === "unrealized_pnl_pct") {
+        const valA = Number(a.unrealized_pnl_pct ?? 0);
+        const valB = Number(b.unrealized_pnl_pct ?? 0);
+        return sortAsc ? valA - valB : valB - valA;
+      }
+      return 0;
+    });
+  }, [positions, searchTerm, pnlFilter, sortField, sortAsc]);
+
+  // Filtrelenmiş ve Sıralanmış Emirler
   const filteredOrders = useMemo(() => {
-    return orders.filter((ord) => {
+    const matched = orders.filter((ord) => {
       if (orderFilter === "BUY") return ord.side === "BUY";
       if (orderFilter === "SELL") return ord.side === "SELL";
       return true;
     });
-  }, [orders, orderFilter]);
+
+    return [...matched].sort((a, b) => {
+      if (orderSortField === "ticker") {
+        const valA = (ordA_ticker(a)).toUpperCase();
+        const valB = (ordA_ticker(b)).toUpperCase();
+        return orderSortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      }
+      if (orderSortField === "date") {
+        const valA = a.date || "";
+        const valB = b.date || "";
+        return orderSortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      }
+      if (orderSortField === "quantity") {
+        const valA = Number(a.quantity ?? 0);
+        const valB = Number(b.quantity ?? 0);
+        return orderSortAsc ? valA - valB : valB - valA;
+      }
+      if (orderSortField === "execution_price") {
+        const valA = Number(a.execution_price ?? a.exit_price ?? a.signal_price ?? 0);
+        const valB = Number(b.execution_price ?? b.exit_price ?? b.signal_price ?? 0);
+        return orderSortAsc ? valA - valB : valB - valA;
+      }
+      if (orderSortField === "realized_pnl") {
+        const valA = Number(a.realized_pnl ?? 0);
+        const valB = Number(b.realized_pnl ?? 0);
+        return orderSortAsc ? valA - valB : valB - valA;
+      }
+      return 0;
+    });
+  }, [orders, orderFilter, orderSortField, orderSortAsc]);
+
+  function ordA_ticker(ord: OrderData): string {
+    return ord.ticker || (ord as any).symbol || "";
+  }
 
   // Varlık Dağılımı Hesaplama (Segment Bar)
   const allocationSegments = useMemo(() => {
@@ -393,6 +488,33 @@ export default function PortfolioPage() {
                   </button>
                 </div>
 
+                {/* Hızlı Sıralama Seçici */}
+                <div className="hidden sm:flex items-center gap-1.5 bg-zinc-950/80 px-2.5 py-1 rounded-lg border border-white/[0.08] text-[11px]">
+                  <span className="text-zinc-500">Sırala:</span>
+                  <select
+                    value={sortField}
+                    onChange={(e) => {
+                      setSortField(e.target.value as any);
+                      setSortAsc(false);
+                    }}
+                    className="bg-transparent text-emerald-400 font-medium focus:outline-none cursor-pointer text-[11px]"
+                  >
+                    <option value="market_value" className="bg-zinc-900 text-white">En Büyük Hisse (Değer)</option>
+                    <option value="unrealized_pnl_pct" className="bg-zinc-900 text-white">En Çok Artan (K/Z %)</option>
+                    <option value="unrealized_pnl" className="bg-zinc-900 text-white">En Çok Kazandıran (TL)</option>
+                    <option value="quantity" className="bg-zinc-900 text-white">Adet (Lot)</option>
+                    <option value="current_price" className="bg-zinc-900 text-white">Anlık Fiyat</option>
+                    <option value="ticker" className="bg-zinc-900 text-white">Sembol (A-Z)</option>
+                  </select>
+                  <button
+                    onClick={() => setSortAsc(!sortAsc)}
+                    className="px-0.5 text-xs font-mono text-zinc-400 hover:text-white"
+                    title={sortAsc ? "Artan Sıralama (Küçükten Büyüğe)" : "Azalan Sıralama (Büyükten Küçüğe)"}
+                  >
+                    {sortAsc ? "▲" : "▼"}
+                  </button>
+                </div>
+
                 {/* Tablo / Grid Görünüm Değiştirici */}
                 <div className="flex bg-zinc-950/80 p-0.5 rounded-lg border border-white/[0.08]">
                   <button
@@ -446,13 +568,69 @@ export default function PortfolioPage() {
                   <div className="overflow-x-auto">
                     <table className="w-full text-left">
                       <thead>
-                        <tr className="border-b border-white/[0.06] text-[11px] font-bold text-zinc-400 uppercase tracking-wider bg-white/[0.01]">
-                          <th className="py-3.5 px-5">Varlık / Hisse</th>
-                          <th className="py-3.5 px-4 text-right">Adet (Lot)</th>
-                          <th className="py-3.5 px-4 text-right">Anlık Fiyat & Maliyet</th>
-                          <th className="py-3.5 px-4 text-right">Toplam Değer & Pay</th>
-                          <th className="py-3.5 px-5 text-right">Kâr / Zarar Durumu</th>
-                          <th className="py-3.5 px-4 text-center">İşlem</th>
+                        <tr className="border-b border-white/[0.06] text-[11px] font-bold uppercase tracking-wider bg-white/[0.01] select-none">
+                          {/* Varlık / Hisse */}
+                          <th 
+                            onClick={() => handleSort("ticker")} 
+                            className={`py-3.5 px-5 cursor-pointer transition-colors hover:text-white ${sortField === "ticker" ? "text-emerald-400" : "text-zinc-400"}`}
+                            title="Sembol adına göre sırala"
+                          >
+                            <div className="flex items-center gap-1.5">
+                              <span>Varlık / Hisse</span>
+                              <span className="text-xs font-mono">{sortField === "ticker" ? (sortAsc ? "▲" : "▼") : "↕"}</span>
+                            </div>
+                          </th>
+
+                          {/* Adet (Lot) */}
+                          <th 
+                            onClick={() => handleSort("quantity")} 
+                            className={`py-3.5 px-4 text-right cursor-pointer transition-colors hover:text-white ${sortField === "quantity" ? "text-emerald-400" : "text-zinc-400"}`}
+                            title="Lot büyüklüğüne göre sırala"
+                          >
+                            <div className="flex items-center justify-end gap-1.5">
+                              <span>Adet (Lot)</span>
+                              <span className="text-xs font-mono">{sortField === "quantity" ? (sortAsc ? "▲" : "▼") : "↕"}</span>
+                            </div>
+                          </th>
+
+                          {/* Anlık Fiyat & Maliyet */}
+                          <th 
+                            onClick={() => handleSort("current_price")} 
+                            className={`py-3.5 px-4 text-right cursor-pointer transition-colors hover:text-white ${sortField === "current_price" ? "text-emerald-400" : "text-zinc-400"}`}
+                            title="Anlık fiyata göre sırala"
+                          >
+                            <div className="flex items-center justify-end gap-1.5">
+                              <span>Anlık Fiyat & Maliyet</span>
+                              <span className="text-xs font-mono">{sortField === "current_price" ? (sortAsc ? "▲" : "▼") : "↕"}</span>
+                            </div>
+                          </th>
+
+                          {/* Toplam Değer & Pay (En büyük hisse) */}
+                          <th 
+                            onClick={() => handleSort("market_value")} 
+                            className={`py-3.5 px-4 text-right cursor-pointer transition-colors hover:text-white ${sortField === "market_value" ? "text-emerald-400" : "text-zinc-400"}`}
+                            title="En büyük hisseye / piyasa değerine göre sırala"
+                          >
+                            <div className="flex items-center justify-end gap-1.5">
+                              <span>Toplam Değer & Pay</span>
+                              <span className="text-xs font-mono">{sortField === "market_value" ? (sortAsc ? "▲" : "▼") : "↕"}</span>
+                            </div>
+                          </th>
+
+                          {/* Kâr / Zarar Durumu (En çok artan) */}
+                          <th 
+                            onClick={() => handleSort("unrealized_pnl_pct")} 
+                            className={`py-3.5 px-5 text-right cursor-pointer transition-colors hover:text-white ${sortField === "unrealized_pnl_pct" ? "text-emerald-400" : "text-zinc-400"}`}
+                            title="En çok artan / kâr-zarar yüzdesine göre sırala"
+                          >
+                            <div className="flex items-center justify-end gap-1.5">
+                              <span>Kâr / Zarar Durumu</span>
+                              <span className="text-xs font-mono">{sortField === "unrealized_pnl_pct" ? (sortAsc ? "▲" : "▼") : "↕"}</span>
+                            </div>
+                          </th>
+
+                          {/* İşlem */}
+                          <th className="py-3.5 px-4 text-center text-zinc-400">İşlem</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-white/[0.04] text-xs">
@@ -634,13 +812,58 @@ export default function PortfolioPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-left">
                   <thead>
-                    <tr className="border-b border-white/[0.06] text-[11px] font-bold text-zinc-400 uppercase tracking-wider bg-white/[0.01]">
-                      <th className="py-3.5 px-5">Tarih</th>
-                      <th className="py-3.5 px-4">Hisse & Yön</th>
-                      <th className="py-3.5 px-4 text-right">Miktar (Lot)</th>
-                      <th className="py-3.5 px-4 text-right">İşlem Fiyatı</th>
-                      <th className="py-3.5 px-4 text-right">Elde Edilen Kâr / Zarar</th>
-                      <th className="py-3.5 px-5 text-right">Durum</th>
+                    <tr className="border-b border-white/[0.06] text-[11px] font-bold uppercase tracking-wider bg-white/[0.01] select-none">
+                      <th 
+                        onClick={() => handleOrderSort("date")} 
+                        className={`py-3.5 px-5 cursor-pointer transition-colors hover:text-white ${orderSortField === "date" ? "text-emerald-400" : "text-zinc-400"}`}
+                        title="Tarihe göre sırala"
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span>Tarih</span>
+                          <span className="text-xs font-mono">{orderSortField === "date" ? (orderSortAsc ? "▲" : "▼") : "↕"}</span>
+                        </div>
+                      </th>
+                      <th 
+                        onClick={() => handleOrderSort("ticker")} 
+                        className={`py-3.5 px-4 cursor-pointer transition-colors hover:text-white ${orderSortField === "ticker" ? "text-emerald-400" : "text-zinc-400"}`}
+                        title="Hisse adına göre sırala"
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span>Hisse & Yön</span>
+                          <span className="text-xs font-mono">{orderSortField === "ticker" ? (orderSortAsc ? "▲" : "▼") : "↕"}</span>
+                        </div>
+                      </th>
+                      <th 
+                        onClick={() => handleOrderSort("quantity")} 
+                        className={`py-3.5 px-4 text-right cursor-pointer transition-colors hover:text-white ${orderSortField === "quantity" ? "text-emerald-400" : "text-zinc-400"}`}
+                        title="Miktara göre sırala"
+                      >
+                        <div className="flex items-center justify-end gap-1.5">
+                          <span>Miktar (Lot)</span>
+                          <span className="text-xs font-mono">{orderSortField === "quantity" ? (orderSortAsc ? "▲" : "▼") : "↕"}</span>
+                        </div>
+                      </th>
+                      <th 
+                        onClick={() => handleOrderSort("execution_price")} 
+                        className={`py-3.5 px-4 text-right cursor-pointer transition-colors hover:text-white ${orderSortField === "execution_price" ? "text-emerald-400" : "text-zinc-400"}`}
+                        title="İşlem fiyatına göre sırala"
+                      >
+                        <div className="flex items-center justify-end gap-1.5">
+                          <span>İşlem Fiyatı</span>
+                          <span className="text-xs font-mono">{orderSortField === "execution_price" ? (orderSortAsc ? "▲" : "▼") : "↕"}</span>
+                        </div>
+                      </th>
+                      <th 
+                        onClick={() => handleOrderSort("realized_pnl")} 
+                        className={`py-3.5 px-4 text-right cursor-pointer transition-colors hover:text-white ${orderSortField === "realized_pnl" ? "text-emerald-400" : "text-zinc-400"}`}
+                        title="Kâr / Zarara göre sırala"
+                      >
+                        <div className="flex items-center justify-end gap-1.5">
+                          <span>Elde Edilen Kâr / Zarar</span>
+                          <span className="text-xs font-mono">{orderSortField === "realized_pnl" ? (orderSortAsc ? "▲" : "▼") : "↕"}</span>
+                        </div>
+                      </th>
+                      <th className="py-3.5 px-5 text-right text-zinc-400">Durum</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/[0.04] text-xs">

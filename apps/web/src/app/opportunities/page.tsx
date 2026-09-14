@@ -86,6 +86,32 @@ export default function OpportunitiesPage() {
     }
   }, [rawSignals]);
 
+  // Kolon Sıralama State'leri
+  type OppSortField = 
+    | "symbol" 
+    | "signal_type" 
+    | "price" 
+    | "change_pct" 
+    | "score" 
+    | "target_price" 
+    | "expected_return_pct" 
+    | "stop_loss" 
+    | "risk_reward_ratio" 
+    | "rsi" 
+    | "volume_ratio";
+
+  const [sortField, setSortField] = useState<OppSortField>("score");
+  const [sortAsc, setSortAsc] = useState<boolean>(false);
+
+  const handleSort = (field: OppSortField) => {
+    if (sortField === field) {
+      setSortAsc(!sortAsc);
+    } else {
+      setSortField(field);
+      setSortAsc(false); // Default: azalan (en yüksek skor, en çok artan, en yüksek getiri vb.)
+    }
+  };
+
   const filteredSignals = useMemo(() => {
     const matched = signals.filter((s) => {
       // Kategori filtresi
@@ -125,16 +151,68 @@ export default function OpportunitiesPage() {
       return true;
     });
 
-    // 4. KURAL: Sıralama daima En Çok Güven (score) ve En Yüksek Getiri (expected_return_pct) olmalı
     return [...matched].sort((a, b) => {
-      const scoreA = Number(a.score ?? a.confidence_score ?? 0);
-      const scoreB = Number(b.score ?? b.confidence_score ?? 0);
-      if (scoreB !== scoreA) return scoreB - scoreA;
-      const retA = Number(a.expected_return_pct ?? 0);
-      const retB = Number(b.expected_return_pct ?? 0);
-      return retB - retA;
+      if (sortField === "symbol") {
+        const valA = (a.symbol || a.ticker || "").toUpperCase();
+        const valB = (b.symbol || b.ticker || "").toUpperCase();
+        return sortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      }
+      if (sortField === "signal_type") {
+        const valA = String(a.signal_type || a.signal || "");
+        const valB = String(b.signal_type || b.signal || "");
+        return sortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      }
+      if (sortField === "price") {
+        const valA = Number(a.price ?? 0);
+        const valB = Number(b.price ?? 0);
+        return sortAsc ? valA - valB : valB - valA;
+      }
+      if (sortField === "change_pct") {
+        const valA = Number(a.change_pct ?? 0);
+        const valB = Number(b.change_pct ?? 0);
+        return sortAsc ? valA - valB : valB - valA;
+      }
+      if (sortField === "score") {
+        const valA = Number(a.score ?? a.confidence_score ?? 0);
+        const valB = Number(b.score ?? b.confidence_score ?? 0);
+        if (valA !== valB) return sortAsc ? valA - valB : valB - valA;
+        const retA = Number(a.expected_return_pct ?? 0);
+        const retB = Number(b.expected_return_pct ?? 0);
+        return retB - retA;
+      }
+      if (sortField === "target_price") {
+        const valA = Number(a.target_price ?? 0);
+        const valB = Number(b.target_price ?? 0);
+        return sortAsc ? valA - valB : valB - valA;
+      }
+      if (sortField === "expected_return_pct") {
+        const valA = Number(a.expected_return_pct ?? 0);
+        const valB = Number(b.expected_return_pct ?? 0);
+        return sortAsc ? valA - valB : valB - valA;
+      }
+      if (sortField === "stop_loss") {
+        const valA = Number(a.stop_loss ?? 0);
+        const valB = Number(b.stop_loss ?? 0);
+        return sortAsc ? valA - valB : valB - valA;
+      }
+      if (sortField === "risk_reward_ratio") {
+        const valA = Number(a.risk_reward_ratio ?? 0);
+        const valB = Number(b.risk_reward_ratio ?? 0);
+        return sortAsc ? valA - valB : valB - valA;
+      }
+      if (sortField === "rsi") {
+        const valA = Number(a.rsi ?? 50);
+        const valB = Number(b.rsi ?? 50);
+        return sortAsc ? valA - valB : valB - valA;
+      }
+      if (sortField === "volume_ratio") {
+        const valA = Number(a.volume_ratio ?? 0);
+        const valB = Number(b.volume_ratio ?? 0);
+        return sortAsc ? valA - valB : valB - valA;
+      }
+      return 0;
     });
-  }, [signals, activeFilter, debouncedSearch]);
+  }, [signals, activeFilter, debouncedSearch, sortField, sortAsc]);
 
   // Kategori bazlı sinyal sayıları
   const categoryCounts = useMemo(() => {
@@ -227,6 +305,35 @@ export default function OpportunitiesPage() {
               title="Tablo Görünümü"
             >
               Tablo
+            </button>
+          </div>
+
+          {/* Sıralama Seçici (Kart ve Tablo için ortak) */}
+          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-xs">
+            <span className="text-zinc-500 text-[11px]">Sırala:</span>
+            <select
+              value={sortField}
+              onChange={(e) => {
+                setSortField(e.target.value as any);
+                setSortAsc(false);
+              }}
+              className="bg-transparent text-emerald-400 font-medium focus:outline-none cursor-pointer text-xs"
+            >
+              <option value="score" className="bg-zinc-900 text-white">ML Skoru (En Yüksek)</option>
+              <option value="change_pct" className="bg-zinc-900 text-white">En Çok Artan (%)</option>
+              <option value="expected_return_pct" className="bg-zinc-900 text-white">Beklenen Alpha (%)</option>
+              <option value="volume_ratio" className="bg-zinc-900 text-white">Hacim Oranı (20G)</option>
+              <option value="price" className="bg-zinc-900 text-white">Fiyat</option>
+              <option value="risk_reward_ratio" className="bg-zinc-900 text-white">R/R Oranı</option>
+              <option value="rsi" className="bg-zinc-900 text-white">RSI Değeri</option>
+              <option value="symbol" className="bg-zinc-900 text-white">Sembol (A-Z)</option>
+            </select>
+            <button
+              onClick={() => setSortAsc(!sortAsc)}
+              className="text-xs font-mono text-zinc-400 hover:text-white px-0.5"
+              title={sortAsc ? "Artan Sıralama" : "Azalan Sıralama"}
+            >
+              {sortAsc ? "▲" : "▼"}
             </button>
           </div>
 
@@ -475,20 +582,142 @@ export default function OpportunitiesPage() {
         <div className="rounded-xl border border-zinc-800/80 bg-zinc-900/40 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-zinc-950/60 text-zinc-400 border-b border-zinc-800">
+              <thead className="bg-zinc-950/60 text-zinc-400 border-b border-zinc-800 select-none">
                 <tr>
-                  <th className="p-3 font-semibold">Sembol</th>
-                  <th className="p-3 font-semibold">Sinyal / Strateji</th>
-                  <th className="p-3 font-semibold text-right">Fiyat</th>
-                  <th className="p-3 font-semibold text-right">Değişim</th>
-                  <th className="p-3 font-semibold text-right">ML Skoru</th>
-                  <th className="p-3 font-semibold text-right">Hedef Fiyat</th>
-                  <th className="p-3 font-semibold text-right">Beklenen Alpha</th>
-                  <th className="p-3 font-semibold text-right">Stop Loss</th>
-                  <th className="p-3 font-semibold text-right">R/R</th>
-                  <th className="p-3 font-semibold text-right">RSI</th>
-                  <th className="p-3 font-semibold text-right">Hacim</th>
-                  <th className="p-3 font-semibold text-center">Detay</th>
+                  {/* Sembol */}
+                  <th 
+                    onClick={() => handleSort("symbol")} 
+                    className={`p-3 font-semibold cursor-pointer transition-colors hover:text-white ${sortField === "symbol" ? "text-emerald-400" : ""}`}
+                    title="Sembole göre sırala"
+                  >
+                    <div className="flex items-center gap-1">
+                      <span>Sembol</span>
+                      <span className="text-xs font-mono">{sortField === "symbol" ? (sortAsc ? "▲" : "▼") : "↕"}</span>
+                    </div>
+                  </th>
+
+                  {/* Sinyal / Strateji */}
+                  <th 
+                    onClick={() => handleSort("signal_type")} 
+                    className={`p-3 font-semibold cursor-pointer transition-colors hover:text-white ${sortField === "signal_type" ? "text-emerald-400" : ""}`}
+                    title="Strateji tipine göre sırala"
+                  >
+                    <div className="flex items-center gap-1">
+                      <span>Sinyal / Strateji</span>
+                      <span className="text-xs font-mono">{sortField === "signal_type" ? (sortAsc ? "▲" : "▼") : "↕"}</span>
+                    </div>
+                  </th>
+
+                  {/* Fiyat */}
+                  <th 
+                    onClick={() => handleSort("price")} 
+                    className={`p-3 font-semibold text-right cursor-pointer transition-colors hover:text-white ${sortField === "price" ? "text-emerald-400" : ""}`}
+                    title="Fiyata göre sırala"
+                  >
+                    <div className="flex items-center justify-end gap-1">
+                      <span>Fiyat</span>
+                      <span className="text-xs font-mono">{sortField === "price" ? (sortAsc ? "▲" : "▼") : "↕"}</span>
+                    </div>
+                  </th>
+
+                  {/* Değişim (En çok artan) */}
+                  <th 
+                    onClick={() => handleSort("change_pct")} 
+                    className={`p-3 font-semibold text-right cursor-pointer transition-colors hover:text-white ${sortField === "change_pct" ? "text-emerald-400" : ""}`}
+                    title="En çok artan / değişime göre sırala"
+                  >
+                    <div className="flex items-center justify-end gap-1">
+                      <span>Değişim</span>
+                      <span className="text-xs font-mono">{sortField === "change_pct" ? (sortAsc ? "▲" : "▼") : "↕"}</span>
+                    </div>
+                  </th>
+
+                  {/* ML Skoru */}
+                  <th 
+                    onClick={() => handleSort("score")} 
+                    className={`p-3 font-semibold text-right cursor-pointer transition-colors hover:text-white ${sortField === "score" ? "text-emerald-400" : ""}`}
+                    title="ML Skoruna göre sırala"
+                  >
+                    <div className="flex items-center justify-end gap-1">
+                      <span>ML Skoru</span>
+                      <span className="text-xs font-mono">{sortField === "score" ? (sortAsc ? "▲" : "▼") : "↕"}</span>
+                    </div>
+                  </th>
+
+                  {/* Hedef Fiyat */}
+                  <th 
+                    onClick={() => handleSort("target_price")} 
+                    className={`p-3 font-semibold text-right cursor-pointer transition-colors hover:text-white ${sortField === "target_price" ? "text-emerald-400" : ""}`}
+                    title="Hedef fiyata göre sırala"
+                  >
+                    <div className="flex items-center justify-end gap-1">
+                      <span>Hedef Fiyat</span>
+                      <span className="text-xs font-mono">{sortField === "target_price" ? (sortAsc ? "▲" : "▼") : "↕"}</span>
+                    </div>
+                  </th>
+
+                  {/* Beklenen Alpha */}
+                  <th 
+                    onClick={() => handleSort("expected_return_pct")} 
+                    className={`p-3 font-semibold text-right cursor-pointer transition-colors hover:text-white ${sortField === "expected_return_pct" ? "text-emerald-400" : ""}`}
+                    title="Beklenen Alpha getirisine göre sırala"
+                  >
+                    <div className="flex items-center justify-end gap-1">
+                      <span>Beklenen Alpha</span>
+                      <span className="text-xs font-mono">{sortField === "expected_return_pct" ? (sortAsc ? "▲" : "▼") : "↕"}</span>
+                    </div>
+                  </th>
+
+                  {/* Stop Loss */}
+                  <th 
+                    onClick={() => handleSort("stop_loss")} 
+                    className={`p-3 font-semibold text-right cursor-pointer transition-colors hover:text-white ${sortField === "stop_loss" ? "text-emerald-400" : ""}`}
+                    title="Stop Loss seviyesine göre sırala"
+                  >
+                    <div className="flex items-center justify-end gap-1">
+                      <span>Stop Loss</span>
+                      <span className="text-xs font-mono">{sortField === "stop_loss" ? (sortAsc ? "▲" : "▼") : "↕"}</span>
+                    </div>
+                  </th>
+
+                  {/* R/R */}
+                  <th 
+                    onClick={() => handleSort("risk_reward_ratio")} 
+                    className={`p-3 font-semibold text-right cursor-pointer transition-colors hover:text-white ${sortField === "risk_reward_ratio" ? "text-emerald-400" : ""}`}
+                    title="Risk/Kazanç oranına göre sırala"
+                  >
+                    <div className="flex items-center justify-end gap-1">
+                      <span>R/R</span>
+                      <span className="text-xs font-mono">{sortField === "risk_reward_ratio" ? (sortAsc ? "▲" : "▼") : "↕"}</span>
+                    </div>
+                  </th>
+
+                  {/* RSI */}
+                  <th 
+                    onClick={() => handleSort("rsi")} 
+                    className={`p-3 font-semibold text-right cursor-pointer transition-colors hover:text-white ${sortField === "rsi" ? "text-emerald-400" : ""}`}
+                    title="RSI değerine göre sırala"
+                  >
+                    <div className="flex items-center justify-end gap-1">
+                      <span>RSI</span>
+                      <span className="text-xs font-mono">{sortField === "rsi" ? (sortAsc ? "▲" : "▼") : "↕"}</span>
+                    </div>
+                  </th>
+
+                  {/* Hacim */}
+                  <th 
+                    onClick={() => handleSort("volume_ratio")} 
+                    className={`p-3 font-semibold text-right cursor-pointer transition-colors hover:text-white ${sortField === "volume_ratio" ? "text-emerald-400" : ""}`}
+                    title="Hacim oranına göre sırala"
+                  >
+                    <div className="flex items-center justify-end gap-1">
+                      <span>Hacim</span>
+                      <span className="text-xs font-mono">{sortField === "volume_ratio" ? (sortAsc ? "▲" : "▼") : "↕"}</span>
+                    </div>
+                  </th>
+
+                  {/* Detay */}
+                  <th className="p-3 font-semibold text-center text-zinc-400">Detay</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800/50">
