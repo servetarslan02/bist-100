@@ -95,8 +95,9 @@ class DynamicOpportunityScanner:
                     continue
 
                 p_now = float(closes[-1])
-                p_prev = float(closes[-2])
-                change_pct = round((p_now - p_prev) / p_prev * 100, 2) if p_prev else 0
+                p_prev = float(closes[-2]) if len(closes) >= 2 else p_now
+                raw_chg = round((p_now - p_prev) / p_prev * 100, 2) if p_prev else 0
+                change_pct = max(-10.0, min(10.0, raw_chg))
 
                 # İndikatörler
                 sma20 = float(closes.rolling(20).mean()[-1])

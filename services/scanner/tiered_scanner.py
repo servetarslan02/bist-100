@@ -263,7 +263,8 @@ class TieredScanner:
         asset.day_low = min(asset.day_low, price) if asset.day_low > 0 else price
 
         if prev_price > 0:
-            asset.price_change_pct = (price / prev_price - 1) * 100
+            raw_pct = (price / prev_price - 1) * 100
+            asset.price_change_pct = max(-10.0, min(10.0, raw_pct))
 
         asset.last_tier_update = timestamp or datetime.now(UTC)
 

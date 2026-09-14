@@ -64,7 +64,7 @@ export default function DashboardClient({ initialData }: { initialData?: Dashboa
       setDashSortAsc(!dashSortAsc);
     } else {
       setDashSortField(field);
-      setDashSortAsc(false); // Default: azalan (en yüksek skor, en çok artan vb.)
+      setDashSortAsc(field === "ticker"); // Default: ticker için A-Z (true), nümerik için azalan (false)
     }
   };
 
@@ -114,7 +114,7 @@ export default function DashboardClient({ initialData }: { initialData?: Dashboa
       if (dashSortField === "ticker") {
         const valA = (a.ticker || a.symbol || "").toUpperCase();
         const valB = (b.ticker || b.symbol || "").toUpperCase();
-        return dashSortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+        return dashSortAsc ? valA.localeCompare(valB, "tr") : valB.localeCompare(valA, "tr");
       }
       if (dashSortField === "price") {
         const valA = Number(a.price ?? 0);
@@ -122,8 +122,10 @@ export default function DashboardClient({ initialData }: { initialData?: Dashboa
         return dashSortAsc ? valA - valB : valB - valA;
       }
       if (dashSortField === "change_pct") {
-        const valA = Number(a.change_pct ?? 0);
-        const valB = Number(b.change_pct ?? 0);
+        const rawA = Number(a.change_pct ?? 0);
+        const rawB = Number(b.change_pct ?? 0);
+        const valA = Math.max(-10.0, Math.min(10.0, rawA));
+        const valB = Math.max(-10.0, Math.min(10.0, rawB));
         return dashSortAsc ? valA - valB : valB - valA;
       }
       if (dashSortField === "score") {
@@ -453,7 +455,8 @@ export default function DashboardClient({ initialData }: { initialData?: Dashboa
                       filteredSignals.map((s, idx) => {
                         const sym = s.ticker || s.symbol || "BIST";
                         const price = Number(s.price ?? 0);
-                        const chg = Number(s.change_pct ?? 0);
+                        const rawChg = Number(s.change_pct ?? 0);
+                        const chg = Math.max(-10.0, Math.min(10.0, rawChg));
                         const score = Number(s.score ?? 75);
                         const expReturn = Number(s.expected_return_pct ?? 4.2);
                         const isPos = chg >= 0;

@@ -173,6 +173,10 @@ class BistMLScanner:
                     highs = float(item.get("high") or latest_p)
                     lows = float(item.get("low") or latest_p)
                     change_pct = round(float(item.get("change") or 0.0), 2)
+                    if change_pct < -10.0:
+                        change_pct = -10.0
+                    elif change_pct > 10.0:
+                        change_pct = 10.0
                     rvol_val = float(item.get("relative_volume_10d_calc") or 1.0)
                     vol_surge = max(0.5, rvol_val)
                     rsi_14 = float(item.get("RSI") or 50.0)
@@ -479,6 +483,10 @@ class BistMLScanner:
                 latest_p = float(closes[-1])
                 prev_p = float(closes[-2]) if len(closes) > 1 else latest_p
                 change_pct = round(((latest_p - prev_p) / max(prev_p, 1e-4)) * 100.0, 2)
+                if change_pct < -10.0:
+                    change_pct = -10.0
+                elif change_pct > 10.0:
+                    change_pct = 10.0
 
                 tr1 = highs[-14:] - lows[-14:]
                 tr2 = np.abs(highs[-14:] - closes[-15:-1])

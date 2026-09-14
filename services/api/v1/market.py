@@ -938,6 +938,11 @@ async def _fetch_radar_fresh(limit: int = 1000) -> dict[str, Any]:
                     name = d[0] or pos_ticker
                     close = float(d[2]) if d[2] is not None else 0.0
                     change_pct = round(float(d[3]), 2) if d[3] is not None else 0.0
+                    # BIST günlük marj sınırı koruması (bedelsiz/split veri sapmalarını filtrele)
+                    if change_pct < -10.0:
+                        change_pct = -10.0
+                    elif change_pct > 10.0:
+                        change_pct = 10.0
                     vol = int(d[5]) if d[5] is not None else 0
                     high = float(d[6]) if d[6] is not None else close
                     low = float(d[7]) if d[7] is not None else close

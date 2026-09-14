@@ -105,8 +105,10 @@ export default function RadarPage() {
           : [];
 
     return rawList.map((r: any) => {
-      const price = Number(r.price ?? 0);
-      const chg = Number(r.change ?? r.change_pct ?? 0);
+      const rawChg = Number(r.change ?? r.change_pct ?? 0);
+      // BIST 100 günlük marj koruması [-10.0%, +10.0%] (split/rüçhan sapmalarını filtrele)
+      const chg = Math.max(-10.0, Math.min(10.0, rawChg));
+      const price = Number(r.price ?? r.close ?? 0);
       const vol = Number(r.volume ?? (r.volume_ratio ? Math.round(r.volume_ratio * 1_000_000) : 0));
       const high = Number(r.high ?? (price > 0 ? price * 1.02 : 0));
       const low = Number(r.low ?? (price > 0 ? price * 0.98 : 0));
@@ -162,9 +164,14 @@ export default function RadarPage() {
         return r.symbol.toLowerCase().includes(q);
       })
       .sort((a, b) => {
-        const valA = a[sortField] ?? 0;
-        const valB = b[sortField] ?? 0;
-        return sortAsc ? Number(valA) - Number(valB) : Number(valB) - Number(valA);
+        if (sortField === "symbol") {
+          return sortAsc 
+            ? a.symbol.localeCompare(b.symbol, "tr") 
+            : b.symbol.localeCompare(a.symbol, "tr");
+        }
+        const valA = Number(a[sortField] ?? 0);
+        const valB = Number(b[sortField] ?? 0);
+        return sortAsc ? valA - valB : valB - valA;
       });
   }, [allRows, debouncedSearch, activeCategory, sortField, sortAsc]);
 
@@ -172,7 +179,8 @@ export default function RadarPage() {
     if (sortField === field) setSortAsc(!sortAsc);
     else {
       setSortField(field);
-      setSortAsc(false);
+      // Sembol için ilk tık A'dan Z'ye (artan), sayısallar için azalan (en büyük)
+      setSortAsc(field === "symbol");
     }
   };
 

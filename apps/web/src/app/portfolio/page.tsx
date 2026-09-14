@@ -64,7 +64,7 @@ export default function PortfolioPage() {
       setSortAsc(!sortAsc);
     } else {
       setSortField(field);
-      setSortAsc(false); // Default: azalan (en büyük hisse, en çok artan vb.)
+      setSortAsc(field === "ticker"); // Default: Ticker için A-Z (true), nümerik değerler için azalan (false)
     }
   };
 
@@ -73,7 +73,7 @@ export default function PortfolioPage() {
       setOrderSortAsc(!orderSortAsc);
     } else {
       setOrderSortField(field);
-      setOrderSortAsc(false);
+      setOrderSortAsc(field === "ticker" || field === "date");
     }
   };
 
@@ -143,7 +143,7 @@ export default function PortfolioPage() {
       if (sortField === "ticker") {
         const valA = (a.ticker || a.symbol || "").toUpperCase();
         const valB = (b.ticker || b.symbol || "").toUpperCase();
-        return sortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+        return sortAsc ? valA.localeCompare(valB, "tr") : valB.localeCompare(valA, "tr");
       }
       if (sortField === "quantity") {
         const valA = Number(a.quantity ?? 0);
@@ -186,12 +186,12 @@ export default function PortfolioPage() {
       if (orderSortField === "ticker") {
         const valA = (ordA_ticker(a)).toUpperCase();
         const valB = (ordA_ticker(b)).toUpperCase();
-        return orderSortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+        return orderSortAsc ? valA.localeCompare(valB, "tr") : valB.localeCompare(valA, "tr");
       }
       if (orderSortField === "date") {
         const valA = a.date || "";
         const valB = b.date || "";
-        return orderSortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+        return orderSortAsc ? valA.localeCompare(valB, "tr") : valB.localeCompare(valA, "tr");
       }
       if (orderSortField === "quantity") {
         const valA = Number(a.quantity ?? 0);

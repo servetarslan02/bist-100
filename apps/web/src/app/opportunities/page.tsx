@@ -108,7 +108,7 @@ export default function OpportunitiesPage() {
       setSortAsc(!sortAsc);
     } else {
       setSortField(field);
-      setSortAsc(false); // Default: azalan (en yüksek skor, en çok artan, en yüksek getiri vb.)
+      setSortAsc(field === "symbol" || field === "signal_type"); // Default: Alfabetik için A-Z (true), nümerik için azalan (false)
     }
   };
 
@@ -155,12 +155,12 @@ export default function OpportunitiesPage() {
       if (sortField === "symbol") {
         const valA = (a.symbol || a.ticker || "").toUpperCase();
         const valB = (b.symbol || b.ticker || "").toUpperCase();
-        return sortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+        return sortAsc ? valA.localeCompare(valB, "tr") : valB.localeCompare(valA, "tr");
       }
       if (sortField === "signal_type") {
         const valA = String(a.signal_type || a.signal || "");
         const valB = String(b.signal_type || b.signal || "");
-        return sortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+        return sortAsc ? valA.localeCompare(valB, "tr") : valB.localeCompare(valA, "tr");
       }
       if (sortField === "price") {
         const valA = Number(a.price ?? 0);
@@ -168,8 +168,10 @@ export default function OpportunitiesPage() {
         return sortAsc ? valA - valB : valB - valA;
       }
       if (sortField === "change_pct") {
-        const valA = Number(a.change_pct ?? 0);
-        const valB = Number(b.change_pct ?? 0);
+        const rawA = Number(a.change_pct ?? 0);
+        const rawB = Number(b.change_pct ?? 0);
+        const valA = Math.max(-10.0, Math.min(10.0, rawA));
+        const valB = Math.max(-10.0, Math.min(10.0, rawB));
         return sortAsc ? valA - valB : valB - valA;
       }
       if (sortField === "score") {
@@ -725,7 +727,8 @@ export default function OpportunitiesPage() {
                   const sym = sig.symbol || sig.ticker;
                   const isHigh = Boolean((sig as any).is_high_conviction) || (sig.score ?? 0) >= 80;
                   const price = Number(sig.price ?? 0);
-                  const chg = Number(sig.change_pct ?? 0);
+                  const rawChg = Number(sig.change_pct ?? 0);
+                  const chg = Math.max(-10.0, Math.min(10.0, rawChg));
                   const target = Number(sig.target_price ?? (price * 1.12));
                   const stop = Number(sig.stop_loss ?? (price * 0.94));
                   return (
