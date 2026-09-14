@@ -70,7 +70,7 @@ export default function EventCenterPage() {
         e.source.toLowerCase().includes(q)
       );
     }
-    return list;
+    return [...list].sort((a, b) => (b.timestamp || "").localeCompare(a.timestamp || ""));
   }, [filter, events, searchTerm]);
 
   return (

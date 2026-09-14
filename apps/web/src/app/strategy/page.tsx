@@ -137,7 +137,7 @@ export default function StrategyPage() {
       setStrategySortAsc(!strategySortAsc);
     } else {
       setStrategySortField(field);
-      setStrategySortAsc(false); // Default descending
+      setStrategySortAsc(field === "symbol"); // Default A-Z for symbol, descending for score/weight
     }
   };
 
@@ -192,7 +192,7 @@ export default function StrategyPage() {
 
     return [...list].sort((a, b) => {
       if (strategySortField === "symbol") {
-        return strategySortAsc ? a.symbol.localeCompare(b.symbol) : b.symbol.localeCompare(a.symbol);
+        return strategySortAsc ? a.symbol.localeCompare(b.symbol, "tr") : b.symbol.localeCompare(a.symbol, "tr");
       }
       if (strategySortField === "weight_pct") {
         return strategySortAsc ? a.weight_pct - b.weight_pct : b.weight_pct - a.weight_pct;
@@ -339,10 +339,10 @@ export default function StrategyPage() {
         return tradeSortAsc ? a.trade_id - b.trade_id : b.trade_id - a.trade_id;
       }
       if (tradeSortField === "entry_date") {
-        return tradeSortAsc ? a.entry_date.localeCompare(b.entry_date) : b.entry_date.localeCompare(a.entry_date);
+        return tradeSortAsc ? a.entry_date.localeCompare(b.entry_date, "tr") : b.entry_date.localeCompare(a.entry_date, "tr");
       }
       if (tradeSortField === "exit_date") {
-        return tradeSortAsc ? a.exit_date.localeCompare(b.exit_date) : b.exit_date.localeCompare(a.exit_date);
+        return tradeSortAsc ? a.exit_date.localeCompare(b.exit_date, "tr") : b.exit_date.localeCompare(a.exit_date, "tr");
       }
       if (tradeSortField === "entry_price") {
         return tradeSortAsc ? a.entry_price - b.entry_price : b.entry_price - a.entry_price;

@@ -548,7 +548,8 @@ async def live_intel_analysis(
         closes_list = [float(c) for c in df["Close"].to_list()]
         latest_price = round(closes_list[-1], 2)
         prev_price = round(closes_list[-2], 2) if len(closes_list) >= 2 else latest_price
-        change_pct = round(float(((latest_price - prev_price) / prev_price) * 100), 2) if (prev_price and prev_price > 0) else 0.0
+        raw_change_pct = round(float(((latest_price - prev_price) / prev_price) * 100), 2) if (prev_price and prev_price > 0) else 0.0
+        change_pct = max(-10.0, min(10.0, raw_change_pct))
 
         # Redis canlı tick senkronizasyonu
         try:
@@ -559,7 +560,7 @@ async def live_intel_analysis(
             if live_item and live_item.get("price") and float(live_item.get("price")) > 0:
                 latest_price = round(float(live_item["price"]), 2)
                 if "change" in live_item:
-                    change_pct = round(float(live_item["change"]), 2)
+                    change_pct = max(-10.0, min(10.0, round(float(live_item["change"]), 2)))
         except Exception as exc:
             logger.warning("canli_tick_hatasi: ticker=%s, hata=%s", sym, exc)
 
@@ -1191,7 +1192,8 @@ async def market_heatmap(
 
         # Alan normalizasyonu
         price = float(item.get("price", 0.0))
-        chg = float(item.get("change") if item.get("change") is not None else item.get("change_pct", 0.0))
+        raw_chg = float(item.get("change") if item.get("change") is not None else item.get("change_pct", 0.0))
+        chg = max(-10.0, min(10.0, raw_chg))
         vol = int(item.get("volume") if item.get("volume") is not None else round(float(item.get("volume_ratio", 1.0)) * 1_000_000))
         score = int(round(float(item.get("score", 50.0))))
 
@@ -1213,7 +1215,8 @@ async def market_heatmap(
             continue
 
         total_vol = sum(it.get("volume", 0) for it in items)
-        avg_chg = round(float(np.mean([it.get("change", 0.0) for it in items])), 2)
+        raw_avg = float(np.mean([it.get("change", 0.0) for it in items])) if items else 0.0
+        avg_chg = round(max(-10.0, min(10.0, raw_avg)), 2)
 
         stock_list: list[dict[str, Any]] = []
         for it in sorted(items, key=lambda x: x.get("volume", 0), reverse=True)[:16]:
@@ -1224,7 +1227,7 @@ async def market_heatmap(
                     "symbol": it.get("symbol"),
                     "name": it.get("name", it.get("symbol")),
                     "price": round(float(it.get("price", 0.0)), 2),
-                    "change_pct": round(float(it.get("change", 0.0)), 2),
+                    "change_pct": round(max(-10.0, min(10.0, float(it.get("change", 0.0)))), 2),
                     "volume": vol_str,
                     "score": it.get("score", 50),
                 }

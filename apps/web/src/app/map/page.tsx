@@ -72,15 +72,19 @@ export default function MarketMapPage() {
   const filteredSectors = useMemo(() => {
     return sectors
       .map((sec) => {
-        let matchingStocks = sec.stocks;
+        let matchingStocks = (sec.stocks || []).map((st) => ({
+          ...st,
+          change_pct: Math.max(-10.0, Math.min(10.0, Number(st.change_pct ?? 0))),
+        }));
         if (debouncedSearch) {
           const q = debouncedSearch.toLowerCase();
-          matchingStocks = sec.stocks.filter(
+          matchingStocks = matchingStocks.filter(
             (st) => st.symbol.toLowerCase().includes(q) || st.name.toLowerCase().includes(q)
           );
         }
         return {
           ...sec,
+          change_pct: Math.max(-10.0, Math.min(10.0, Number(sec.change_pct ?? 0))),
           stocks: matchingStocks,
         };
       })

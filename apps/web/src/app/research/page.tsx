@@ -103,7 +103,8 @@ export default function AIResearchPage() {
 
     signals.forEach((sig) => {
       const price = sig.price ?? sig.current_price ?? 0;
-      const change = sig.change_pct ?? 0;
+      const rawChg = Number(sig.change_pct ?? 0);
+      const change = Math.max(-10.0, Math.min(10.0, rawChg));
       const rawScore = sig.score ?? 85;
       const score = Math.min(99, Math.max(50, Math.round(rawScore > 100 ? 50 + (rawScore % 50) : rawScore)));
       const action = sig.signal || sig.action || "GÜÇLÜ AL";
@@ -243,7 +244,7 @@ export default function AIResearchPage() {
       }
 
       return true;
-    });
+    }).sort((a, b) => b.confidence - a.confidence);
   }, [reports, strategyFilter, searchTerm]);
 
   // Seçili rapor

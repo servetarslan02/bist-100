@@ -284,7 +284,9 @@ function AssetIntelContent() {
     }
   };
 
-  const isPos = (asset?.change_pct ?? 0) >= 0;
+  const rawChg = asset?.change_pct != null ? Number(asset.change_pct) : 0.0;
+  const clampedChg = Math.max(-10.0, Math.min(10.0, rawChg));
+  const isPos = clampedChg >= 0;
 
   return (
     <ErrorBoundary name="asset">
@@ -438,7 +440,7 @@ function AssetIntelContent() {
                   <div className="flex items-center justify-end gap-1">
                     {isPos ? <ArrowUpRight size={12} className="text-emerald-400" /> : <ArrowDownRight size={12} className="text-red-400" />}
                     <span className={`text-xs font-semibold font-data ${isPos ? "text-emerald-400" : "text-red-400"}`}>
-                      {isPos ? "+" : ""}%{asset.change_pct != null ? Number(asset.change_pct).toFixed(2) : "0.00"} (Bugün)
+                      {isPos ? "+" : ""}%{clampedChg.toFixed(2)} (Bugün)
                     </span>
                   </div>
                 </div>

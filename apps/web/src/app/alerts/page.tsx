@@ -120,7 +120,7 @@ export default function AlertsPage() {
       }
 
       return true;
-    });
+    }).sort((a, b) => (b.timestamp || "").localeCompare(a.timestamp || ""));
   }, [alerts, filter, searchTerm]);
 
   // Tekil okundu işaretleme (LocalStorage + Backend)
