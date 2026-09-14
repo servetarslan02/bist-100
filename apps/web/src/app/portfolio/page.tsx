@@ -638,6 +638,7 @@ export default function PortfolioPage() {
                           const sym = pos.ticker || pos.symbol || "";
                           const pnlVal = Number(pos.unrealized_pnl ?? 0);
                           const pnlPct = Number(pos.unrealized_pnl_pct ?? 0);
+                          const dailyChg = Number(pos.daily_change_pct ?? 0);
                           const isPos = pnlVal >= 0;
                           const curPrice = Number(pos.current_price ?? pos.avg_cost ?? 0);
                           const avgCost = Number(pos.avg_cost ?? 0);
@@ -679,10 +680,21 @@ export default function PortfolioPage() {
 
                               {/* Anlık Fiyat & Maliyet */}
                               <td className="py-3.5 px-4 text-right">
-                                <div className={`font-data font-bold text-sm ${flash === "up" ? "text-emerald-400" : flash === "down" ? "text-rose-400" : "text-white"}`}>
-                                  ₺{curPrice.toFixed(2)}
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <div className={`font-data font-bold text-sm ${flash === "up" ? "text-emerald-400" : flash === "down" ? "text-rose-400" : "text-white"}`}>
+                                    ₺{curPrice.toFixed(2)}
+                                  </div>
+                                  <span className={`text-[10px] font-bold font-data px-1.5 py-0.2 rounded border ${
+                                    dailyChg > 0 
+                                      ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" 
+                                      : dailyChg < 0 
+                                      ? "bg-rose-500/10 text-rose-400 border-rose-500/20" 
+                                      : "bg-white/[0.04] text-zinc-400 border-white/[0.06]"
+                                  }`} title="Bugünkü borsa değişimi">
+                                    {dailyChg > 0 ? "+" : ""}%{dailyChg.toFixed(2)} Bugün
+                                  </span>
                                 </div>
-                                <div className="font-data text-[11px] text-zinc-500">
+                                <div className="font-data text-[11px] text-zinc-500 mt-0.5">
                                   Maliyet: ₺{avgCost.toFixed(2)}
                                 </div>
                               </td>
@@ -704,12 +716,12 @@ export default function PortfolioPage() {
                                   <span className={`font-extrabold font-data text-sm ${isPos ? "text-emerald-400" : "text-rose-400"}`}>
                                     {isPos ? "+" : ""}₺{pnlVal.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                   </span>
-                                  <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
+                                  <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded border ${
                                     isPos 
-                                      ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" 
-                                      : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
-                                  }`}>
-                                    {isPos ? "+" : ""}%{pnlPct.toFixed(2)}
+                                      ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" 
+                                      : "bg-rose-500/10 text-rose-400 border-rose-500/20"
+                                  }`} title="Alış maliyetine göre toplam kâr/zarar">
+                                    {isPos ? "+" : ""}%{pnlPct.toFixed(2)} Maliyetten
                                   </span>
                                 </div>
                               </td>
@@ -734,6 +746,7 @@ export default function PortfolioPage() {
                     const sym = pos.ticker || pos.symbol || "";
                     const pnlVal = Number(pos.unrealized_pnl ?? 0);
                     const pnlPct = Number(pos.unrealized_pnl_pct ?? 0);
+                    const dailyChg = Number(pos.daily_change_pct ?? 0);
                     const isPos = pnlVal >= 0;
                     const curPrice = Number(pos.current_price ?? pos.avg_cost ?? 0);
                     const avgCost = Number(pos.avg_cost ?? 0);
@@ -743,19 +756,20 @@ export default function PortfolioPage() {
                       <div
                         key={idx}
                         onClick={() => router.push(`/asset?symbol=${sym}`)}
-                        className="rounded-2xl p-4 border border-white/[0.06] bg-zinc-900/40 hover:bg-zinc-900/70 hover:border-emerald-500/30 transition-all cursor-pointer space-y-3.5 group backdrop-blur-md hover:-translate-y-1 shadow-lg"
+                        className="rounded-2xl p-4.5 border border-white/[0.08] bg-zinc-900/40 backdrop-blur-xl hover:bg-zinc-900/60 hover:border-white/[0.15] transition-all cursor-pointer flex flex-col gap-3 group shadow-lg"
                       >
+                        {/* Başlık ve Ticker */}
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold font-data text-xs bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 group-hover:scale-105 transition-all">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold font-data text-xs bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 group-hover:scale-105 group-hover:bg-emerald-500/20 transition-all">
                               {sym.slice(0, 3)}
                             </div>
                             <div>
-                              <div className="flex items-center gap-1.5">
-                                <span className="font-bold text-white text-sm group-hover:text-emerald-400 transition-colors font-data">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold font-data text-white group-hover:text-emerald-400 transition-colors">
                                   {sym}
                                 </span>
-                                <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/[0.05] text-zinc-400">
+                                <span className="text-[9px] px-1.5 py-0.2 rounded bg-white/[0.05] text-zinc-400 border border-white/[0.06]">
                                   {pos.sector || "BIST"}
                                 </span>
                               </div>
@@ -766,11 +780,13 @@ export default function PortfolioPage() {
                           </div>
 
                           <span className={`px-2 py-0.5 rounded-lg text-xs font-bold font-data border ${
-                            isPos 
+                            dailyChg > 0 
                               ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" 
-                              : "bg-rose-500/10 text-rose-400 border-rose-500/20"
-                          }`}>
-                            {isPos ? "+" : ""}%{pnlPct.toFixed(2)}
+                              : dailyChg < 0 
+                              ? "bg-rose-500/10 text-rose-400 border-rose-500/20" 
+                              : "bg-white/[0.04] text-zinc-400 border-white/[0.06]"
+                          }`} title="Bugünkü borsa değişimi">
+                            {dailyChg > 0 ? "+" : ""}%{dailyChg.toFixed(2)} Bugün
                           </span>
                         </div>
 
@@ -794,9 +810,18 @@ export default function PortfolioPage() {
                         {/* Net Kâr Alt Barı */}
                         <div className="flex items-center justify-between pt-2 border-t border-white/[0.04] text-xs">
                           <span className="text-[11px] text-zinc-400">Net Kâr/Zarar:</span>
-                          <span className={`font-bold font-data ${isPos ? "text-emerald-400" : "text-rose-400"}`}>
-                            {isPos ? "+" : ""}₺{pnlVal.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </span>
+                          <div className="flex items-center gap-1.5 font-data">
+                            <span className={`font-bold ${isPos ? "text-emerald-400" : "text-rose-400"}`}>
+                              {isPos ? "+" : ""}₺{pnlVal.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                            <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded border ${
+                              isPos 
+                                ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" 
+                                : "bg-rose-500/10 text-rose-400 border-rose-500/20"
+                            }`} title="Maliyete göre toplam getiri">
+                              {isPos ? "+" : ""}%{pnlPct.toFixed(2)}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     );

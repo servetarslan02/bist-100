@@ -316,6 +316,23 @@ class PaperTradingOrchestrator:
         ref_dict = dict(reference_prices or {})
         next_open_dict = dict(next_open_prices or {})
 
+        # Canlı Borsa / Redis Fiyat Haritası (Canlı Seans Koruması)
+        live_price_map: dict[str, float] = {}
+        try:
+            from services.core.redis_helper import get_cached
+
+            radar_items = get_cached("radar:data") or []
+            if radar_items:
+                live_price_map = {
+                    x["symbol"]: float(x["price"])
+                    for x in radar_items
+                    if x.get("symbol") and x.get("price") and float(x.get("price")) > 0
+                }
+        except Exception:
+            live_price_map = {}
+
+        is_today_str = str(date)[:10] == datetime.now(UTC).strftime("%Y-%m-%d")
+
         if market_data is not None:
             if not market_data:
                 # Boş market_data fail-safe kontrolü
@@ -339,30 +356,39 @@ class PaperTradingOrchestrator:
                         if getattr(df_idx, "tz", None) is not None:
                             df_idx = df_idx.tz_convert(None)
 
+                        is_matched_row = False
                         if dt_lookup in df_idx:
                             curr_idx = df_idx.get_loc(dt_lookup)
                             if isinstance(curr_idx, slice):
                                 curr_idx = curr_idx.start
                             row = df[curr_idx]
+                            is_matched_row = True
                         elif date in df.index:
                             curr_idx = df.index.get_loc(date)
                             if isinstance(curr_idx, slice):
                                 curr_idx = curr_idx.start
                             row = df[curr_idx]
+                            is_matched_row = True
                         else:
                             # Canlı/Paper trading modunda piyasanın en son mevcut barını kullan
                             curr_idx = len(df) - 1
                             row = df[-1]
 
-                        price_dict[ticker] = float(_get_val(row, "close", "Close", "price", "Price", default=0.0))
+                        close_p = float(_get_val(row, "close", "Close", "price", "Price", default=0.0))
+                        open_p = float(_get_val(row, "open", "Open", "close", "Close", default=close_p))
                         vol_dict[ticker] = int(_get_val(row, "volume", "Volume", default=1_000_000))
+                        ref_dict[ticker] = close_p
+
+                        # Canlı seans önceliği: Eğer bugünse veya çubuk güncel değilse Redis anlık fiyatını al
+                        if ticker in live_price_map and (is_today_str or not is_matched_row):
+                            exec_p = live_price_map[ticker]
+                        else:
+                            exec_p = open_p if is_morning_execution else close_p
+
+                        price_dict[ticker] = exec_p
+                        next_open_dict[ticker] = exec_p
 
                         if is_morning_execution:
-                            # Sabah Açılışı: Emir BUGÜNÜN (date) AÇILIŞ fiyatından gerçekleşir
-                            open_p = float(_get_val(row, "open", "Open", "close", "Close", default=0.0))
-                            next_open_dict[ticker] = open_p
-                            price_dict[ticker] = open_p
-
                             # Likidite tahmini: YALNIZCA dün ve öncesine (T-1) ait geçmiş barlar kullanılır
                             if isinstance(curr_idx, int) and curr_idx >= 1:
                                 hist_slice = df[max(0, curr_idx - 20) : curr_idx]
@@ -443,8 +469,27 @@ class PaperTradingOrchestrator:
                         valid_v = df["Volume"].drop_nulls() if "Volume" in df.columns else pl.Series()
                         vol_v = int(valid_v[-1]) if len(valid_v) > 0 else 1_000_000
 
-                        price_dict[ticker] = open_p if is_morning_execution else close_p
-                        next_open_dict[ticker] = open_p
+                        # Polars Tarih Eşleme Kontrolü
+                        is_matched_row = False
+                        if "Date" in df.columns:
+                            matched = df.filter(pl.col("Date").cast(pl.Utf8).str.starts_with(str(date)[:10]))
+                            if len(matched) > 0:
+                                matched_row = matched[-1]
+                                close_p = float(matched_row["Close"][0]) if "Close" in matched_row else close_p
+                                open_p = float(matched_row["Open"][0]) if "Open" in matched_row else close_p
+                                vol_v = int(matched_row["Volume"][0]) if "Volume" in matched_row else vol_v
+                                is_matched_row = True
+
+                        ref_dict[ticker] = close_p
+
+                        # Canlı Seans Fiyat Önceliği
+                        if ticker in live_price_map and (is_today_str or not is_matched_row):
+                            exec_p = live_price_map[ticker]
+                        else:
+                            exec_p = open_p if is_morning_execution else close_p
+
+                        price_dict[ticker] = exec_p
+                        next_open_dict[ticker] = exec_p
                         vol_dict[ticker] = vol_v
 
                         # 20 gunluk gecmis
@@ -473,6 +518,13 @@ class PaperTradingOrchestrator:
                     except Exception as e:
                         logger.warning("Polars row extraction failed", ticker=ticker, error=str(e))
                         continue
+
+        # Canlı seans koruması: Bugün çalıştırılıyorsa canlı fiyatı garanti et
+        if is_today_str and live_price_map:
+            for ticker in list(price_dict.keys()):
+                if ticker in live_price_map:
+                    price_dict[ticker] = live_price_map[ticker]
+                    next_open_dict[ticker] = live_price_map[ticker]
 
         return self.process_daily_cycle(
             date=date,

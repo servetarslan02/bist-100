@@ -408,6 +408,7 @@ export interface PortfolioData {
     market_value: number;
     unrealized_pnl: number;
     unrealized_pnl_pct: number;
+    daily_change_pct?: number;
     weight_pct: number;
     [key: string]: any;
   }>;

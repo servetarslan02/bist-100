@@ -391,6 +391,7 @@ class VirtualPortfolio:
     # ===================== QUERIES =====================
 
     _price_cache: dict[str, float] = {}
+    _change_cache: dict[str, float] = {}
     _price_cache_ts: float = 0.0
     _PRICE_CACHE_TTL: float = 2.0  # saniye
 
@@ -406,6 +407,7 @@ class VirtualPortfolio:
             now = time.monotonic()
             if now - self._price_cache_ts < self._PRICE_CACHE_TTL and self._price_cache:
                 price_map = self._price_cache
+                change_map = self._change_cache
             else:
                 from services.core.redis_helper import get_cached
 
@@ -416,15 +418,23 @@ class VirtualPortfolio:
                         for x in radar
                         if x.get("symbol") and x.get("price") and float(x.get("price")) > 0
                     }
+                    change_map = {
+                        x["symbol"]: float(x.get("change", 0.0))
+                        for x in radar
+                        if x.get("symbol") and x.get("change") is not None
+                    }
                     self._price_cache = price_map
+                    self._change_cache = change_map
                     self._price_cache_ts = now
                 else:
                     price_map = self._price_cache
+                    change_map = self._change_cache
             for ticker, pos in self._positions.items():
                 if ticker in price_map:
                     live_p = price_map[ticker]
                     pos["current_price"] = live_p
                     pos["market_value"] = pos["quantity"] * live_p
+                    pos["daily_change_pct"] = change_map.get(ticker, 0.0)
         except Exception:
             logger.warning("Caught Exception in _sync_live_prices", exc_info=True)
 
@@ -586,6 +596,7 @@ class VirtualPortfolio:
             pos["company_name"] = c_name
             pos["unrealized_pnl"] = round(unrealized, 2)
             pos["unrealized_pnl_pct"] = round(unrealized_pct, 2)
+            pos["daily_change_pct"] = round(float(p.get("daily_change_pct", 0.0)), 2)
             pos["weight_pct"] = round(weight, 2)
             pos["market_value"] = round(m_val, 2)
             pos["avg_cost"] = round(cost, 2)
