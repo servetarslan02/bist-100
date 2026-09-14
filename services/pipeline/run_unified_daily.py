@@ -322,7 +322,7 @@ async def run_eod_signal_cycle(target_date: str | None = None, force_rebalance: 
 
             # Sinyalleri StateStore'a PENDING olarak kaydet (Sabah Açılışında Yürütülecek)
             if queued_signals:
-                paper_orchestrator.store.save_pending_signals(queued_signals)
+                paper_orchestrator.store.save_pending_signals(queued_signals, today_str)
                 logger.info("Queued signals stored for morning execution", count=len(queued_signals))
 
         # DB Takas/Portföy Log Kaydı

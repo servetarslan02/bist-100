@@ -229,8 +229,8 @@ class PaperTradingOrchestrator:
             self._audit_no_trade(date, msg)
             return {"status": "NO_TRADE", "reason": msg, "date": date, "num_orders": 0, "num_trades": 0}
 
-        # Satış/Çıkış (SHORT) sinyalleri nakit ve limit açmak için ALIŞ'lardan (LONG) ÖNCE işletilir
-        valid_signals.sort(key=lambda s: 0 if s.get("direction") == "SHORT" else 1)
+        # Satış/Çıkış (SHORT/SELL) sinyalleri nakit ve limit açmak için ALIŞ'lardan (LONG/BUY) ÖNCE işletilir
+        valid_signals.sort(key=lambda s: 0 if s.get("direction") in ("SHORT", "SELL") else 1)
 
         # 3. Sinyal -> Risk -> Seans -> Eşleşme
         for sig in valid_signals:
@@ -616,7 +616,7 @@ class PaperTradingOrchestrator:
             market_price = float(price)
 
         # 2. Alış veya Satış Yönü & Gerçekçi Miktar Boyutlandırması (Açılış + %2 Kayma/Komisyon Tamponu)
-        if direction == "LONG":
+        if direction in ("LONG", "BUY"):
             side = "BUY"
             if ticker in self.portfolio._positions:
                 self._audit_no_trade(date, f"Already holding {ticker}", ticker)
@@ -630,7 +630,7 @@ class PaperTradingOrchestrator:
             # Gerçek açılış fiyatı + en kötü senaryo kayma tamponu ile miktar hesabı
             worst_case_exec_price = market_price * 1.02
             quantity = int((total_value * target_weight) / worst_case_exec_price) if worst_case_exec_price > 0 else 0
-        elif direction == "SHORT":
+        elif direction in ("SHORT", "SELL"):
             if ticker not in self.portfolio._positions:
                 self._audit_no_trade(date, f"No position to exit for {ticker}", ticker)
                 return {}

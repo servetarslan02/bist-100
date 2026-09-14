@@ -491,14 +491,15 @@ class PaperStateStore:
 
     # ===================== PENDING SIGNALS =====================
 
-    def save_pending_signals(self, signals: list[dict[str, Any]], date: str) -> Any:
+    def save_pending_signals(self, signals: list[dict[str, Any]], date: str | None = None) -> Any:
         """EOD (18:15) anında üretilen sinyalleri sabah seans açılışında yürütülmek üzere kaydeder (buffered — SSD dostu)."""
+        effective_date = date or datetime.now(UTC).strftime("%Y-%m-%d")
         self._buffered_write("DELETE FROM pending_signals", ())
         now_iso = datetime.now(UTC).isoformat()
         expires_dt = datetime.now(UTC) + timedelta(days=1)
         expires_iso = expires_dt.isoformat()
         for idx, sig in enumerate(signals):
-            sig_id = f"SIG_{date}_{sig.get('ticker', 'UNKNOWN')}_{idx}"
+            sig_id = f"SIG_{effective_date}_{sig.get('ticker', 'UNKNOWN')}_{idx}"
             self._buffered_write(
                 """
                 INSERT OR REPLACE INTO pending_signals (
@@ -508,7 +509,7 @@ class PaperStateStore:
             """,
                 (
                     sig_id,
-                    date,
+                    effective_date,
                     sig.get("ticker", ""),
                     sig.get("direction", "LONG"),
                     sig.get("rank", idx + 1),
